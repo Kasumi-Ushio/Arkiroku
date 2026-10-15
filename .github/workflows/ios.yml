@@ -9,6 +9,7 @@ on:
       - '.github/workflows/ios-test.yml'
       - '.github/workflows/android-test.yml'
       - '.github/workflows/cache-cleanup.yml'
+      - '.workflow/**'
   pull_request:
     branches: [main]
     paths-ignore:
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/ios-test.yml'
       - '.github/workflows/android-test.yml'
       - '.github/workflows/cache-cleanup.yml'
+      - '.workflow/**'
   workflow_dispatch:
 
 concurrency:
@@ -29,7 +31,9 @@ permissions:
 
 jobs:
   ios-debug:
-    runs-on: macos-26
+    # macos-latest (currently macos-26, default Xcode 26.6): floats to macOS 27
+    # once GitHub promotes it, so no label change is needed for the transition.
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -132,7 +136,9 @@ jobs:
           if-no-files-found: error
 
   ios-release:
-    runs-on: macos-26
+    # macos-latest (currently macos-26, default Xcode 26.6): floats to macOS 27
+    # once GitHub promotes it, so no label change is needed for the transition.
+    runs-on: macos-latest
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout

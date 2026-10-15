@@ -9,6 +9,7 @@ on:
       - '.github/workflows/android-test.yml'
       - '.github/workflows/ios-test.yml'
       - '.github/workflows/cache-cleanup.yml'
+      - '.workflow/**'
   pull_request:
     branches: [main]
     paths-ignore:
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/android-test.yml'
       - '.github/workflows/ios-test.yml'
       - '.github/workflows/cache-cleanup.yml'
+      - '.workflow/**'
   workflow_dispatch:
 
 concurrency:
