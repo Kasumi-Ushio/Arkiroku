@@ -1,18 +1,27 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
@@ -33,10 +42,13 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -52,10 +64,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.stringResource
@@ -70,7 +89,10 @@ import phitracker.composeapp.generated.resources.preload_dialog_message
 import phitracker.composeapp.generated.resources.preload_dialog_skip
 import phitracker.composeapp.generated.resources.preload_dialog_start
 import phitracker.composeapp.generated.resources.preload_dialog_title
+import phitracker.composeapp.generated.resources.profile_avatar
+import phitracker.composeapp.generated.resources.profile_set_avatar
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
+import org.kasumi321.ushio.phitracker.data.platform.rememberAvatarPicker
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportPayload
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
@@ -79,10 +101,13 @@ import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
 import org.kasumi321.ushio.phitracker.ui.glass.HomeGlassScaffold
 import org.kasumi321.ushio.phitracker.ui.glass.HomeGlassTopBar
 import org.kasumi321.ushio.phitracker.ui.glass.HomeHeaderSpec
+import org.kasumi321.ushio.phitracker.ui.glass.HomeNavMode
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.update.UpdateResultDialog
 import org.kasumi321.ushio.phitracker.ui.utils.asString
+import org.kasumi321.ushio.phitracker.ui.utils.isAtLeastMedium
 import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
+import org.kasumi321.ushio.phitracker.ui.utils.rememberWindowSizeClass
 import org.kasumi321.ushio.phitracker.ui.utils.resolve
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -130,16 +155,22 @@ private fun MainBottomBar(
     if (!reducedMotionEnabled) {
         NavigationBar(containerColor = Color.Transparent) {
             navItems.forEach { item ->
+                val selected = selectedTab == item.tab
                 NavigationBarItem(
-                    selected = selectedTab == item.tab,
+                    selected = selected,
                     onClick = { onTabSelected(item.tab) },
                     icon = {
                         Icon(
-                            imageVector = if (selectedTab == item.tab) item.selectedIcon else item.unselectedIcon,
+                            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
                             contentDescription = item.label
                         )
                     },
-                    label = { Text(item.label) }
+                    label = {
+                        Text(
+                            text = item.label,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
                 )
             }
         }
@@ -147,7 +178,8 @@ private fun MainBottomBar(
     }
 
     Surface(
-        color = Color.Transparent
+        color = Color.Transparent,
+        modifier = Modifier.navigationBarsPadding()
     ) {
         Row(
             modifier = Modifier
@@ -156,10 +188,12 @@ private fun MainBottomBar(
             horizontalArrangement = Arrangement.SpaceAround
         ) {
             navItems.forEach { item ->
+                val selected = selectedTab == item.tab
                 TextButton(onClick = { onTabSelected(item.tab) }) {
                     Text(
                         text = item.label,
-                        color = if (selectedTab == item.tab) {
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) {
                             MaterialTheme.colorScheme.primary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -168,6 +202,135 @@ private fun MainBottomBar(
                 }
             }
         }
+    }
+}
+
+/** Circular avatar pinned to the top of the rail; taps open the avatar picker. */
+@Composable
+private fun RailAvatar(
+    avatarUri: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val platformContext = LocalPlatformContext.current
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (avatarUri != null) {
+            val imageRequest = remember(platformContext, avatarUri) {
+                ImageRequest.Builder(platformContext)
+                    .data(avatarUri)
+                    .crossfade(true)
+                    .build()
+            }
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = stringResource(Res.string.profile_avatar),
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = stringResource(Res.string.profile_set_avatar),
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun MainNavigationRail(
+    navItems: List<BottomNavItem>,
+    selectedTab: HomeTab,
+    avatarUri: String?,
+    onAvatarClick: () -> Unit,
+    reducedMotionEnabled: Boolean,
+    onTabSelected: (HomeTab) -> Unit
+) {
+    // Opaque official-styled rail: tab content is physically shifted right of
+    // the rail (see HomeGlassScaffold), so nothing ever scrolls beneath it and
+    // a glass background would have nothing to blur. The trailing divider
+    // separates the rail from the content; it is part of this slot so the
+    // scaffold's measured rail width includes it.
+    Row {
+        if (!reducedMotionEnabled) {
+            NavigationRail(
+                header = { RailAvatar(avatarUri = avatarUri, onClick = onAvatarClick) }
+            ) {
+                Spacer(modifier = Modifier.weight(1f))
+                navItems.forEach { item ->
+                    val selected = selectedTab == item.tab
+                    NavigationRailItem(
+                        selected = selected,
+                        onClick = { onTabSelected(item.tab) },
+                        icon = {
+                            Icon(
+                                imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                contentDescription = item.label
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = item.label,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    )
+                }
+                // Lift the item group one tab height off the bottom edge.
+                Spacer(modifier = Modifier.height(64.dp))
+            }
+            VerticalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                modifier = Modifier.statusBarsPadding()
+            )
+            return@Row
+        }
+
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxHeight()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                RailAvatar(avatarUri = avatarUri, onClick = onAvatarClick)
+                Spacer(modifier = Modifier.weight(1f))
+                navItems.forEach { item ->
+                    val selected = selectedTab == item.tab
+                    TextButton(onClick = { onTabSelected(item.tab) }) {
+                        Text(
+                            text = item.label,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(64.dp))
+            }
+        }
+        VerticalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            modifier = Modifier.statusBarsPadding()
+        )
     }
 }
 
@@ -190,6 +353,8 @@ fun MainScreen(
     val selectedTab = tabState.selected
     val tip = remember(selectedTab) { viewModel.getRandomTip() }
     val reducedMotionEnabled = rememberReducedMotionEnabled()
+    val windowSizeClass = rememberWindowSizeClass()
+    val navMode = if (windowSizeClass.isAtLeastMedium()) HomeNavMode.Rail else HomeNavMode.BottomBar
 
     val navItems = listOf(
         BottomNavItem(HomeTab.Profile, stringResource(Res.string.home_tab_profile), Icons.Filled.Home, Icons.Outlined.Home),
@@ -197,6 +362,8 @@ fun MainScreen(
         BottomNavItem(HomeTab.Songs, stringResource(Res.string.home_tab_songs), Icons.Filled.MusicNote, Icons.Outlined.MusicNote),
         BottomNavItem(HomeTab.Tools, stringResource(Res.string.home_tab_tools), Icons.Filled.Build, Icons.Outlined.Build)
     )
+
+    val launchAvatarPicker = rememberAvatarPicker { uri -> uri?.let(viewModel::setAvatarUri) }
 
     LaunchedEffect(state.sync.isLoggedOut) {
         if (state.sync.isLoggedOut) onLogout()
@@ -308,12 +475,19 @@ fun MainScreen(
     // ViewModel); scrolling away from the top auto-collapses, returning to the
     // top re-expands only when the user did not explicitly collapse
     val b30ListState = rememberLazyListState()
+    val b30GridState = rememberLazyGridState()
+    val b30UseGrid = windowSizeClass.isAtLeastMedium()
     var b30UserCollapsed by rememberSaveable { mutableStateOf(false) }
     var b30UserExpanded by rememberSaveable { mutableStateOf(false) }
-    val b30AtTop by remember {
+    val b30AtTop by remember(b30UseGrid) {
         derivedStateOf {
-            b30ListState.firstVisibleItemIndex == 0 &&
-                b30ListState.firstVisibleItemScrollOffset < 48
+            if (b30UseGrid) {
+                b30GridState.firstVisibleItemIndex == 0 &&
+                    b30GridState.firstVisibleItemScrollOffset < 48
+            } else {
+                b30ListState.firstVisibleItemIndex == 0 &&
+                    b30ListState.firstVisibleItemScrollOffset < 48
+            }
         }
     }
     LaunchedEffect(b30AtTop) {
@@ -334,16 +508,25 @@ fun MainScreen(
     // the top right; tapping the icon reopens the full search field until the
     // list returns to the top
     val songsListState = rememberLazyListState()
-    val songsAtTop by remember {
+    val songsGridState = rememberLazyGridState()
+    val songsUseGrid = windowSizeClass.isAtLeastMedium()
+    val songsAtTop by remember(songsUseGrid) {
         derivedStateOf {
-            songsListState.firstVisibleItemIndex == 0 &&
-                songsListState.firstVisibleItemScrollOffset < 48
+            if (songsUseGrid) {
+                songsGridState.firstVisibleItemIndex == 0 &&
+                    songsGridState.firstVisibleItemScrollOffset < 48
+            } else {
+                songsListState.firstVisibleItemIndex == 0 &&
+                    songsListState.firstVisibleItemScrollOffset < 48
+            }
         }
     }
     var songsSearchOpen by remember { mutableStateOf(false) }
     // Any scroll while the reopened search field is visible collapses it again
-    LaunchedEffect(songsListState.isScrollInProgress) {
-        if (songsListState.isScrollInProgress) songsSearchOpen = false
+    val songsScrollInProgress =
+        if (songsUseGrid) songsGridState.isScrollInProgress else songsListState.isScrollInProgress
+    LaunchedEffect(songsScrollInProgress) {
+        if (songsScrollInProgress) songsSearchOpen = false
     }
     // Armed only by the search icon: an icon-triggered reopening focuses the
     // field (raising the IME), while automatic re-expansion when the list
@@ -373,6 +556,7 @@ fun MainScreen(
 
     HomeGlassScaffold(
         snackbarHostState = snackbarHostState,
+        navMode = navMode,
         topBar = { hazeState, glassStyle ->
             // Keep the bottom edge blurred while the songs search field is
             // expanded, so the field never sits on the faded-out gradient tail
@@ -434,14 +618,24 @@ fun MainScreen(
                 }
             }
         },
-        bottomBar = { hazeState, glassStyle ->
-            GlassBottomBar(hazeState = hazeState, style = glassStyle) {
-                MainBottomBar(
+        navigationBar = { hazeState, glassStyle ->
+            when (navMode) {
+                HomeNavMode.Rail -> MainNavigationRail(
                     navItems = navItems,
                     selectedTab = selectedTab,
+                    avatarUri = state.profile.avatarUri,
+                    onAvatarClick = { launchAvatarPicker() },
                     reducedMotionEnabled = reducedMotionEnabled,
                     onTabSelected = tabState::select
                 )
+                else -> GlassBottomBar(hazeState = hazeState, style = glassStyle) {
+                    MainBottomBar(
+                        navItems = navItems,
+                        selectedTab = selectedTab,
+                        reducedMotionEnabled = reducedMotionEnabled,
+                        onTabSelected = tabState::select
+                    )
+                }
             }
         }
     ) { contentPadding ->
@@ -501,6 +695,8 @@ fun MainScreen(
                 },
                 contentPadding = contentPadding,
                 listState = b30ListState,
+                useGrid = b30UseGrid,
+                gridState = b30GridState,
                 onRetryTagAnalysis = { viewModel.retryTagAnalysis() }
             )
             HomeTab.Songs -> {
@@ -533,7 +729,9 @@ fun MainScreen(
                         getIllustrationUrl = { viewModel.getLowIllustrationUrl(it) },
                         onSongClick = { songId, _ -> onNavigateToSongDetail(songId) },
                         contentPadding = contentPadding,
-                        listState = songsListState
+                        listState = songsListState,
+                        useGrid = songsUseGrid,
+                        gridState = songsGridState
                     )
                     // The progress card floats below the glass top bar instead of
                     // scrolling with the list, so the pull gesture collapsing the

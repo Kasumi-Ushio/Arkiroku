@@ -143,140 +143,145 @@ fun ProfileTab(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp)
     ) {
-        Spacer(modifier = Modifier.height(contentPadding.calculateTopPadding()))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(contentPadding.calculateTopPadding()))
 
-        if (!isLoggedIn) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                )
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text(
-                        text = stringResource(Res.string.profile_guest_title),
-                        style = MaterialTheme.typography.titleMedium
+            if (!isLoggedIn) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(Res.string.profile_guest_message),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = onNavigateToLogin, modifier = Modifier.align(Alignment.End)) {
-                        Text(stringResource(Res.string.action_go_login))
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text(
+                            text = stringResource(Res.string.profile_guest_title),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(Res.string.profile_guest_message),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = onNavigateToLogin, modifier = Modifier.align(Alignment.End)) {
+                            Text(stringResource(Res.string.action_go_login))
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        ProfileHeaderCard(
-            nickname = nickname,
-            displayRks = displayRks,
-            challengeModeRank = challengeModeRank,
-            moneyString = moneyString,
-            avatarUri = avatarUri,
-            onAvatarClick = { launchPicker() },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        StatsTableCard(
-            clearCounts = clearCounts,
-            fcCount = fcCount,
-            phiCount = phiCount,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        if (histogram != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    B30RksHistogramChart(
-                        histogram = histogram,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
-        if (gameUpdateInfo != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            GameUpdateInfoCard(
-                info = gameUpdateInfo,
+            ProfileHeaderCard(
+                nickname = nickname,
+                displayRks = displayRks,
+                challengeModeRank = challengeModeRank,
+                moneyString = moneyString,
+                avatarUri = avatarUri,
+                onAvatarClick = { launchPicker() },
                 modifier = Modifier.fillMaxWidth()
             )
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        Text(
-            text = stringResource(Res.string.profile_recent_sync),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        if (lastSyncTime != null) {
-            val formattedTime = epochMillisToDateTimeString(lastSyncTime)
-            Text(
-                text = stringResource(Res.string.profile_sync_time, formattedTime),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
+            StatsTableCard(
+                clearCounts = clearCounts,
+                fcCount = fcCount,
+                phiCount = phiCount,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            if (recentSyncedRecords.isNotEmpty()) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (histogram != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    recentSyncedRecords.forEachIndexed { index, record ->
-                        ScoreCard(
-                            rank = index + 1,
-                            record = record,
-                            illustrationUrl = getIllustrationUrl(record.songId),
-                            onSongClick = onSongClick
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        B30RksHistogramChart(
+                            histogram = histogram,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
-            } else {
-                Text(
-                    text = stringResource(Res.string.profile_no_score_changes),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
             }
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
-            ) {
-                Text(
-                    text = stringResource(Res.string.profile_never_synced),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(24.dp)
-                )
-            }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
-        Spacer(modifier = Modifier.height(contentPadding.calculateBottomPadding()))
+            if (gameUpdateInfo != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                GameUpdateInfoCard(
+                    info = gameUpdateInfo,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = stringResource(Res.string.profile_recent_sync),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            if (lastSyncTime != null) {
+                val formattedTime = epochMillisToDateTimeString(lastSyncTime)
+                Text(
+                    text = stringResource(Res.string.profile_sync_time, formattedTime),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                if (recentSyncedRecords.isNotEmpty()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        recentSyncedRecords.forEachIndexed { index, record ->
+                            ScoreCard(
+                                rank = index + 1,
+                                record = record,
+                                illustrationUrl = getIllustrationUrl(record.songId),
+                                onSongClick = onSongClick
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = stringResource(Res.string.profile_no_score_changes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                ) {
+                    Text(
+                        text = stringResource(Res.string.profile_never_synced),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(contentPadding.calculateBottomPadding()))
+        }
     }
 }
 

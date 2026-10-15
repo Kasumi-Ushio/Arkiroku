@@ -383,103 +383,174 @@ fun SettingsTab(
                                         top = innerPadding.calculateTopPadding(),
                                         bottom = innerPadding.calculateBottomPadding()
                                 )
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            CategoryTitle(stringResource(Res.string.settings_category_interface_theme))
-
-            val themeOptions =
-                    listOf(
-                            stringResource(Res.string.settings_theme_follow_system),
-                            stringResource(Res.string.settings_theme_light),
-                            stringResource(Res.string.settings_theme_dark),
-                            stringResource(Res.string.settings_theme_amoled)
-                    )
-            var expandedTheme by remember { mutableStateOf(false) }
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Column(
+                    modifier =
+                            Modifier.fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Text(
-                        stringResource(Res.string.settings_dark_mode),
-                        style = MaterialTheme.typography.bodyLarge
-                )
-                Box {
-                    TextButton(onClick = { expandedTheme = true }) {
-                        Text(themeOptions.getOrElse(themeMode) { themeOptions[0] })
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                    }
-                    DropdownMenu(
-                            expanded = expandedTheme,
-                            onDismissRequest = { expandedTheme = false }
-                    ) {
-                        themeOptions.forEachIndexed { index, title ->
-                            DropdownMenuItem(
-                                    text = { Text(title) },
-                                    onClick = {
-                                        onThemeModeChange(index)
-                                        expandedTheme = false
-                                    }
-                            )
-                        }
-                    }
-                }
-            }
+                CategoryTitle(stringResource(Res.string.settings_category_interface_theme))
 
-            val languageOptions =
-                    listOf(
-                            SettingsConstants.LANGUAGE_SYSTEM to stringResource(Res.string.settings_language_follow_system),
-                            SettingsConstants.LANGUAGE_ENGLISH to "English",
-                            SettingsConstants.LANGUAGE_ZH_HANS to "简体中文",
-                            SettingsConstants.LANGUAGE_ZH_HANT to "繁體中文"
-                    )
-            var expandedLanguage by remember { mutableStateOf(false) }
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                        stringResource(Res.string.settings_language_title),
-                        style = MaterialTheme.typography.bodyLarge
-                )
-                Box {
-                    TextButton(onClick = { expandedLanguage = true }) {
-                        Text(
-                                languageOptions
-                                        .firstOrNull { it.first == appLanguage }
-                                        ?.second
-                                        ?: languageOptions[0].second
-                        )
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                    }
-                    DropdownMenu(
-                            expanded = expandedLanguage,
-                            onDismissRequest = { expandedLanguage = false }
-                    ) {
-                        languageOptions.forEach { (tag, label) ->
-                            DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        onAppLanguageChange(tag)
-                                        expandedLanguage = false
-                                    }
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (shouldShowThemeColorSourceSetting) {
-                val colorSourceOptions =
+                val themeOptions =
                         listOf(
-                                THEME_COLOR_SOURCE_SYSTEM to
-                                        stringResource(Res.string.settings_color_source_default),
-                                THEME_COLOR_SOURCE_IMAGE to
-                                        stringResource(Res.string.settings_color_source_image)
+                                stringResource(Res.string.settings_theme_follow_system),
+                                stringResource(Res.string.settings_theme_light),
+                                stringResource(Res.string.settings_theme_dark),
+                                stringResource(Res.string.settings_theme_amoled)
                         )
+                var expandedTheme by remember { mutableStateOf(false) }
+
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                            stringResource(Res.string.settings_dark_mode),
+                            style = MaterialTheme.typography.bodyLarge
+                    )
+                    Box {
+                        TextButton(onClick = { expandedTheme = true }) {
+                            Text(themeOptions.getOrElse(themeMode) { themeOptions[0] })
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(
+                                expanded = expandedTheme,
+                                onDismissRequest = { expandedTheme = false }
+                        ) {
+                            themeOptions.forEachIndexed { index, title ->
+                                DropdownMenuItem(
+                                        text = { Text(title) },
+                                        onClick = {
+                                            onThemeModeChange(index)
+                                            expandedTheme = false
+                                        }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                val languageOptions =
+                        listOf(
+                                SettingsConstants.LANGUAGE_SYSTEM to stringResource(Res.string.settings_language_follow_system),
+                                SettingsConstants.LANGUAGE_ENGLISH to "English",
+                                SettingsConstants.LANGUAGE_ZH_HANS to "简体中文",
+                                SettingsConstants.LANGUAGE_ZH_HANT to "繁體中文"
+                        )
+                var expandedLanguage by remember { mutableStateOf(false) }
+
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                            stringResource(Res.string.settings_language_title),
+                            style = MaterialTheme.typography.bodyLarge
+                    )
+                    Box {
+                        TextButton(onClick = { expandedLanguage = true }) {
+                            Text(
+                                    languageOptions
+                                            .firstOrNull { it.first == appLanguage }
+                                            ?.second
+                                            ?: languageOptions[0].second
+                            )
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(
+                                expanded = expandedLanguage,
+                                onDismissRequest = { expandedLanguage = false }
+                        ) {
+                            languageOptions.forEach { (tag, label) ->
+                                DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            onAppLanguageChange(tag)
+                                            expandedLanguage = false
+                                        }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (shouldShowThemeColorSourceSetting) {
+                    val colorSourceOptions =
+                            listOf(
+                                    THEME_COLOR_SOURCE_SYSTEM to
+                                            stringResource(Res.string.settings_color_source_default),
+                                    THEME_COLOR_SOURCE_IMAGE to
+                                            stringResource(Res.string.settings_color_source_image)
+                            )
+
+                    Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                    stringResource(Res.string.settings_theme_color_source),
+                                    style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                    text =
+                                            if (themeColorSource == THEME_COLOR_SOURCE_IMAGE &&
+                                                            themeImageSeedColorArgb != null
+                                            ) {
+                                                stringResource(
+                                                        Res.string.settings_theme_color_extracted_subtitle
+                                                )
+                                            } else {
+                                                stringResource(
+                                                        Res.string.settings_theme_color_source_desc
+                                                )
+                                            },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Box {
+                            TextButton(onClick = { expandedColorSource = true }) {
+                                Text(
+                                        colorSourceOptions
+                                                .firstOrNull { it.first == themeColorSource }
+                                                ?.second
+                                                ?: stringResource(
+                                                        Res.string.settings_color_source_default
+                                                )
+                                )
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                            DropdownMenu(
+                                    expanded = expandedColorSource,
+                                    onDismissRequest = { expandedColorSource = false }
+                            ) {
+                                DropdownMenuItem(
+                                        text = {
+                                            Text(stringResource(Res.string.settings_color_source_default))
+                                        },
+                                        onClick = {
+                                            onThemeImageColorClear()
+                                            onThemeColorSourceChange(THEME_COLOR_SOURCE_SYSTEM)
+                                            expandedColorSource = false
+                                        }
+                                )
+                                DropdownMenuItem(
+                                        text = {
+                                            Text(stringResource(Res.string.settings_color_source_image))
+                                        },
+                                        onClick = {
+                                            expandedColorSource = false
+                                            pickThemeImageColor()
+                                        }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -488,645 +559,579 @@ fun SettingsTab(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                                stringResource(Res.string.settings_theme_color_source),
+                                stringResource(Res.string.settings_palette_style),
                                 style = MaterialTheme.typography.bodyLarge
                         )
                         Text(
-                                text =
-                                        if (themeColorSource == THEME_COLOR_SOURCE_IMAGE &&
-                                                        themeImageSeedColorArgb != null
-                                        ) {
-                                            stringResource(
-                                                    Res.string.settings_theme_color_extracted_subtitle
-                                            )
-                                        } else {
-                                            stringResource(
-                                                    Res.string.settings_theme_color_source_desc
-                                            )
-                                        },
+                                text = stringResource(Res.string.settings_palette_style_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Box {
-                        TextButton(onClick = { expandedColorSource = true }) {
-                            Text(
-                                    colorSourceOptions
-                                            .firstOrNull { it.first == themeColorSource }
-                                            ?.second
-                                            ?: stringResource(
-                                                    Res.string.settings_color_source_default
-                                            )
-                            )
+                        TextButton(onClick = { expandedPaletteStyle = true }) {
+                            Text(paletteStyleName)
                             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                         }
                         DropdownMenu(
-                                expanded = expandedColorSource,
-                                onDismissRequest = { expandedColorSource = false }
+                                expanded = expandedPaletteStyle,
+                                onDismissRequest = { expandedPaletteStyle = false }
                         ) {
-                            DropdownMenuItem(
-                                    text = {
-                                        Text(stringResource(Res.string.settings_color_source_default))
-                                    },
-                                    onClick = {
-                                        onThemeImageColorClear()
-                                        onThemeColorSourceChange(THEME_COLOR_SOURCE_SYSTEM)
-                                        expandedColorSource = false
-                                    }
-                            )
-                            DropdownMenuItem(
-                                    text = {
-                                        Text(stringResource(Res.string.settings_color_source_image))
-                                    },
-                                    onClick = {
-                                        expandedColorSource = false
-                                        pickThemeImageColor()
-                                    }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            stringResource(Res.string.settings_palette_style),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                            text = stringResource(Res.string.settings_palette_style_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Box {
-                    TextButton(onClick = { expandedPaletteStyle = true }) {
-                        Text(paletteStyleName)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                    }
-                    DropdownMenu(
-                            expanded = expandedPaletteStyle,
-                            onDismissRequest = { expandedPaletteStyle = false }
-                    ) {
-                        PaletteStyle.entries.forEach { style ->
-                            DropdownMenuItem(
-                                    text = { Text(style.name) },
-                                    onClick = {
-                                        onPaletteStyleNameChange(style.name)
-                                        expandedPaletteStyle = false
-                                    }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            stringResource(Res.string.settings_haze_blur),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                            text = stringResource(Res.string.settings_haze_blur_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(checked = hazeBlurEnabled, onCheckedChange = { onHazeBlurEnabledChange(it) })
-            }
-
-            if (hazeBlurEnabled) {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(stringResource(Res.string.settings_blur_strength))
-                        Text(
-                                text = "${(hazeBlurStrength * 100).roundToInt()}%",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                            value = hazeBlurStrength,
-                            onValueChange = { onHazeBlurStrengthChange(it) },
-                            valueRange =
-                                    SettingsConstants.HAZE_STRENGTH_MIN..SettingsConstants
-                                            .HAZE_STRENGTH_MAX,
-                            steps = SettingsConstants.HAZE_SLIDER_STEPS,
-                            modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-            CategoryTitle(stringResource(Res.string.settings_category_b30))
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            stringResource(Res.string.settings_show_overflow),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                            text = stringResource(Res.string.settings_show_overflow_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(checked = showB30Overflow, onCheckedChange = { onShowB30OverflowChange(it) })
-            }
-
-            if (showB30Overflow) {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(stringResource(Res.string.settings_overflow_count))
-                        Text(
-                                text = overflowCount.toString(),
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                            value = overflowCount.toFloat(),
-                            onValueChange = { onOverflowCountChange(it.roundToInt()) },
-                            valueRange =
-                                    SettingsConstants.OVERFLOW_COUNT_MIN
-                                            .toFloat()..SettingsConstants.OVERFLOW_COUNT_MAX
-                                            .toFloat(),
-                            steps = SettingsConstants.OVERFLOW_SLIDER_STEPS,
-                            modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-            CategoryTitle(stringResource(Res.string.settings_category_score_api))
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            stringResource(Res.string.settings_enable_score_api),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                            text = stringResource(Res.string.settings_enable_score_api_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                        checked = apiEnabled,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                showApiRiskDialog = true
-                            } else {
-                                onApiEnabledChange(false)
+                            PaletteStyle.entries.forEach { style ->
+                                DropdownMenuItem(
+                                        text = { Text(style.name) },
+                                        onClick = {
+                                            onPaletteStyleNameChange(style.name)
+                                            expandedPaletteStyle = false
+                                        }
+                                )
                             }
                         }
-                )
-            }
-
-            if (apiEnabled) {
-                val credentialsConfigured = apiPlatform.isNotBlank() &&
-                        apiPlatformId.isNotBlank() && apiUserId.isNotBlank() && apiToken.isNotBlank()
-
-                CenteredListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.settings_api_credentials))
-                        },
-                        supportingContent = {
-                            Text(
-                                    text =
-                                            if (credentialsConfigured)
-                                                    stringResource(
-                                                            Res.string.settings_api_credentials_configured
-                                                    )
-                                            else
-                                                    stringResource(
-                                                            Res.string.settings_api_credentials_not_configured
-                                                    ),
-                                    style = MaterialTheme.typography.bodySmall
-                            )
-                        },
-                        modifier = Modifier.clickable { showApiCredentialDialog = true }
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
 
                 Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                                stringResource(Res.string.settings_use_api_data),
+                                stringResource(Res.string.settings_haze_blur),
                                 style = MaterialTheme.typography.bodyLarge
                         )
                         Text(
-                                text = stringResource(Res.string.settings_use_api_data_desc),
+                                text = stringResource(Res.string.settings_haze_blur_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Switch(checked = useApiData, onCheckedChange = onUseApiDataChange)
+                    Switch(checked = hazeBlurEnabled, onCheckedChange = { onHazeBlurEnabledChange(it) })
+                }
+
+                if (hazeBlurEnabled) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(stringResource(Res.string.settings_blur_strength))
+                            Text(
+                                    text = "${(hazeBlurStrength * 100).roundToInt()}%",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Slider(
+                                value = hazeBlurStrength,
+                                onValueChange = { onHazeBlurStrengthChange(it) },
+                                valueRange =
+                                        SettingsConstants.HAZE_STRENGTH_MIN..SettingsConstants
+                                                .HAZE_STRENGTH_MAX,
+                                steps = SettingsConstants.HAZE_SLIDER_STEPS,
+                                modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                CategoryTitle(stringResource(Res.string.settings_category_b30))
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                stringResource(Res.string.settings_show_overflow),
+                                style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                                text = stringResource(Res.string.settings_show_overflow_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = showB30Overflow, onCheckedChange = { onShowB30OverflowChange(it) })
+                }
+
+                if (showB30Overflow) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(stringResource(Res.string.settings_overflow_count))
+                            Text(
+                                    text = overflowCount.toString(),
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Slider(
+                                value = overflowCount.toFloat(),
+                                onValueChange = { onOverflowCountChange(it.roundToInt()) },
+                                valueRange =
+                                        SettingsConstants.OVERFLOW_COUNT_MIN
+                                                .toFloat()..SettingsConstants.OVERFLOW_COUNT_MAX
+                                                .toFloat(),
+                                steps = SettingsConstants.OVERFLOW_SLIDER_STEPS,
+                                modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                CategoryTitle(stringResource(Res.string.settings_category_score_api))
+
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                stringResource(Res.string.settings_enable_score_api),
+                                style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                                text = stringResource(Res.string.settings_enable_score_api_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                            checked = apiEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    showApiRiskDialog = true
+                                } else {
+                                    onApiEnabledChange(false)
+                                }
+                            }
+                    )
+                }
+
+                if (apiEnabled) {
+                    val credentialsConfigured = apiPlatform.isNotBlank() &&
+                            apiPlatformId.isNotBlank() && apiUserId.isNotBlank() && apiToken.isNotBlank()
+
+                    CenteredListItem(
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_api_credentials))
+                            },
+                            supportingContent = {
+                                Text(
+                                        text =
+                                                if (credentialsConfigured)
+                                                        stringResource(
+                                                                Res.string.settings_api_credentials_configured
+                                                        )
+                                                else
+                                                        stringResource(
+                                                                Res.string.settings_api_credentials_not_configured
+                                                        ),
+                                        style = MaterialTheme.typography.bodySmall
+                                )
+                            },
+                            modifier = Modifier.clickable { showApiCredentialDialog = true }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                    stringResource(Res.string.settings_use_api_data),
+                                    style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                    text = stringResource(Res.string.settings_use_api_data_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = useApiData, onCheckedChange = onUseApiDataChange)
+                    }
+
+                    Text(
+                            text = stringResource(Res.string.settings_api_data_disclaimer),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                CategoryTitle(stringResource(Res.string.settings_category_updates))
+
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                stringResource(Res.string.settings_auto_check_update),
+                                style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                                text = stringResource(Res.string.settings_auto_check_update_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = autoCheckUpdate, onCheckedChange = { onAutoCheckUpdateChange(it) })
+                }
+
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                stringResource(Res.string.settings_auto_check_song_data_update),
+                                style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                                text = stringResource(Res.string.settings_auto_check_song_data_update_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                            checked = autoCheckSongDataUpdate,
+                            onCheckedChange = { onAutoCheckSongDataUpdateChange(it) }
+                    )
+                }
+
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                stringResource(Res.string.settings_include_prerelease),
+                                style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                                text = stringResource(Res.string.settings_include_prerelease_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                            checked = includePreRelease,
+                            onCheckedChange = { onIncludePreReleaseChange(it) }
+                    )
                 }
 
                 Text(
-                        text = stringResource(Res.string.settings_api_data_disclaimer),
+                        text = stringResource(Res.string.settings_prerelease_notice),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-            CategoryTitle(stringResource(Res.string.settings_category_updates))
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            stringResource(Res.string.settings_auto_check_update),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                            text = stringResource(Res.string.settings_auto_check_update_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(checked = autoCheckUpdate, onCheckedChange = { onAutoCheckUpdateChange(it) })
-            }
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            stringResource(Res.string.settings_auto_check_song_data_update),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                            text = stringResource(Res.string.settings_auto_check_song_data_update_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                        checked = autoCheckSongDataUpdate,
-                        onCheckedChange = { onAutoCheckSongDataUpdateChange(it) }
-                )
-            }
-
-            Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            stringResource(Res.string.settings_include_prerelease),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                            text = stringResource(Res.string.settings_include_prerelease_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                        checked = includePreRelease,
-                        onCheckedChange = { onIncludePreReleaseChange(it) }
-                )
-            }
-
-            Text(
-                    text = stringResource(Res.string.settings_prerelease_notice),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-            CategoryTitle(stringResource(Res.string.settings_category_data_cache))
-
-            CenteredListItem(
-                    headlineContent = {
-                        Text(stringResource(Res.string.settings_cache_b30_artwork))
-                    },
-                    supportingContent = {
-                        if (isCachingB30Artwork) {
-                            Text(
-                                    stringResource(
-                                            Res.string.settings_caching_progress,
-                                            b30ArtworkCacheCompleted,
-                                            b30ArtworkCacheTotal
-                                    )
-                            )
-                        } else {
-                            Text(
-                                    stringResource(Res.string.settings_cache_b30_artwork_desc)
-                            )
-                        }
-                    },
-                    leadingContent = {
-                        if (isCachingB30Artwork) {
-                            CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(Icons.Default.CloudDownload, contentDescription = null)
-                        }
-                    },
-                    modifier =
-                            Modifier.clickable(enabled = !isCachingB30Artwork) {
-                                onCacheB30Artwork { result ->
-                                    if (result.isSuccess) {
-                                        showPlatformMessage(artworkPreloadDoneMessage)
-                                    } else {
-                                        showPlatformMessage(artworkPreloadFailedMessage)
-                                    }
-                                }
-                            }
-            )
-
-            CenteredListItem(
-                    headlineContent = {
-                        Text(stringResource(Res.string.settings_clear_artwork_cache))
-                    },
-                    supportingContent = {
-                        Text(stringResource(Res.string.settings_clear_artwork_cache_desc))
-                    },
-                    leadingContent = { Icon(Icons.Default.DeleteSweep, contentDescription = null) },
-                    modifier = Modifier.clickable { showClearCacheDialog = true }
-            )
-
-            CenteredListItem(
-                    headlineContent = {
-                        Text(stringResource(Res.string.settings_redownload_artwork))
-                    },
-                    supportingContent = {
-                        Text(stringResource(Res.string.settings_redownload_artwork_desc))
-                    },
-                    leadingContent = {
-                        Icon(
-                                Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    modifier = Modifier.clickable { showRedownloadDialog = true }
-            )
-
-            CenteredListItem(
-                    headlineContent = { Text(stringResource(Res.string.settings_update_song_data)) },
-                    supportingContent = {
-                        Text(stringResource(Res.string.settings_update_song_data_desc))
-                    },
-                    leadingContent = {
-                        Icon(Icons.Default.CloudDownload, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable { showUpdateDataDialog = true }
-            )
-
-            if (isDebugBuild) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-                CategoryTitle(stringResource(Res.string.settings_category_debug))
+                CategoryTitle(stringResource(Res.string.settings_category_data_cache))
 
                 CenteredListItem(
                         headlineContent = {
-                            Text(stringResource(Res.string.settings_crash_notification_permission))
+                            Text(stringResource(Res.string.settings_cache_b30_artwork))
                         },
                         supportingContent = {
-                            if (notificationPermissionGranted) {
+                            if (isCachingB30Artwork) {
                                 Text(
                                         stringResource(
-                                                Res.string.settings_crash_notification_granted
+                                                Res.string.settings_caching_progress,
+                                                b30ArtworkCacheCompleted,
+                                                b30ArtworkCacheTotal
                                         )
                                 )
                             } else {
                                 Text(
-                                        stringResource(
-                                                Res.string.settings_crash_notification_denied
-                                        )
+                                        stringResource(Res.string.settings_cache_b30_artwork_desc)
                                 )
                             }
                         },
-                        leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
-                        modifier =
-                                Modifier.clickable {
-                                    requestCrashNotificationPermission { granted ->
-                                        notificationPermissionGranted = granted
-                                        if (!granted) {
-                                            showPlatformMessage(
-                                                    notificationPermissionDeniedMessage
-                                            )
-                                        }
-                                    }
-                                }
-                )
-
-                CenteredListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.settings_export_runtime_log))
-                        },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_export_runtime_log_desc))
-                        },
                         leadingContent = {
-                            Icon(Icons.Default.BugReport, contentDescription = null)
-                        },
-                        modifier =
-                                Modifier.clickable {
-                                    if (!hasRuntimeLogs) {
-                                        showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
-                                        return@clickable
-                                    }
-                                    val text = onExportRuntimeLog()
-                                    if (text.isBlank()) {
-                                        showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
-                                        return@clickable
-                                    }
-                                    coroutineScope.launch {
-                                        val result =
-                                                shareTextLog(text, "phitracker_runtime_logs.txt")
-                                        if (result.isFailure) {
-                                            showPlatformAlert(
-                                                    exportRuntimeLogFailedTitle,
-                                                    getString(
-                                                            Res.string
-                                                                    .settings_export_runtime_failed_message,
-                                                            result.exceptionOrNull()?.message
-                                                                    ?: exportFailedUnknownError
-                                                    )
-                                            )
-                                        }
-                                    }
-                                }
-                )
-
-                CenteredListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.settings_export_crash_log))
-                        },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_export_crash_log_desc))
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.BugReport, contentDescription = null)
-                        },
-                        modifier =
-                                Modifier.clickable {
-                                    if (!hasCrashLogs) {
-                                        showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
-                                        return@clickable
-                                    }
-                                    val text = onExportCrashLog()
-                                    if (text.isBlank()) {
-                                        showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
-                                        return@clickable
-                                    }
-                                    coroutineScope.launch {
-                                        val result =
-                                                shareTextLog(text, "phitracker_crash_reports.txt")
-                                        if (result.isFailure) {
-                                            showPlatformAlert(
-                                                    exportCrashLogFailedTitle,
-                                                    getString(
-                                                            Res.string
-                                                                    .settings_export_crash_failed_message,
-                                                            result.exceptionOrNull()?.message
-                                                                    ?: exportFailedUnknownError
-                                                    )
-                                            )
-                                        }
-                                    }
-                                }
-                )
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_clear_logs)) },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_clear_logs_desc))
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = null)
-                        },
-                        modifier =
-                                Modifier.clickable {
-                                    val ok = onClearAllLogs()
-                                    if (ok) {
-                                        showPlatformAlert(
-                                                clearLogsDoneTitle,
-                                                clearLogsDoneMessage
-                                        )
-                                    } else {
-                                        showPlatformAlert(
-                                                clearLogsFailedTitle,
-                                                clearLogsFailedMessage
-                                        )
-                                    }
-                                }
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-            CategoryTitle(stringResource(Res.string.settings_category_about))
-
-            CenteredListItem(
-                    headlineContent = { Text(stringResource(Res.string.settings_check_update)) },
-                    supportingContent = {
-                        when (val state = updateCheckState) {
-                            is UpdateCheckState.Checking ->
-                                Text(stringResource(Res.string.settings_checking_update))
-                            is UpdateCheckState.NoUpdate ->
-                                Text(stringResource(Res.string.settings_already_latest))
-                            is UpdateCheckState.Error ->
-                                Text(
-                                        stringResource(
-                                                Res.string.settings_check_update_failed,
-                                                state.message
-                                        )
+                            if (isCachingB30Artwork) {
+                                CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
                                 )
-                            else ->
-                                Text(stringResource(Res.string.settings_check_update_desc))
-                        }
-                    },
-                    leadingContent = {
-                        if (updateCheckState is UpdateCheckState.Checking) {
-                            CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp
+                            } else {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null)
+                            }
+                        },
+                        modifier =
+                                Modifier.clickable(enabled = !isCachingB30Artwork) {
+                                    onCacheB30Artwork { result ->
+                                        if (result.isSuccess) {
+                                            showPlatformMessage(artworkPreloadDoneMessage)
+                                        } else {
+                                            showPlatformMessage(artworkPreloadFailedMessage)
+                                        }
+                                    }
+                                }
+                )
+
+                CenteredListItem(
+                        headlineContent = {
+                            Text(stringResource(Res.string.settings_clear_artwork_cache))
+                        },
+                        supportingContent = {
+                            Text(stringResource(Res.string.settings_clear_artwork_cache_desc))
+                        },
+                        leadingContent = { Icon(Icons.Default.DeleteSweep, contentDescription = null) },
+                        modifier = Modifier.clickable { showClearCacheDialog = true }
+                )
+
+                CenteredListItem(
+                        headlineContent = {
+                            Text(stringResource(Res.string.settings_redownload_artwork))
+                        },
+                        supportingContent = {
+                            Text(stringResource(Res.string.settings_redownload_artwork_desc))
+                        },
+                        leadingContent = {
+                            Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
                             )
-                        } else {
+                        },
+                        modifier = Modifier.clickable { showRedownloadDialog = true }
+                )
+
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.settings_update_song_data)) },
+                        supportingContent = {
+                            Text(stringResource(Res.string.settings_update_song_data_desc))
+                        },
+                        leadingContent = {
                             Icon(Icons.Default.CloudDownload, contentDescription = null)
-                        }
-                    },
-                    modifier =
-                            Modifier.clickable(
-                                    enabled = updateCheckState !is UpdateCheckState.Checking
-                            ) { onCheckForUpdate() }
-            )
+                        },
+                        modifier = Modifier.clickable { showUpdateDataDialog = true }
+                )
 
-            Spacer(modifier = Modifier.height(4.dp))
+                if (isDebugBuild) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-            CenteredListItem(
-                    headlineContent = { Text(stringResource(Res.string.settings_about_app)) },
-                    supportingContent = {
-                        Text(stringResource(Res.string.settings_about_app_desc))
-                    },
-                    leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable { onNavigateToAbout() }
-            )
+                    CategoryTitle(stringResource(Res.string.settings_category_debug))
 
-            Spacer(modifier = Modifier.height(16.dp))
+                    CenteredListItem(
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_crash_notification_permission))
+                            },
+                            supportingContent = {
+                                if (notificationPermissionGranted) {
+                                    Text(
+                                            stringResource(
+                                                    Res.string.settings_crash_notification_granted
+                                            )
+                                    )
+                                } else {
+                                    Text(
+                                            stringResource(
+                                                    Res.string.settings_crash_notification_denied
+                                            )
+                                    )
+                                }
+                            },
+                            leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
+                            modifier =
+                                    Modifier.clickable {
+                                        requestCrashNotificationPermission { granted ->
+                                            notificationPermissionGranted = granted
+                                            if (!granted) {
+                                                showPlatformMessage(
+                                                        notificationPermissionDeniedMessage
+                                                )
+                                            }
+                                        }
+                                    }
+                    )
 
-            OutlinedButton(
-                    onClick = { showLogoutDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                            ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                            )
-            ) { Text(stringResource(Res.string.settings_logout)) }
+                    CenteredListItem(
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_export_runtime_log))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_export_runtime_log_desc))
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.BugReport, contentDescription = null)
+                            },
+                            modifier =
+                                    Modifier.clickable {
+                                        if (!hasRuntimeLogs) {
+                                            showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
+                                            return@clickable
+                                        }
+                                        val text = onExportRuntimeLog()
+                                        if (text.isBlank()) {
+                                            showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
+                                            return@clickable
+                                        }
+                                        coroutineScope.launch {
+                                            val result =
+                                                    shareTextLog(text, "phitracker_runtime_logs.txt")
+                                            if (result.isFailure) {
+                                                showPlatformAlert(
+                                                        exportRuntimeLogFailedTitle,
+                                                        getString(
+                                                                Res.string
+                                                                        .settings_export_runtime_failed_message,
+                                                                result.exceptionOrNull()?.message
+                                                                        ?: exportFailedUnknownError
+                                                        )
+                                                )
+                                            }
+                                        }
+                                    }
+                    )
 
-            Spacer(modifier = Modifier.height(32.dp))
+                    CenteredListItem(
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_export_crash_log))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_export_crash_log_desc))
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.BugReport, contentDescription = null)
+                            },
+                            modifier =
+                                    Modifier.clickable {
+                                        if (!hasCrashLogs) {
+                                            showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
+                                            return@clickable
+                                        }
+                                        val text = onExportCrashLog()
+                                        if (text.isBlank()) {
+                                            showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
+                                            return@clickable
+                                        }
+                                        coroutineScope.launch {
+                                            val result =
+                                                    shareTextLog(text, "phitracker_crash_reports.txt")
+                                            if (result.isFailure) {
+                                                showPlatformAlert(
+                                                        exportCrashLogFailedTitle,
+                                                        getString(
+                                                                Res.string
+                                                                        .settings_export_crash_failed_message,
+                                                                result.exceptionOrNull()?.message
+                                                                        ?: exportFailedUnknownError
+                                                        )
+                                                )
+                                            }
+                                        }
+                                    }
+                    )
+
+                    CenteredListItem(
+                            headlineContent = { Text(stringResource(Res.string.settings_clear_logs)) },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_clear_logs_desc))
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                            },
+                            modifier =
+                                    Modifier.clickable {
+                                        val ok = onClearAllLogs()
+                                        if (ok) {
+                                            showPlatformAlert(
+                                                    clearLogsDoneTitle,
+                                                    clearLogsDoneMessage
+                                            )
+                                        } else {
+                                            showPlatformAlert(
+                                                    clearLogsFailedTitle,
+                                                    clearLogsFailedMessage
+                                            )
+                                        }
+                                    }
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                CategoryTitle(stringResource(Res.string.settings_category_about))
+
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.settings_check_update)) },
+                        supportingContent = {
+                            when (val state = updateCheckState) {
+                                is UpdateCheckState.Checking ->
+                                    Text(stringResource(Res.string.settings_checking_update))
+                                is UpdateCheckState.NoUpdate ->
+                                    Text(stringResource(Res.string.settings_already_latest))
+                                is UpdateCheckState.Error ->
+                                    Text(
+                                            stringResource(
+                                                    Res.string.settings_check_update_failed,
+                                                    state.message
+                                            )
+                                    )
+                                else ->
+                                    Text(stringResource(Res.string.settings_check_update_desc))
+                            }
+                        },
+                        leadingContent = {
+                            if (updateCheckState is UpdateCheckState.Checking) {
+                                CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null)
+                            }
+                        },
+                        modifier =
+                                Modifier.clickable(
+                                        enabled = updateCheckState !is UpdateCheckState.Checking
+                                ) { onCheckForUpdate() }
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.settings_about_app)) },
+                        supportingContent = {
+                            Text(stringResource(Res.string.settings_about_app_desc))
+                        },
+                        leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                        },
+                        modifier = Modifier.clickable { onNavigateToAbout() }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedButton(
+                        onClick = { showLogoutDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                                ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                )
+                ) { Text(stringResource(Res.string.settings_logout)) }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 

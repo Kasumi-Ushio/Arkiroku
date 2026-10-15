@@ -346,86 +346,88 @@ private fun LanguageStep(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
     ) {
-        StepHeader(
-            title = stringResource(Res.string.onboarding_step_language_title),
-            message = stringResource(Res.string.onboarding_step_language_message)
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            StepHeader(
+                title = stringResource(Res.string.onboarding_step_language_title),
+                message = stringResource(Res.string.onboarding_step_language_message)
+            )
 
-        // Settings-like rows: label on the left, dropdown picker on the right,
-        // whole row tappable — same idiom as the Settings page.
-        val languageOptions = listOf(
-            SettingsConstants.LANGUAGE_SYSTEM to stringResource(Res.string.settings_language_follow_system),
-            SettingsConstants.LANGUAGE_ENGLISH to "English",
-            SettingsConstants.LANGUAGE_ZH_HANS to "简体中文",
-            SettingsConstants.LANGUAGE_ZH_HANT to "繁體中文"
-        )
-        val selectedLanguageIndex = languageOptions.indexOfFirst { it.first == appLanguage }.coerceAtLeast(0)
-        SettingsDropdownRow(
-            title = stringResource(Res.string.settings_language_title),
-            options = languageOptions.map { it.second },
-            selectedIndex = selectedLanguageIndex,
-            onSelect = { index -> onSelectLanguage(languageOptions[index].first) }
-        )
+            // Settings-like rows: label on the left, dropdown picker on the right,
+            // whole row tappable — same idiom as the Settings page.
+            val languageOptions = listOf(
+                SettingsConstants.LANGUAGE_SYSTEM to stringResource(Res.string.settings_language_follow_system),
+                SettingsConstants.LANGUAGE_ENGLISH to "English",
+                SettingsConstants.LANGUAGE_ZH_HANS to "简体中文",
+                SettingsConstants.LANGUAGE_ZH_HANT to "繁體中文"
+            )
+            val selectedLanguageIndex = languageOptions.indexOfFirst { it.first == appLanguage }.coerceAtLeast(0)
+            SettingsDropdownRow(
+                title = stringResource(Res.string.settings_language_title),
+                options = languageOptions.map { it.second },
+                selectedIndex = selectedLanguageIndex,
+                onSelect = { index -> onSelectLanguage(languageOptions[index].first) }
+            )
 
-        val themeOptions = listOf(
-            stringResource(Res.string.settings_theme_follow_system),
-            stringResource(Res.string.settings_theme_light),
-            stringResource(Res.string.settings_theme_dark),
-            stringResource(Res.string.settings_theme_amoled)
-        )
-        SettingsDropdownRow(
-            title = stringResource(Res.string.onboarding_appearance_theme),
-            options = themeOptions,
-            selectedIndex = themeMode.coerceIn(0, themeOptions.lastIndex),
-            onSelect = onThemeModeChange
-        )
-        SettingsDropdownRow(
-            title = stringResource(Res.string.settings_palette_style),
-            options = PaletteStyle.entries.map { it.name },
-            selectedIndex = PaletteStyle.entries.indexOfFirst { it.name == paletteStyleName }.coerceAtLeast(0),
-            onSelect = { index -> onPaletteStyleChange(PaletteStyle.entries[index].name) }
-        )
-        SettingsSwitchRow(
-            title = stringResource(Res.string.onboarding_appearance_haze),
-            description = stringResource(Res.string.settings_haze_blur_desc),
-            checked = hazeBlurEnabled,
-            onCheckedChange = onHazeBlurEnabledChange
-        )
+            val themeOptions = listOf(
+                stringResource(Res.string.settings_theme_follow_system),
+                stringResource(Res.string.settings_theme_light),
+                stringResource(Res.string.settings_theme_dark),
+                stringResource(Res.string.settings_theme_amoled)
+            )
+            SettingsDropdownRow(
+                title = stringResource(Res.string.onboarding_appearance_theme),
+                options = themeOptions,
+                selectedIndex = themeMode.coerceIn(0, themeOptions.lastIndex),
+                onSelect = onThemeModeChange
+            )
+            SettingsDropdownRow(
+                title = stringResource(Res.string.settings_palette_style),
+                options = PaletteStyle.entries.map { it.name },
+                selectedIndex = PaletteStyle.entries.indexOfFirst { it.name == paletteStyleName }.coerceAtLeast(0),
+                onSelect = { index -> onPaletteStyleChange(PaletteStyle.entries[index].name) }
+            )
+            SettingsSwitchRow(
+                title = stringResource(Res.string.onboarding_appearance_haze),
+                description = stringResource(Res.string.settings_haze_blur_desc),
+                checked = hazeBlurEnabled,
+                onCheckedChange = onHazeBlurEnabledChange
+            )
 
-        if (hazeBlurEnabled) {
-            // Mirror of the settings tab's blur-strength block: label row
-            // with a bold primary percentage, slider underneath.
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(stringResource(Res.string.settings_blur_strength))
-                    Text(
-                            text = "${(hazeBlurStrength * 100).roundToInt()}%",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+            if (hazeBlurEnabled) {
+                // Mirror of the settings tab's blur-strength block: label row
+                // with a bold primary percentage, slider underneath.
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(stringResource(Res.string.settings_blur_strength))
+                        Text(
+                                text = "${(hazeBlurStrength * 100).roundToInt()}%",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = hazeBlurStrength,
+                        onValueChange = onHazeBlurStrengthChange,
+                        valueRange = SettingsConstants.HAZE_STRENGTH_MIN..SettingsConstants.HAZE_STRENGTH_MAX,
+                        steps = SettingsConstants.HAZE_SLIDER_STEPS,
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    Text(
+                        text = stringResource(Res.string.onboarding_appearance_preview),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HazeBlurPreview()
                 }
-                Slider(
-                    value = hazeBlurStrength,
-                    onValueChange = onHazeBlurStrengthChange,
-                    valueRange = SettingsConstants.HAZE_STRENGTH_MIN..SettingsConstants.HAZE_STRENGTH_MAX,
-                    steps = SettingsConstants.HAZE_SLIDER_STEPS,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = stringResource(Res.string.onboarding_appearance_preview),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                HazeBlurPreview()
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
+        }
     }
-}
 
 /**
  * Mirror of the settings tab's dropdown row (SettingsTab: theme/language
@@ -603,28 +605,33 @@ private fun LoginChoiceStep(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        StepHeader(
-            title = stringResource(Res.string.onboarding_step_login_title),
-            message = stringResource(Res.string.onboarding_step_login_message)
-        )
-        InlineLoginSection(onLoggedIn = onLoggedIn, onSkip = onSkipLogin)
-        if (loggedIn) {
-            ApiSetupSection(
-                apiEnabled = apiEnabled,
-                apiUserId = apiUserId,
-                apiPlatform = apiPlatform,
-                apiPlatformId = apiPlatformId,
-                apiToken = apiToken,
-                onApiEnabledChange = onApiEnabledChange,
-                onApiUserIdChange = onApiUserIdChange,
-                onApiPlatformChange = onApiPlatformChange,
-                onApiPlatformIdChange = onApiPlatformIdChange,
-                onApiTokenChange = onApiTokenChange
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            StepHeader(
+                title = stringResource(Res.string.onboarding_step_login_title),
+                message = stringResource(Res.string.onboarding_step_login_message)
             )
+            InlineLoginSection(onLoggedIn = onLoggedIn, onSkip = onSkipLogin)
+            if (loggedIn) {
+                ApiSetupSection(
+                    apiEnabled = apiEnabled,
+                    apiUserId = apiUserId,
+                    apiPlatform = apiPlatform,
+                    apiPlatformId = apiPlatformId,
+                    apiToken = apiToken,
+                    onApiEnabledChange = onApiEnabledChange,
+                    onApiUserIdChange = onApiUserIdChange,
+                    onApiPlatformChange = onApiPlatformChange,
+                    onApiPlatformIdChange = onApiPlatformIdChange,
+                    onApiTokenChange = onApiTokenChange
+                )
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
+        }
     }
-}
 
 /**
  * Full login flow embedded in the wizard: a wizard-scoped [LoginViewModel]
@@ -831,87 +838,92 @@ private fun SongDataUpdateStep(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        StepHeader(
-            title = stringResource(Res.string.onboarding_step_song_data_title),
-            message = stringResource(Res.string.onboarding_step_song_data_message)
-        )
-        when (status) {
-            OnboardingSongDataStatus.Idle,
-            OnboardingSongDataStatus.Checking -> {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = stringResource(Res.string.songs_songdata_checking),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            OnboardingSongDataStatus.UpToDate -> {
-                Text(
-                    text = stringResource(Res.string.songs_songdata_up_to_date),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            OnboardingSongDataStatus.UpdateAvailable -> {
-                ChoiceButton(
-                    text = stringResource(Res.string.onboarding_song_data_update_now),
-                    selected = true,
-                    onClick = onUpdate
-                )
-            }
-
-            OnboardingSongDataStatus.Updating -> {
-                LinearProgressIndicator(
-                    progress = { if (total == 0) 0f else completed.toFloat() / total },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                currentFile?.let { file ->
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            StepHeader(
+                title = stringResource(Res.string.onboarding_step_song_data_title),
+                message = stringResource(Res.string.onboarding_step_song_data_message)
+            )
+            when (status) {
+                OnboardingSongDataStatus.Idle,
+                OnboardingSongDataStatus.Checking -> {
+                    CircularProgressIndicator()
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = stringResource(Res.string.songs_songdata_downloading, file, completed, total),
+                        text = stringResource(Res.string.songs_songdata_checking),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                 }
-            }
 
-            OnboardingSongDataStatus.Updated -> {
-                // Same idiom as the preload step: the full bar stays visible so
-                // the completion reads as the end state of the run above it.
-                LinearProgressIndicator(
-                    progress = { 1f },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = stringResource(Res.string.songs_songdata_updated),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+                OnboardingSongDataStatus.UpToDate -> {
+                    Text(
+                        text = stringResource(Res.string.songs_songdata_up_to_date),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
-            OnboardingSongDataStatus.Failed -> {
-                Text(
-                    text = stringResource(Res.string.onboarding_song_data_failed),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedButton(onClick = onCheck) {
-                    Text(stringResource(Res.string.onboarding_preload_retry))
+                OnboardingSongDataStatus.UpdateAvailable -> {
+                    ChoiceButton(
+                        text = stringResource(Res.string.onboarding_song_data_update_now),
+                        selected = true,
+                        onClick = onUpdate
+                    )
+                }
+
+                OnboardingSongDataStatus.Updating -> {
+                    LinearProgressIndicator(
+                        progress = { if (total == 0) 0f else completed.toFloat() / total },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    currentFile?.let { file ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(Res.string.songs_songdata_downloading, file, completed, total),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                OnboardingSongDataStatus.Updated -> {
+                    // Same idiom as the preload step: the full bar stays visible so
+                    // the completion reads as the end state of the run above it.
+                    LinearProgressIndicator(
+                        progress = { 1f },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(Res.string.songs_songdata_updated),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                OnboardingSongDataStatus.Failed -> {
+                    Text(
+                        text = stringResource(Res.string.onboarding_song_data_failed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(onClick = onCheck) {
+                        Text(stringResource(Res.string.onboarding_preload_retry))
+                    }
                 }
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
+        }
     }
-}
 
 @Composable
 private fun PreloadChoiceStep(
@@ -931,105 +943,110 @@ private fun PreloadChoiceStep(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        StepHeader(
-            title = stringResource(Res.string.onboarding_step_preload_title),
-            message = stringResource(Res.string.onboarding_step_preload_message)
-        )
-        when (status) {
-            OnboardingPreloadStatus.Idle -> {
-                ChoiceButton(
-                    text = stringResource(Res.string.onboarding_preload_download),
-                    selected = choice == OnboardingPreloadChoice.Download,
-                    onClick = {
-                        onSelect(OnboardingPreloadChoice.Download)
-                        onStartDownload()
-                    }
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                ChoiceButton(
-                    text = stringResource(Res.string.onboarding_preload_skip),
-                    selected = choice == OnboardingPreloadChoice.Skip,
-                    onClick = { onSelect(OnboardingPreloadChoice.Skip) }
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = stringResource(Res.string.onboarding_preload_disclosure, totalCount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            OnboardingPreloadStatus.Running -> {
-                LinearProgressIndicator(
-                    progress = { if (total == 0) 0f else completed.toFloat() / total },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                currentSong?.let { song ->
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            StepHeader(
+                title = stringResource(Res.string.onboarding_step_preload_title),
+                message = stringResource(Res.string.onboarding_step_preload_message)
+            )
+            when (status) {
+                OnboardingPreloadStatus.Idle -> {
+                    ChoiceButton(
+                        text = stringResource(Res.string.onboarding_preload_download),
+                        selected = choice == OnboardingPreloadChoice.Download,
+                        onClick = {
+                            onSelect(OnboardingPreloadChoice.Download)
+                            onStartDownload()
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ChoiceButton(
+                        text = stringResource(Res.string.onboarding_preload_skip),
+                        selected = choice == OnboardingPreloadChoice.Skip,
+                        onClick = { onSelect(OnboardingPreloadChoice.Skip) }
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = stringResource(Res.string.onboarding_preload_current_song, song),
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = stringResource(Res.string.onboarding_preload_disclosure, totalCount),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = stringResource(Res.string.onboarding_preload_progress, completed, total),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedButton(onClick = onCancelDownload) {
-                    Text(stringResource(Res.string.onboarding_preload_cancel))
-                }
-            }
 
-            OnboardingPreloadStatus.Succeeded -> {
-                // Keep the full progress bar and counter visible so the
-                // completion reads as the end state of the download above,
-                // not as a disconnected message.
-                LinearProgressIndicator(
-                    progress = { 1f },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = stringResource(Res.string.onboarding_preload_progress, completed, total),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = stringResource(Res.string.onboarding_preload_done),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            OnboardingPreloadStatus.Failed -> {
-                Text(
-                    text = stringResource(Res.string.onboarding_preload_failed),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row {
-                    OutlinedButton(onClick = onStartDownload) {
-                        Text(stringResource(Res.string.onboarding_preload_retry))
+                OnboardingPreloadStatus.Running -> {
+                    LinearProgressIndicator(
+                        progress = { if (total == 0) 0f else completed.toFloat() / total },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    currentSong?.let { song ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(Res.string.onboarding_preload_current_song, song),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    TextButton(onClick = onCancelDownload) {
-                        Text(stringResource(Res.string.onboarding_preload_skip))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(Res.string.onboarding_preload_progress, completed, total),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(onClick = onCancelDownload) {
+                        Text(stringResource(Res.string.onboarding_preload_cancel))
+                    }
+                }
+
+                OnboardingPreloadStatus.Succeeded -> {
+                    // Keep the full progress bar and counter visible so the
+                    // completion reads as the end state of the download above,
+                    // not as a disconnected message.
+                    LinearProgressIndicator(
+                        progress = { 1f },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(Res.string.onboarding_preload_progress, completed, total),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(Res.string.onboarding_preload_done),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                OnboardingPreloadStatus.Failed -> {
+                    Text(
+                        text = stringResource(Res.string.onboarding_preload_failed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row {
+                        OutlinedButton(onClick = onStartDownload) {
+                            Text(stringResource(Res.string.onboarding_preload_retry))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        TextButton(onClick = onCancelDownload) {
+                            Text(stringResource(Res.string.onboarding_preload_skip))
+                        }
                     }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1052,78 +1069,83 @@ private fun B30StyleStep(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        StepHeader(
-            title = stringResource(Res.string.onboarding_step_b30_title),
-            message = stringResource(Res.string.onboarding_step_b30_message)
-        )
-
-        AppearanceSectionTitle(stringResource(Res.string.b30ex_card_style))
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = cardStyle == B30ExportCardStyle.Classic,
-                onClick = { onCardStyleChange(B30ExportCardStyle.Classic) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-            ) {
-                Text(stringResource(Res.string.b30ex_card_style_classic))
-            }
-            SegmentedButton(
-                selected = cardStyle == B30ExportCardStyle.Poster,
-                onClick = { onCardStyleChange(B30ExportCardStyle.Poster) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-            ) {
-                Text(stringResource(Res.string.b30ex_card_style_poster))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = stringResource(Res.string.b30ex_theme_follow_global),
-                style = MaterialTheme.typography.bodyLarge
+            StepHeader(
+                title = stringResource(Res.string.onboarding_step_b30_title),
+                message = stringResource(Res.string.onboarding_step_b30_message)
             )
-            Switch(checked = themeFollowGlobal, onCheckedChange = onThemeFollowGlobalChange)
-        }
-        AnimatedVisibility(visible = !themeFollowGlobal) {
+
+            AppearanceSectionTitle(stringResource(Res.string.b30ex_card_style))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                val themeLabels = listOf(
-                    stringResource(Res.string.b30ex_theme_light),
-                    stringResource(Res.string.b30ex_theme_dark),
-                    "AMOLED"
+                SegmentedButton(
+                    selected = cardStyle == B30ExportCardStyle.Classic,
+                    onClick = { onCardStyleChange(B30ExportCardStyle.Classic) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) {
+                    Text(stringResource(Res.string.b30ex_card_style_classic))
+                }
+                SegmentedButton(
+                    selected = cardStyle == B30ExportCardStyle.Poster,
+                    onClick = { onCardStyleChange(B30ExportCardStyle.Poster) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) {
+                    Text(stringResource(Res.string.b30ex_card_style_poster))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(Res.string.b30ex_theme_follow_global),
+                    style = MaterialTheme.typography.bodyLarge
                 )
-                themeLabels.forEachIndexed { index, label ->
-                    SegmentedButton(
-                        selected = exportThemeMode == index + 1,
-                        onClick = { onExportThemeModeChange(index + 1) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = themeLabels.size)
-                    ) {
-                        Text(label)
+                Switch(checked = themeFollowGlobal, onCheckedChange = onThemeFollowGlobalChange)
+            }
+            AnimatedVisibility(visible = !themeFollowGlobal) {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val themeLabels = listOf(
+                        stringResource(Res.string.b30ex_theme_light),
+                        stringResource(Res.string.b30ex_theme_dark),
+                        "AMOLED"
+                    )
+                    themeLabels.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = exportThemeMode == index + 1,
+                            onClick = { onExportThemeModeChange(index + 1) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = themeLabels.size)
+                        ) {
+                            Text(label)
+                        }
                     }
                 }
             }
-        }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-        AppearanceSectionTitle(stringResource(Res.string.onboarding_appearance_preview))
-        Spacer(modifier = Modifier.height(4.dp))
-        B30CardPreview(
-            b30Records = b30Records,
-            cardStyle = cardStyle,
-            themeFollowGlobal = themeFollowGlobal,
-            exportThemeMode = exportThemeMode,
-            globalThemeMode = globalThemeMode,
-            paletteStyleName = paletteStyleName,
-            systemDark = systemDark,
-            getLowIllustrationUrl = getLowIllustrationUrl
-        )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+            AppearanceSectionTitle(stringResource(Res.string.onboarding_appearance_preview))
+            Spacer(modifier = Modifier.height(4.dp))
+            B30CardPreview(
+                b30Records = b30Records,
+                cardStyle = cardStyle,
+                themeFollowGlobal = themeFollowGlobal,
+                exportThemeMode = exportThemeMode,
+                globalThemeMode = globalThemeMode,
+                paletteStyleName = paletteStyleName,
+                systemDark = systemDark,
+                getLowIllustrationUrl = getLowIllustrationUrl
+            )
+        }
         Spacer(modifier = Modifier.height(24.dp))
+        }
     }
-}
 
 /**
  * Live single-card preview of the B30 style step: renders the player's top
@@ -1313,31 +1335,33 @@ private fun AutoUpdateStep(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
     ) {
-        StepHeader(
-            title = stringResource(Res.string.onboarding_step_update_title),
-            message = stringResource(Res.string.onboarding_step_update_message)
-        )
-        SettingsSwitchRow(
-            title = stringResource(Res.string.settings_auto_check_update),
-            description = stringResource(Res.string.settings_auto_check_update_desc),
-            checked = autoCheckUpdate,
-            onCheckedChange = onAutoCheckUpdateChange
-        )
-        SettingsSwitchRow(
-            title = stringResource(Res.string.settings_auto_check_song_data_update),
-            description = stringResource(Res.string.settings_auto_check_song_data_update_desc),
-            checked = autoCheckSongDataUpdate,
-            onCheckedChange = onAutoCheckSongDataUpdateChange
-        )
-        SettingsSwitchRow(
-            title = stringResource(Res.string.settings_include_prerelease),
-            description = stringResource(Res.string.settings_include_prerelease_desc),
-            checked = includePreRelease,
-            onCheckedChange = onIncludePreReleaseChange
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            StepHeader(
+                title = stringResource(Res.string.onboarding_step_update_title),
+                message = stringResource(Res.string.onboarding_step_update_message)
+            )
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_auto_check_update),
+                description = stringResource(Res.string.settings_auto_check_update_desc),
+                checked = autoCheckUpdate,
+                onCheckedChange = onAutoCheckUpdateChange
+            )
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_auto_check_song_data_update),
+                description = stringResource(Res.string.settings_auto_check_song_data_update_desc),
+                checked = autoCheckSongDataUpdate,
+                onCheckedChange = onAutoCheckSongDataUpdateChange
+            )
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_include_prerelease),
+                description = stringResource(Res.string.settings_include_prerelease_desc),
+                checked = includePreRelease,
+                onCheckedChange = onIncludePreReleaseChange
+            )
+        }
         Spacer(modifier = Modifier.height(24.dp))
+        }
     }
-}
 
 @Composable
 private fun OnboardingBottomBar(

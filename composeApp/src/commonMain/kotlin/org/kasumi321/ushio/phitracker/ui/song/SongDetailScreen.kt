@@ -648,42 +648,44 @@ private fun AliasProposalDialog(
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState())
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
             ) {
-                OutlinedTextField(
-                    value = alias,
-                    onValueChange = { alias = it },
-                    label = { Text(stringResource(Res.string.song_detail_alias_propose_alias_label)) },
-                    singleLine = true,
-                    enabled = !state.submitting,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text(stringResource(Res.string.song_detail_alias_propose_note_label)) },
-                    enabled = !state.submitting,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                state.error?.let { error ->
+                    OutlinedTextField(
+                        value = alias,
+                        onValueChange = { alias = it },
+                        label = { Text(stringResource(Res.string.song_detail_alias_propose_alias_label)) },
+                        singleLine = true,
+                        enabled = !state.submitting,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        label = { Text(stringResource(Res.string.song_detail_alias_propose_note_label)) },
+                        enabled = !state.submitting,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    state.error?.let { error ->
+                        Text(
+                            text = error.asString(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     Text(
-                        text = error.asString(),
+                        text = stringResource(Res.string.song_detail_alias_propose_review_notice),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    HorizontalDivider()
+                    Text(
+                        text = stringResource(Res.string.song_detail_alias_propose_doc_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Text(
-                    text = stringResource(Res.string.song_detail_alias_propose_review_notice),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                HorizontalDivider()
-                Text(
-                    text = stringResource(Res.string.song_detail_alias_propose_doc_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         },
         confirmButton = {
             TextButton(
@@ -768,66 +770,119 @@ private fun DifficultyContent(
             .fillMaxSize()
             .verticalScroll(scrollState)
     ) {
-        val charter = songInfo.charters[difficulty] ?: stringResource(Res.string.song_detail_unknown)
-        val notes = songInfo.noteCounts[difficulty]
-        val record = userRecords.find { it.difficulty == difficulty }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+        ) {
+            val charter = songInfo.charters[difficulty] ?: stringResource(Res.string.song_detail_unknown)
+            val notes = songInfo.noteCounts[difficulty]
+            val record = userRecords.find { it.difficulty == difficulty }
 
-        if (record != null) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
-            ) {
-                Row(
+            if (record != null) {
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
                 ) {
-                    Column {
-                        Text(
-                            text = stringResource(Res.string.song_detail_record_title),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
                             Text(
-                                text = record.score.formatScore(),
-                                style = MaterialTheme.typography.headlineSmall,
+                                text = stringResource(Res.string.song_detail_record_title),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = record.score.formatScore(),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                ScoreRatingTag(
+                                    rating = ScoreRating.fromScore(record.score, record.isFullCombo),
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${record.accuracy.formatFourDecimals()}%",
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            ScoreRatingTag(
-                                rating = ScoreRating.fromScore(record.score, record.isFullCombo),
-                                fontSize = 10.sp
+                            Text(
+                                text = stringResource(Res.string.song_detail_rks_value, record.rks.formatFourDecimals()),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    Column(horizontalAlignment = Alignment.End) {
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (apiEnabled && useApiData) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Text(
-                            text = "${record.accuracy.formatFourDecimals()}%",
+                            text = stringResource(Res.string.song_detail_community_stats),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.primary
                         )
-                        Text(
-                            text = stringResource(Res.string.song_detail_rks_value, record.rks.formatFourDecimals()),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (songApiDetail.isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else if (songApiDetail.error != null) {
+                            Text(
+                                text = songApiDetail.error!!.asString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Text(
+                                stringResource(
+                                    Res.string.song_detail_chart_ranking,
+                                    songApiDetail.userRank ?: "—",
+                                    songApiDetail.totalUsers ?: "—"
+                                )
+                            )
+                            Text(
+                                text = stringResource(
+                                    Res.string.song_detail_avg_acc,
+                                    songApiDetail.avgAcc?.let { "${it.formatFourDecimals()}%" } ?: "—",
+                                    songApiDetail.avgAccCount ?: 0
+                                )
+                            )
+                        }
                     }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
             }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
 
-        if (apiEnabled && useApiData) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -839,157 +894,109 @@ private fun DifficultyContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(16.dp)
                 ) {
                     Text(
-                        text = stringResource(Res.string.song_detail_community_stats),
+                        text = stringResource(Res.string.song_detail_chart_info),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    if (songApiDetail.isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else if (songApiDetail.error != null) {
-                        Text(
-                            text = songApiDetail.error!!.asString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else {
-                        Text(
-                            stringResource(
-                                Res.string.song_detail_chart_ranking,
-                                songApiDetail.userRank ?: "—",
-                                songApiDetail.totalUsers ?: "—"
-                            )
-                        )
-                        Text(
-                            text = stringResource(
-                                Res.string.song_detail_avg_acc,
-                                songApiDetail.avgAcc?.let { "${it.formatFourDecimals()}%" } ?: "—",
-                                songApiDetail.avgAccCount ?: 0
-                            )
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+                    Spacer(modifier = Modifier.height(12.dp))
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.song_detail_chart_info),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row {
-                    Text(
-                        text = stringResource(Res.string.song_detail_charter),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    SelectionContainer(modifier = Modifier.weight(1f)) {
+                    Row {
                         Text(
-                            text = charter,
+                            text = stringResource(Res.string.song_detail_charter),
                             style = MaterialTheme.typography.bodyLarge
                         )
+                        SelectionContainer(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = charter,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                if (notes != null && notes.total > 0) {
-                    Text(
-                        text = stringResource(Res.string.song_detail_notes_distribution, notes.total),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        NoteStatItem("Tap", notes.tap)
-                        NoteStatItem("Drag", notes.drag)
-                        NoteStatItem("Hold", notes.hold)
-                        NoteStatItem("Flick", notes.flick)
+                    if (notes != null && notes.total > 0) {
+                        Text(
+                            text = stringResource(Res.string.song_detail_notes_distribution, notes.total),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            NoteStatItem("Tap", notes.tap)
+                            NoteStatItem("Drag", notes.drag)
+                            NoteStatItem("Hold", notes.hold)
+                            NoteStatItem("Flick", notes.flick)
+                        }
+                    } else {
+                        Text(
+                            text = stringResource(Res.string.song_detail_no_notes_data),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                } else {
-                    Text(
-                        text = stringResource(Res.string.song_detail_no_notes_data),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // Chart-tag reads are public, so the section shows regardless of the
-        // score-API switch; only voting requires the api_token.
-        ChartTagSection(
-            state = chartTagState,
-            difficulty = difficulty,
-            canVote = canVote,
-            onSubmitVote = onSubmitChartTagVote
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        val currentHistory = if (apiEnabled && useApiData) songApiDetail.history else syncHistory
-        val filteredHistory = currentHistory
-            .filter { it.difficulty == difficulty.name }
-            .take(3)
-
-        if (filteredHistory.isNotEmpty()) {
-            Text(
-                text = stringResource(Res.string.song_detail_sync_history),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp)
+            // Chart-tag reads are public, so the section shows regardless of the
+            // score-API switch; only voting requires the api_token.
+            ChartTagSection(
+                state = chartTagState,
+                difficulty = difficulty,
+                canVote = canVote,
+                onSubmitVote = onSubmitChartTagVote
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            filteredHistory.forEach { entry ->
-                SyncHistoryCard(entry)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        } else {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
-            ) {
-                Text(
-                    text = stringResource(Res.string.song_detail_no_sync_history),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-        }
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // Keep the last card clear of the gesture navigation bar and the
-        // screen's rounded bottom corners
-        Spacer(modifier = Modifier.height(contentBottomPadding + 16.dp))
+            val currentHistory = if (apiEnabled && useApiData) songApiDetail.history else syncHistory
+            val filteredHistory = currentHistory
+                .filter { it.difficulty == difficulty.name }
+                .take(3)
+
+            if (filteredHistory.isNotEmpty()) {
+                Text(
+                    text = stringResource(Res.string.song_detail_sync_history),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                filteredHistory.forEach { entry ->
+                    SyncHistoryCard(entry)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            } else {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                ) {
+                    Text(
+                        text = stringResource(Res.string.song_detail_no_sync_history),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+
+            // Keep the last card clear of the gesture navigation bar and the
+            // screen's rounded bottom corners
+            Spacer(modifier = Modifier.height(contentBottomPadding + 16.dp))
+            }
     }
 }
 

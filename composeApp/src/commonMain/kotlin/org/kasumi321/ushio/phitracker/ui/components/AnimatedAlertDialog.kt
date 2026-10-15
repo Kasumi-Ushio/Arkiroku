@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BasicAlertDialog
@@ -141,7 +142,8 @@ private fun AnimatedAlertDialogContent(
             Surface(
                 shape = shape,
                 color = containerColor,
-                tonalElevation = tonalElevation
+                tonalElevation = tonalElevation,
+                modifier = Modifier.widthIn(max = 560.dp)
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
                     if (icon != null) {

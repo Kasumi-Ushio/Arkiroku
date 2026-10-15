@@ -21,6 +21,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,6 +70,7 @@ import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.SongInfo
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
 import org.kasumi321.ushio.phitracker.ui.theme.DifficultyColors
+import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
 import org.kasumi321.ushio.phitracker.ui.utils.chapterDisplayNameLocalized
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.songs_action_done
@@ -102,6 +109,8 @@ fun SongsTab(
     onSongClick: (String, Difficulty?) -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
     listState: LazyListState = rememberLazyListState(),
+    useGrid: Boolean = false,
+    gridState: LazyGridState = rememberLazyGridState(),
     modifier: Modifier = Modifier
 ) {
     val songs = state.filteredSongs
@@ -116,54 +125,66 @@ fun SongsTab(
 
     // Title, tip, search and filter live in the floating SongsHeader; the list
     // scrolls behind it, padded so the first and last songs stay clear
-    LazyColumn(
-        state = listState,
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = contentPadding.calculateTopPadding() + 8.dp,
-            // Keeps the last song clear of the floating glass bottom bar
-            bottom = contentPadding.calculateBottomPadding() + 8.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        if (state.songDataUpdateAvailable && !state.isSongDataRefreshing) {
-            item(key = "song_data_update_banner", contentType = "song_data_banner") {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
+    val listContentPadding = PaddingValues(
+        start = 16.dp,
+        end = 16.dp,
+        top = contentPadding.calculateTopPadding() + 8.dp,
+        // Keeps the last song clear of the floating glass bottom bar
+        bottom = contentPadding.calculateBottomPadding() + 8.dp
+    )
+    if (useGrid) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(ADAPTIVE_GRID_MIN_COLUMN_WIDTH),
+            state = gridState,
+            modifier = modifier.fillMaxSize(),
+            contentPadding = listContentPadding,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (state.songDataUpdateAvailable && !state.isSongDataRefreshing) {
+                item(
+                    key = "song_data_update_banner",
+                    contentType = "song_data_banner",
+                    span = { GridItemSpan(maxLineSpan) }
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.songs_data_update_available),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        TextButton(onClick = onRefreshSongData) {
-                            Text(stringResource(Res.string.songs_update_now))
-                        }
-                    }
+                    SongDataUpdateBanner(onRefreshSongData)
                 }
             }
+            items(
+                songs,
+                key = { it.id },
+                contentType = { "song_item" }
+            ) { song ->
+                SongItem(
+                    song = song,
+                    illustrationUrl = getIllustrationUrl(song.id),
+                    onSongClick = { songId -> onSongClick(songId, null) }
+                )
+            }
         }
-        items(
-            songs,
-            key = { it.id },
-            contentType = { "song_item" }
-        ) { song ->
-            SongItem(
-                song = song,
-                illustrationUrl = getIllustrationUrl(song.id),
-                onSongClick = { songId -> onSongClick(songId, null) }
-            )
+    } else {
+        LazyColumn(
+            state = listState,
+            modifier = modifier.fillMaxSize(),
+            contentPadding = listContentPadding,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (state.songDataUpdateAvailable && !state.isSongDataRefreshing) {
+                item(key = "song_data_update_banner", contentType = "song_data_banner") {
+                    SongDataUpdateBanner(onRefreshSongData)
+                }
+            }
+            items(
+                songs,
+                key = { it.id },
+                contentType = { "song_item" }
+            ) { song ->
+                SongItem(
+                    song = song,
+                    illustrationUrl = getIllustrationUrl(song.id),
+                    onSongClick = { songId -> onSongClick(songId, null) }
+                )
+            }
         }
     }
 
@@ -187,6 +208,32 @@ fun SongsTab(
                 onResetFilters = onResetFilters,
                 onClose = { onToggleFilterSheet(false) }
             )
+        }
+    }
+}
+
+@Composable
+private fun SongDataUpdateBanner(onRefreshSongData: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = stringResource(Res.string.songs_data_update_available),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            TextButton(onClick = onRefreshSongData) {
+                Text(stringResource(Res.string.songs_update_now))
+            }
         }
     }
 }

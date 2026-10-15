@@ -7,6 +7,10 @@ internal interface B30NavigationGateway {
     fun navigateHomeSkippingLogin()
     fun popCurrent()
     fun popToHome(): Boolean
+
+    /** Pops a detail-pane-hosted B30 image back to the pane placeholder.
+     * Returns false when no detail pane is active (compact layout). */
+    fun popDetailToPlaceholder(): Boolean
     fun navigateLoginClearingGraph()
 }
 
@@ -59,6 +63,11 @@ internal class B30NavigationCoordinator(
 
     fun recoverMissingPayload(): B30MissingPayloadRecovery {
         clearPayload()
+        // In the expanded two-pane layout the B30 image lives in the detail
+        // pane; recovering means returning that pane to its placeholder.
+        if (gateway.popDetailToPlaceholder()) {
+            return B30MissingPayloadRecovery.HomePopped
+        }
         return if (gateway.popToHome()) {
             B30MissingPayloadRecovery.HomePopped
         } else {

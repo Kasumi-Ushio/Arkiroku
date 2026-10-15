@@ -19,4 +19,5 @@
     <string name="sync_login_required">Please log in before continuing</string>
     <string name="api_error_missing_fields">Please fill in the platform name, platform ID and API user ID first</string>
     <string name="action_go_login">Log in</string>
+    <string name="detail_pane_placeholder">Pick a page from the left to show it here</string>
 </resources>

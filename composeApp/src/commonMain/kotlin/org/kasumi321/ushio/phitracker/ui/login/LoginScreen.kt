@@ -140,50 +140,57 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 32.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(36.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Spacer(modifier = Modifier.height(36.dp))
 
-            Text(
-                text = "Phi Tracker",
-                style = MaterialTheme.typography.headlineLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(Res.string.login_app_credit),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            LoginMethodSection(
-                state = state,
-                onUpdateServer = viewModel::updateServer,
-                onStartQrLogin = viewModel::startQrLogin,
-                onCancelQrLogin = viewModel::cancelQrLogin,
-                onTokenChange = viewModel::updateToken,
-                onLogin = viewModel::login
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            TextButton(onClick = onSkip) {
                 Text(
-                    text = stringResource(Res.string.login_skip_to_home),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Phi Tracker",
+                    style = MaterialTheme.typography.headlineLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            }
 
-            Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = stringResource(Res.string.login_app_credit),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                LoginMethodSection(
+                    state = state,
+                    onUpdateServer = viewModel::updateServer,
+                    onStartQrLogin = viewModel::startQrLogin,
+                    onCancelQrLogin = viewModel::cancelQrLogin,
+                    onTokenChange = viewModel::updateToken,
+                    onLogin = viewModel::login
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                TextButton(onClick = onSkip) {
+                    Text(
+                        text = stringResource(Res.string.login_skip_to_home),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
+            }
         }
     }
 }

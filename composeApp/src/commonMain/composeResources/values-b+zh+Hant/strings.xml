@@ -19,4 +19,5 @@
     <string name="sync_login_required">請先登入後再操作</string>
     <string name="api_error_missing_fields">請先填寫平台名稱、平台 ID 與 API 使用者 ID</string>
     <string name="action_go_login">去登入</string>
+    <string name="detail_pane_placeholder">從左側選擇頁面，在此顯示</string>
 </resources>

@@ -141,6 +141,63 @@ class PhiTrackerNavHostTest {
         assertEquals(listOf("login"), gateway.routes)
     }
 
+    @Test
+    fun missingPayloadRecoversToDetailPlaceholderWhenDetailPaneActive() {
+        val gateway = RecordingGateway("detail_placeholder", "b30image")
+        gateway.hasDetailPane = true
+        val coordinator = B30NavigationCoordinator(gateway)
+
+        val recovery = coordinator.recoverMissingPayload()
+
+        assertEquals(B30MissingPayloadRecovery.HomePopped, recovery)
+        assertNull(coordinator.payload)
+        assertEquals(listOf("detail_placeholder"), gateway.routes)
+    }
+
+    @Test
+    fun migratableDetailRouteKeepsPlainSecondaryRoutes() {
+        val migratable = listOf(
+            Screen.About,
+            Screen.Disclaimer,
+            Screen.Acknowledgments,
+            Screen.Licenses,
+            Screen.PrivacyPolicy,
+            Screen.Settings,
+            Screen.Suggest
+        )
+        migratable.forEach { screen ->
+            assertEquals(screen.route, migratableDetailRoute(screen.route))
+        }
+    }
+
+    @Test
+    fun migratableDetailRouteDropsRoutesThatCannotMigrate() {
+        // The B30 image needs its in-memory payload; typed routes cannot be
+        // re-navigated from their pattern string; both fall back to Home.
+        assertNull(migratableDetailRoute(null))
+        assertNull(migratableDetailRoute(DetailPlaceholderRoute))
+        assertNull(migratableDetailRoute(Screen.B30Image.route))
+        assertNull(migratableDetailRoute(Screen.Home.route))
+        assertNull(migratableDetailRoute("song_detail/{songId}/{difficulty}"))
+    }
+
+    @Test
+    fun detailPaneStateConsumesPendingRouteOnce() {
+        val state = DetailPaneState()
+        state.onDetailRouteChanged(Screen.Settings.route)
+
+        assertEquals(Screen.Settings.route, state.consumePendingRoute())
+        assertNull(state.consumePendingRoute())
+    }
+
+    @Test
+    fun detailPaneStateIgnoresNonMigratableDetailRoutes() {
+        val state = DetailPaneState()
+        state.onDetailRouteChanged(DetailPlaceholderRoute)
+
+        assertNull(state.consumePendingRoute())
+    }
+
     private fun payload(songId: String) = B30ExportPayload(
         b30 = listOf(
             BestRecord(
@@ -169,6 +226,7 @@ class PhiTrackerNavHostTest {
 
     private class RecordingGateway(vararg initialRoutes: String) : B30NavigationGateway {
         val routes = initialRoutes.toMutableList()
+        var hasDetailPane: Boolean = false
         var observePayload: () -> B30ExportPayload? = { null }
         var payloadObservedDuringNavigation: B30ExportPayload? = null
             private set
@@ -205,6 +263,13 @@ class PhiTrackerNavHostTest {
             val homeIndex = routes.indexOfLast { it == "home" }
             if (homeIndex < 0) return false
             while (routes.lastIndex > homeIndex) routes.removeLast()
+            return true
+        }
+
+        override fun popDetailToPlaceholder(): Boolean {
+            if (!hasDetailPane) return false
+            routes.clear()
+            routes += "detail_placeholder"
             return true
         }
 

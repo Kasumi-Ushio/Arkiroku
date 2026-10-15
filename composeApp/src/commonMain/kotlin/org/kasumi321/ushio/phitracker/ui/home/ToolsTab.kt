@@ -141,70 +141,75 @@ fun ToolsTab(
     Column(
             modifier =
                     modifier.fillMaxSize()
-                            .padding(horizontal = 16.dp)
                             .imePadding()
-                            .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .verticalScroll(scrollState)
     ) {
-        Spacer(modifier = Modifier.height(contentPadding.calculateTopPadding()))
-
-            CollapsibleToolCard(
-                    title = stringResource(Res.string.tools_rks_calculator_title),
-                    subtitle = stringResource(Res.string.tools_rks_calculator_subtitle),
-                    icon = Icons.Default.Calculate
-            ) { RksCalculatorContent() }
-
-            CollapsibleToolCard(
-                    title = stringResource(Res.string.tools_suggest_title),
-                    subtitle = stringResource(Res.string.tools_suggest_subtitle),
-                    icon = Icons.AutoMirrored.Filled.ShowChart
-            ) { SuggestEntryContent(onNavigateToSuggest) }
-
-            CollapsibleToolCard(
-                    title = stringResource(Res.string.tools_rks_history_title),
-                    subtitle = stringResource(Res.string.tools_rks_history_subtitle),
-                    icon = Icons.AutoMirrored.Filled.ShowChart
-            ) { RksHistoryChartContent(syncSnapshots) }
-
-            if (apiEnabled && useApiData) {
-                CollapsibleToolCard(
-                        title = stringResource(Res.string.tools_my_rank_title),
-                        subtitle = stringResource(Res.string.tools_my_rank_subtitle),
-                        icon = Icons.Default.AccountCircle
-                ) { ApiRankByUserContent(state = apiRankByUser, onFetch = onFetchRankByUser) }
+        Column(
+                modifier =
+                        Modifier.fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Spacer(modifier = Modifier.height(contentPadding.calculateTopPadding()))
 
                 CollapsibleToolCard(
-                        title = stringResource(Res.string.tools_rank_lookup_title),
-                        subtitle = stringResource(Res.string.tools_rank_lookup_subtitle),
-                        icon = Icons.Default.DataThresholding
-                ) {
-                    ApiRankByPositionContent(
-                            state = apiRankByPosition,
-                            onFetch = onFetchRankByPosition
-                    )
+                        title = stringResource(Res.string.tools_rks_calculator_title),
+                        subtitle = stringResource(Res.string.tools_rks_calculator_subtitle),
+                        icon = Icons.Default.Calculate
+                ) { RksCalculatorContent() }
+
+                CollapsibleToolCard(
+                        title = stringResource(Res.string.tools_suggest_title),
+                        subtitle = stringResource(Res.string.tools_suggest_subtitle),
+                        icon = Icons.AutoMirrored.Filled.ShowChart
+                ) { SuggestEntryContent(onNavigateToSuggest) }
+
+                CollapsibleToolCard(
+                        title = stringResource(Res.string.tools_rks_history_title),
+                        subtitle = stringResource(Res.string.tools_rks_history_subtitle),
+                        icon = Icons.AutoMirrored.Filled.ShowChart
+                ) { RksHistoryChartContent(syncSnapshots) }
+
+                if (apiEnabled && useApiData) {
+                    CollapsibleToolCard(
+                            title = stringResource(Res.string.tools_my_rank_title),
+                            subtitle = stringResource(Res.string.tools_my_rank_subtitle),
+                            icon = Icons.Default.AccountCircle
+                    ) { ApiRankByUserContent(state = apiRankByUser, onFetch = onFetchRankByUser) }
+
+                    CollapsibleToolCard(
+                            title = stringResource(Res.string.tools_rank_lookup_title),
+                            subtitle = stringResource(Res.string.tools_rank_lookup_subtitle),
+                            icon = Icons.Default.DataThresholding
+                    ) {
+                        ApiRankByPositionContent(
+                                state = apiRankByPosition,
+                                onFetch = onFetchRankByPosition
+                        )
+                    }
+
+                    CollapsibleToolCard(
+                            title = stringResource(Res.string.tools_rks_distribution_title),
+                            subtitle = stringResource(Res.string.tools_rks_distribution_subtitle),
+                            icon = Icons.Default.AreaChart
+                    ) {
+                        ApiRksRankContent(
+                                state = apiRksRankResult,
+                                defaultRks = defaultRks,
+                                onFetch = onFetchRksRank
+                        )
+                    }
                 }
 
                 CollapsibleToolCard(
-                        title = stringResource(Res.string.tools_rks_distribution_title),
-                        subtitle = stringResource(Res.string.tools_rks_distribution_subtitle),
-                        icon = Icons.Default.AreaChart
-                ) {
-                    ApiRksRankContent(
-                            state = apiRksRankResult,
-                            defaultRks = defaultRks,
-                            onFetch = onFetchRksRank
-                    )
-                }
+                        title = stringResource(Res.string.tools_session_token_title),
+                        subtitle = stringResource(Res.string.tools_session_token_subtitle),
+                        icon = Icons.Default.ContentCopy
+                ) { SessionTokenContent(sessionToken, onNavigateToLogin) }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(contentPadding.calculateBottomPadding()))
             }
-
-            CollapsibleToolCard(
-                    title = stringResource(Res.string.tools_session_token_title),
-                    subtitle = stringResource(Res.string.tools_session_token_subtitle),
-                    icon = Icons.Default.ContentCopy
-            ) { SessionTokenContent(sessionToken, onNavigateToLogin) }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Spacer(modifier = Modifier.height(contentPadding.calculateBottomPadding()))
     }
 }
 

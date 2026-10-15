@@ -17,6 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -40,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.ui.b30.B30TagAnalysisContent
+import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
 import org.kasumi321.ushio.phitracker.ui.utils.asString
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.b30_action_collapse
@@ -60,6 +67,8 @@ fun B30Tab(
     onSongClick: (String, Difficulty?) -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
     listState: LazyListState = rememberLazyListState(),
+    useGrid: Boolean = false,
+    gridState: LazyGridState = rememberLazyGridState(),
     onRetryTagAnalysis: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -91,17 +100,107 @@ fun B30Tab(
             )
         }
     } else {
-        LazyColumn(
-            state = listState,
-            modifier = modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = contentPadding.calculateTopPadding() + 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 8.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        val listContentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = contentPadding.calculateTopPadding() + 8.dp,
+            bottom = contentPadding.calculateBottomPadding() + 8.dp
+        )
+        if (useGrid) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(ADAPTIVE_GRID_MIN_COLUMN_WIDTH),
+                state = gridState,
+                modifier = modifier.fillMaxSize(),
+                contentPadding = listContentPadding,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (showTagSection) {
+                    item(contentType = "tag_analysis", span = { GridItemSpan(maxLineSpan) }) {
+                        CollapsibleTagAnalysis(
+                            state = tagAnalysis,
+                            onRetry = onRetryTagAnalysis
+                        )
+                    }
+                }
+
+                if (phi3.isNotEmpty()) {
+                    item(contentType = "header", span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = stringResource(Res.string.b30_section_phi_best),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                    itemsIndexed(
+                        phi3,
+                        key = { _, r -> "phi_${r.songId}_${r.difficulty}" },
+                        contentType = { _, _ -> "score_card" }
+                    ) { index, record ->
+                        ScoreCard(
+                            rank = index + 1,
+                            record = record,
+                            illustrationUrl = getIllustrationUrl(record.songId),
+                            onSongClick = onSongClick
+                        )
+                    }
+                }
+
+                item(contentType = "header", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = stringResource(Res.string.b30_section_best27),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    )
+                }
+                itemsIndexed(
+                    b27,
+                    key = { _, r -> "b27_${r.songId}_${r.difficulty}" },
+                    contentType = { _, _ -> "score_card" }
+                ) { index, record ->
+                    ScoreCard(
+                        rank = index + 1,
+                        record = record,
+                        illustrationUrl = getIllustrationUrl(record.songId),
+                        onSongClick = onSongClick
+                    )
+                }
+
+                if (overflow.isNotEmpty()) {
+                    item(contentType = "header", span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = stringResource(Res.string.b30_section_overflow),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                        )
+                    }
+                    itemsIndexed(
+                        overflow,
+                        key = { _, r -> "overflow_${r.songId}_${r.difficulty}" },
+                        contentType = { _, _ -> "score_card" }
+                    ) { index, record ->
+                        ScoreCard(
+                            rank = index + 1,
+                            record = record,
+                            illustrationUrl = getIllustrationUrl(record.songId),
+                            onSongClick = onSongClick
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = modifier.fillMaxSize(),
+                contentPadding = listContentPadding,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             if (showTagSection) {
                 item(contentType = "tag_analysis") {
                     CollapsibleTagAnalysis(
@@ -179,6 +278,7 @@ fun B30Tab(
                         onSongClick = onSongClick
                     )
                 }
+            }
             }
         }
     }
