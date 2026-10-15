@@ -1,5 +1,6 @@
 package org.kasumi321.ushio.phitracker.ui
 
+import androidx.compose.runtime.saveable.SaverScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -172,8 +173,9 @@ class PhiTrackerNavHostTest {
 
     @Test
     fun migratableDetailRouteDropsRoutesThatCannotMigrate() {
-        // The B30 image needs its in-memory payload; typed routes cannot be
-        // re-navigated from their pattern string; both fall back to Home.
+        // The B30 image needs its in-memory payload and falls back to Home.
+        // The typed song detail migrates through toDetailRouteRequest with its
+        // decoded arguments; its pattern string alone is not navigable.
         assertNull(migratableDetailRoute(null))
         assertNull(migratableDetailRoute(DetailPlaceholderRoute))
         assertNull(migratableDetailRoute(Screen.B30Image.route))
@@ -184,18 +186,60 @@ class PhiTrackerNavHostTest {
     @Test
     fun detailPaneStateConsumesPendingRouteOnce() {
         val state = DetailPaneState()
-        state.onDetailRouteChanged(Screen.Settings.route)
+        state.setPendingRoute(DetailRouteRequest.Plain(Screen.Settings.route))
 
-        assertEquals(Screen.Settings.route, state.consumePendingRoute())
+        assertEquals(DetailRouteRequest.Plain(Screen.Settings.route), state.consumePendingRoute())
         assertNull(state.consumePendingRoute())
     }
 
     @Test
     fun detailPaneStateIgnoresNonMigratableDetailRoutes() {
         val state = DetailPaneState()
-        state.onDetailRouteChanged(DetailPlaceholderRoute)
+        state.setPendingRoute(migratableDetailRoute(DetailPlaceholderRoute)?.let(DetailRouteRequest::Plain))
 
         assertNull(state.consumePendingRoute())
+    }
+
+    @Test
+    fun detailPaneStateSaverRestoresPendingRouteAcrossRecreation() {
+        // A foldable's display switch recreates the Activity; the mirrored
+        // detail route must survive so the reopened layout can restore it.
+        val state = DetailPaneState()
+        state.setPendingRoute(DetailRouteRequest.Plain(Screen.Settings.route))
+
+        val saved = with(DetailPaneState.Saver) {
+            with(SaverScope { true }) { save(state) }
+        }
+        val restored = DetailPaneState.Saver.restore(checkNotNull(saved))
+
+        assertEquals(DetailRouteRequest.Plain(Screen.Settings.route), restored?.consumePendingRoute())
+    }
+
+    @Test
+    fun detailPaneStateSaverRestoresSongDetailWithArguments() {
+        // Song details opened from the B30 or songs tab are the common case on
+        // a foldable; their typed arguments must survive the recreation too,
+        // including non-ASCII song ids.
+        val state = DetailPaneState()
+        state.setPendingRoute(DetailRouteRequest.SongDetail("光.姜米條.0", "AT"))
+
+        val saved = with(DetailPaneState.Saver) {
+            with(SaverScope { true }) { save(state) }
+        }
+        val restored = DetailPaneState.Saver.restore(checkNotNull(saved))
+
+        assertEquals(
+            DetailRouteRequest.SongDetail("光.姜米條.0", "AT"),
+            restored?.consumePendingRoute()
+        )
+    }
+
+    @Test
+    fun detailPaneStateSaverSkipsNothingToSave() {
+        val saved = with(DetailPaneState.Saver) {
+            with(SaverScope { true }) { save(DetailPaneState()) }
+        }
+        assertNull(saved)
     }
 
     private fun payload(songId: String) = B30ExportPayload(

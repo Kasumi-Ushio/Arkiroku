@@ -345,11 +345,11 @@ fun MainScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToSuggest: () -> Unit,
     onNavigateToLogin: () -> Unit,
+    tabState: HomeTabState,
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val tabState = rememberSaveable(saver = HomeTabState.Saver) { HomeTabState() }
     val selectedTab = tabState.selected
     val tip = remember(selectedTab) { viewModel.getRandomTip() }
     val reducedMotionEnabled = rememberReducedMotionEnabled()

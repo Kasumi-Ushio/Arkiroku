@@ -28,4 +28,19 @@ class ExpandedHomeLayoutTest {
         // minimum wins so the rail stays usable.
         assertEquals(320.dp, clampListPaneWidth(500.dp, totalWidth = 600.dp))
     }
+
+    @Test
+    fun preferredListPaneWidthPrefersUserDrag() {
+        assertEquals(500.dp, preferredListPaneWidth(500f, hingeLeft = 700.dp, height = 818.dp))
+    }
+
+    @Test
+    fun preferredListPaneWidthAlignsToHingeBeforeNineToSixteen() {
+        assertEquals(700.dp, preferredListPaneWidth(Float.NaN, hingeLeft = 700.dp, height = 818.dp))
+    }
+
+    @Test
+    fun preferredListPaneWidthFallsBackToNineToSixteen() {
+        assertEquals(460.125.dp, preferredListPaneWidth(Float.NaN, hingeLeft = null, height = 818.dp))
+    }
 }

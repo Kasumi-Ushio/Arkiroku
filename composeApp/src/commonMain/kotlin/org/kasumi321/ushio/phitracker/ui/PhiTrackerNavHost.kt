@@ -29,6 +29,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -42,8 +44,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.toRoute
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.triggerAppRestart
 import org.kasumi321.ushio.phitracker.data.song.IllustrationUriResolver
@@ -53,6 +61,7 @@ import org.kasumi321.ushio.phitracker.ui.b30.B30ImageScreen
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationGateway
 import org.kasumi321.ushio.phitracker.ui.home.ExpandedHomeScreen
+import org.kasumi321.ushio.phitracker.ui.home.HomeTabState
 import org.kasumi321.ushio.phitracker.ui.home.HomeViewModel
 import org.kasumi321.ushio.phitracker.ui.home.MainScreen
 import org.kasumi321.ushio.phitracker.ui.login.LoginScreen
@@ -107,34 +116,85 @@ sealed class Screen(val route: String) {
 internal const val DetailPlaceholderRoute = "detail_placeholder"
 
 /**
+ * A secondary destination captured for a hand-off between the compact and
+ * expanded layouts, or for restoration after an Activity recreation. Typed
+ * routes (song detail) keep their decoded arguments; destinations carrying
+ * in-memory payloads (the B30 image) cannot be captured and fall back to
+ * Home instead.
+ */
+@Serializable
+internal sealed interface DetailRouteRequest {
+    @Serializable
+    data class Plain(val route: String) : DetailRouteRequest
+
+    @Serializable
+    data class SongDetail(val songId: String, val difficultyName: String?) : DetailRouteRequest
+}
+
+/**
  * Bridge between the outer NavHost and the detail-pane NavHost of the expanded
  * two-pane layout. [controller] is set while the detail pane is composed and
  * null in the compact single-pane layout, so navigation gateways can route to
- * whichever host currently owns secondary destinations. [onDetailRouteChanged]
- * continuously mirrors the detail pane's current route; when the window
- * shrinks back below Expanded the compact layout consumes it to reopen the
- * same page full-screen.
+ * whichever host currently owns secondary destinations. [setPendingRoute]
+ * continuously mirrors the detail pane's current destination; when the window
+ * shrinks below Expanded the compact layout consumes it to reopen the same
+ * page full-screen, and when it grows back to Expanded the full-screen page
+ * hands itself back through the same slot so the two-pane layout can reopen
+ * it in the detail pane.
+ *
+ * The pending route also survives Activity recreation (a foldable's display
+ * switch recreates the Activity even with the full `configChanges` set): the
+ * [Saver] persists it as JSON, and whichever layout mounts first restores it.
  */
-internal class DetailPaneState {
+internal class DetailPaneState(restoredRoute: DetailRouteRequest? = null) {
     var controller: NavHostController? = null
-    private var pendingRoute: String? = null
+    private var pendingRoute: DetailRouteRequest? = restoredRoute
 
-    fun onDetailRouteChanged(route: String?) {
-        pendingRoute = migratableDetailRoute(route)
+    fun setPendingRoute(request: DetailRouteRequest?) {
+        pendingRoute = request
     }
 
-    fun consumePendingRoute(): String? {
+    fun consumePendingRoute(): DetailRouteRequest? {
         val route = pendingRoute
         pendingRoute = null
         return route
     }
+
+    companion object {
+        private val saverJson = Json { ignoreUnknownKeys = true }
+
+        val Saver: Saver<DetailPaneState, String> = Saver(
+            save = { state ->
+                state.pendingRoute?.let { saverJson.encodeToString(it) }
+            },
+            restore = { saved ->
+                DetailPaneState(
+                    runCatching { saverJson.decodeFromString<DetailRouteRequest>(saved) }.getOrNull()
+                )
+            }
+        )
+    }
 }
 
 /**
- * Only plain string routes may migrate across the expanded/compact split.
- * Typed routes (song detail) carry serialized arguments whose pattern string
- * cannot be re-navigated, and the B30 image needs its in-memory payload; both
- * fall back to Home instead.
+ * Capture [entry]'s destination for a cross-layout hand-off, or null when the
+ * destination cannot migrate. Plain string routes migrate as-is; the typed
+ * song detail keeps its decoded arguments so it can be re-navigated; the B30
+ * image needs its in-memory payload and falls back to Home.
+ */
+internal fun NavBackStackEntry.toDetailRouteRequest(): DetailRouteRequest? = when {
+    destination.hasRoute<SongDetailRoute>() -> {
+        val route = toRoute<SongDetailRoute>()
+        DetailRouteRequest.SongDetail(route.songId, route.difficultyName)
+    }
+
+    else -> migratableDetailRoute(destination.route)?.let(DetailRouteRequest::Plain)
+}
+
+/**
+ * Only plain string routes migrate by route string. The typed song detail is
+ * captured through [toDetailRouteRequest] instead; the B30 image needs its
+ * in-memory payload and falls back to Home.
  */
 internal fun migratableDetailRoute(route: String?): String? = when (route) {
     Screen.About.route,
@@ -146,6 +206,20 @@ internal fun migratableDetailRoute(route: String?): String? = when (route) {
     Screen.Suggest.route -> route
 
     else -> null
+}
+
+/** Navigate to a captured secondary destination, restoring typed arguments. */
+internal fun NavHostController.navigateDetailRequest(
+    request: DetailRouteRequest,
+    builder: NavOptionsBuilder.() -> Unit = {}
+) {
+    when (request) {
+        is DetailRouteRequest.Plain -> navigate(request.route, builder)
+        is DetailRouteRequest.SongDetail -> navigate(
+            SongDetailRoute(songId = request.songId, difficultyName = request.difficultyName),
+            builder
+        )
+    }
 }
 
 /** The route the cold start must open, plus the one-shot flag side effects. */
@@ -255,7 +329,7 @@ fun PhiTrackerNavHost() {
         return
     }
 
-    val detailPaneState = remember { DetailPaneState() }
+    val detailPaneState = rememberSaveable(saver = DetailPaneState.Saver) { DetailPaneState() }
     val b30Navigation = remember(navController, detailPaneState) {
         B30NavigationCoordinator(
             object : B30NavigationGateway {
@@ -376,6 +450,11 @@ fun PhiTrackerNavHost() {
             LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_home") }
             val homeViewModel: HomeViewModel = koinViewModel()
             val windowSizeClass = rememberWindowSizeClass()
+            // Hoisted above the layout split: the tab selection must survive
+            // swapping between the compact and expanded home layouts (a
+            // foldable's fold/unfold swaps them without recreating this
+            // destination).
+            val tabState = rememberSaveable(saver = HomeTabState.Saver) { HomeTabState() }
             if (windowSizeClass.isExpanded()) {
                 // Expanded: rail + home tabs stay pinned on the left while
                 // secondary pages open in the detail pane on the right.
@@ -386,6 +465,7 @@ fun PhiTrackerNavHost() {
                     settingsRepository = settingsRepository,
                     reducedMotionEnabled = reducedMotionEnabled,
                     outerNavController = navController,
+                    tabState = tabState,
                     onLogout = b30Navigation::homeLogout,
                     onNavigateToLogin = { navController.navigate(Screen.Login.route) }
                 )
@@ -393,7 +473,7 @@ fun PhiTrackerNavHost() {
                 // Shrunk below Expanded (e.g. foldable closed): reopen the page
                 // the detail pane was showing, now full-screen.
                 LaunchedEffect(Unit) {
-                    detailPaneState.consumePendingRoute()?.let { navController.navigate(it) }
+                    detailPaneState.consumePendingRoute()?.let { navController.navigateDetailRequest(it) }
                 }
                 MainScreen(
                     onLogout = b30Navigation::homeLogout,
@@ -416,6 +496,7 @@ fun PhiTrackerNavHost() {
                     onNavigateToLogin = {
                         navController.navigate(Screen.Login.route)
                     },
+                    tabState = tabState,
                     viewModel = homeViewModel
                 )
             }
@@ -425,7 +506,9 @@ fun PhiTrackerNavHost() {
             outer = navController,
             b30Navigation = b30Navigation,
             reducedMotionEnabled = reducedMotionEnabled,
-            settingsRepository = settingsRepository
+            settingsRepository = settingsRepository,
+            detailPaneState = detailPaneState,
+            migrateOnExpanded = true
         )
         composable<IllustrationPreviewRoute>(
             enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
@@ -453,6 +536,31 @@ fun PhiTrackerNavHost() {
 }
 
 /**
+ * Compact→expanded hand-off: when the window grows back to Expanded while a
+ * secondary page sits full-screen on the outer stack (unfolding a foldable,
+ * or widening a window), hand the page back to the detail pane and pop the
+ * outer entry so Home resurfaces as the two-pane layout. Wired only on the
+ * outer graph ([enabled]); the detail pane's own copies of these destinations
+ * must not migrate.
+ */
+@Composable
+private fun MigrateSecondaryToDetailOnExpanded(
+    request: DetailRouteRequest,
+    enabled: Boolean,
+    detailPaneState: DetailPaneState,
+    host: NavHostController
+) {
+    if (!enabled) return
+    val expanded = rememberWindowSizeClass().isExpanded()
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            detailPaneState.setPendingRoute(request)
+            host.popBackStack()
+        }
+    }
+}
+
+/**
  * Secondary destinations shared by the outer NavHost (compact layout) and the
  * detail-pane NavHost (expanded two-pane layout). [host] is the controller of
  * the graph being built — all secondary-to-secondary navigation and back pops
@@ -461,13 +569,20 @@ fun PhiTrackerNavHost() {
  * preview). Registering the same destinations on both graphs keeps the
  * compact flow unchanged while letting the detail pane host them when
  * expanded.
+ *
+ * [migrateOnExpanded] must be true only on the outer graph: when the window
+ * grows back to Expanded while one of these pages sits on it full-screen, the
+ * page hands itself back to the detail pane via [detailPaneState] and pops,
+ * so Home resurfaces as the two-pane layout.
  */
 internal fun NavGraphBuilder.secondaryDestinations(
     host: NavHostController,
     outer: NavHostController,
     b30Navigation: B30NavigationCoordinator,
     reducedMotionEnabled: Boolean,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    detailPaneState: DetailPaneState,
+    migrateOnExpanded: Boolean
 ) {
     composable(
         route = Screen.B30Image.route,
@@ -530,6 +645,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) {
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Plain(Screen.About.route),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_about") }
         val aboutSettingsViewModel: SettingsViewModel = koinViewModel()
         AboutScreen(
@@ -548,6 +669,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) {
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Plain(Screen.Disclaimer.route),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         DisclaimerScreen(
             onNavigateBack = { host.popBackStack() }
         )
@@ -559,6 +686,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) {
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Plain(Screen.Acknowledgments.route),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         AcknowledgmentsScreen(
             onNavigateBack = { host.popBackStack() }
         )
@@ -570,6 +703,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) {
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Plain(Screen.Licenses.route),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         LicensesScreen(
             onNavigateBack = { host.popBackStack() }
         )
@@ -581,6 +720,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) {
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Plain(Screen.Settings.route),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_settings") }
         val viewModel: SettingsViewModel = koinViewModel()
         SettingsScreen(
@@ -597,6 +742,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) {
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Plain(Screen.Suggest.route),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_suggest") }
         val suggestViewModel: SuggestViewModel = koinViewModel()
         val illustrationResolver: IllustrationUriResolver = koinInject()
@@ -622,6 +773,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) {
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Plain(Screen.PrivacyPolicy.route),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         PrivacyPolicyScreen(
             onNavigateBack = { host.popBackStack() }
         )
@@ -633,6 +790,12 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) { backStackEntry ->
         val route = backStackEntry.toRoute<SongDetailRoute>()
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.SongDetail(route.songId, route.difficultyName),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
         val songId = route.songId
         val difficulty = route.difficulty()
         val viewModel: SongDetailViewModel = koinViewModel(

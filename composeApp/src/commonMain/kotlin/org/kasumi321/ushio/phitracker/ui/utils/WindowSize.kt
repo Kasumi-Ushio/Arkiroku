@@ -1,7 +1,9 @@
 package org.kasumi321.ushio.phitracker.ui.utils
 
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.separatingVerticalHingeBounds
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
@@ -15,6 +17,16 @@ import androidx.window.core.layout.WindowSizeClass
 @Composable
 fun rememberWindowSizeClass(): WindowSizeClass =
     currentWindowAdaptiveInfoV2().windowSizeClass
+
+/**
+ * Bounds (window pixels) of the vertical hinge the device is currently folded
+ * around, or null when there is none (flat foldable, non-foldable, iOS). The
+ * expanded two-pane layout aligns its split to this hinge and keeps the drag
+ * handle clear of it.
+ */
+@Composable
+fun rememberSeparatingVerticalHingeBounds(): Rect? =
+    currentWindowAdaptiveInfoV2().windowPosture.separatingVerticalHingeBounds.firstOrNull()
 
 /** Medium width starts at 600dp, Expanded at 840dp, per M3 window size classes. */
 fun WindowSizeClass.isAtLeastMedium(): Boolean =

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -55,10 +56,14 @@ import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
 import org.kasumi321.ushio.phitracker.ui.DetailPaneState
 import org.kasumi321.ushio.phitracker.ui.DetailPlaceholderRoute
+import org.kasumi321.ushio.phitracker.ui.DetailRouteRequest
 import org.kasumi321.ushio.phitracker.ui.Screen
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
+import org.kasumi321.ushio.phitracker.ui.navigateDetailRequest
 import org.kasumi321.ushio.phitracker.ui.navigation.SongDetailRoute
 import org.kasumi321.ushio.phitracker.ui.secondaryDestinations
+import org.kasumi321.ushio.phitracker.ui.toDetailRouteRequest
+import org.kasumi321.ushio.phitracker.ui.utils.rememberSeparatingVerticalHingeBounds
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.detail_pane_placeholder
 
@@ -73,6 +78,16 @@ private val DividerHandleWidth = 16.dp
 
 /** Default list pane width: a phone-like 9:16 (width:height) portrait pane. */
 internal fun defaultListPaneWidth(height: Dp): Dp = height * 9 / 16
+
+/**
+ * Settled list pane width before clamping: a user's drag wins, then the
+ * hinge's left edge on a book-mode foldable, then the 9:16 default.
+ */
+internal fun preferredListPaneWidth(userWidthDp: Float, hingeLeft: Dp?, height: Dp): Dp = when {
+    !userWidthDp.isNaN() -> userWidthDp.dp
+    hingeLeft != null -> hingeLeft
+    else -> defaultListPaneWidth(height)
+}
 
 /** Keeps the list pane inside [MinListPaneWidth, totalWidth - [MinDetailPaneWidth]]. */
 internal fun clampListPaneWidth(width: Dp, totalWidth: Dp): Dp =
@@ -107,9 +122,9 @@ private fun Modifier.detailPaneWidth(progress: State<Float>, detailWidthPx: Int)
     layout(w, placeable.height) { placeable.place(0, 0) }
 }
 
-/** Animated drag handle width: 0 when the detail pane is hidden. */
-private fun Modifier.handleWidth(progress: State<Float>, handleWidthPx: Int) = layout { measurable, constraints ->
-    val w = (handleWidthPx * progress.value.coerceIn(0f, 1f)).roundToInt()
+/** Animated width for the drag handle and the hinge gap: 0 when the detail pane is hidden. */
+private fun Modifier.animatedWidth(progress: State<Float>, widthPx: Int) = layout { measurable, constraints ->
+    val w = (widthPx * progress.value.coerceIn(0f, 1f)).roundToInt()
     val placeable = measurable.measure(constraints.copy(minWidth = w, maxWidth = w))
     layout(w, placeable.height) { placeable.place(0, 0) }
 }
@@ -128,6 +143,12 @@ private fun Modifier.handleWidth(progress: State<Float>, handleWidthPx: Int) = l
  *
  * Full-screen destinations (onboarding, login, illustration preview) never
  * enter this layout; they stay on the outer graph above Home.
+ *
+ * Foldables: on a book-mode device the split aligns to the vertical hinge and
+ * the hinge's physical strip is left empty. A fold/unfold display switch
+ * recreates the Activity, so the detail route persists through
+ * [detailPaneState]'s saver and is restored into the fresh pane (or reopened
+ * full-screen when the new posture is below Expanded).
  */
 @Composable
 internal fun ExpandedHomeScreen(
@@ -137,6 +158,7 @@ internal fun ExpandedHomeScreen(
     settingsRepository: SettingsRepository,
     reducedMotionEnabled: Boolean,
     outerNavController: NavHostController,
+    tabState: HomeTabState,
     onLogout: () -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
@@ -147,18 +169,11 @@ internal fun ExpandedHomeScreen(
         onDispose { detailPaneState.controller = null }
     }
 
-    // Mirror the detail pane's current route so the compact layout can reopen
-    // it full-screen when the window shrinks below Expanded.
-    val detailEntry by detailNavController.currentBackStackEntryAsState()
-    LaunchedEffect(detailEntry) {
-        detailPaneState.onDetailRouteChanged(detailEntry?.destination?.route)
-    }
-
     // Top-level detail destinations replace each other above the placeholder,
     // keeping the back stack shallow; nested flows (e.g. About -> Licenses)
     // navigate plainly inside the detail graph and stack normally.
-    fun navigateDetail(route: String) {
-        detailNavController.navigate(route) {
+    fun navigateDetail(request: DetailRouteRequest) {
+        detailNavController.navigateDetailRequest(request) {
             popUpTo(DetailPlaceholderRoute) { inclusive = false }
             launchSingleTop = true
         }
@@ -169,6 +184,21 @@ internal fun ExpandedHomeScreen(
             popUpTo(DetailPlaceholderRoute) { inclusive = false }
             launchSingleTop = true
         }
+    }
+
+    // Restore the detail destination that survived an Activity recreation (a
+    // foldable's display switch recreates the Activity). This must run before
+    // the route mirror below, whose first placeholder report would otherwise
+    // erase the restored route.
+    LaunchedEffect(detailNavController) {
+        detailPaneState.consumePendingRoute()?.let { navigateDetail(it) }
+    }
+
+    // Mirror the detail pane's current destination so the compact layout can
+    // reopen it full-screen when the window shrinks below Expanded.
+    val detailEntry by detailNavController.currentBackStackEntryAsState()
+    LaunchedEffect(detailEntry) {
+        detailPaneState.setPendingRoute(detailEntry?.toDetailRouteRequest())
     }
 
     val density = LocalDensity.current
@@ -204,14 +234,19 @@ internal fun ExpandedHomeScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val totalWidth = maxWidth
+        // Book-mode foldable: split along the hinge and keep the drag handle
+        // clear of it. A user's drag still wins over the hinge-aligned default.
+        val hingeBounds = rememberSeparatingVerticalHingeBounds()
+        val hingeLeft = hingeBounds?.let { with(density) { it.left.toDp() } }
+        val hingeGapPx = hingeBounds?.let { (it.right - it.left).roundToInt() } ?: 0
         val listPaneWidth = clampListPaneWidth(
-            width = if (userWidthDp.isNaN()) defaultListPaneWidth(maxHeight) else userWidthDp.dp,
+            width = preferredListPaneWidth(userWidthDp, hingeLeft, maxHeight),
             totalWidth = totalWidth
         )
         val fullWidthPx = constraints.maxWidth
         val listPaneWidthPx = with(density) { listPaneWidth.roundToPx() }
         val handleWidthPx = with(density) { DividerHandleWidth.roundToPx() }
-        val detailWidthPx = (fullWidthPx - listPaneWidthPx - handleWidthPx).coerceAtLeast(0)
+        val detailWidthPx = (fullWidthPx - listPaneWidthPx - handleWidthPx - hingeGapPx).coerceAtLeast(0)
         Row(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
@@ -226,19 +261,30 @@ internal fun ExpandedHomeScreen(
                     onNavigateToSongDetailWithDifficulty = { songId, difficulty ->
                         navigateSongDetail(songId, difficulty)
                     },
-                    onNavigateToAbout = { navigateDetail(Screen.About.route) },
-                    onNavigateToSettings = { navigateDetail(Screen.Settings.route) },
-                    onNavigateToSuggest = { navigateDetail(Screen.Suggest.route) },
+                    onNavigateToAbout = { navigateDetail(DetailRouteRequest.Plain(Screen.About.route)) },
+                    onNavigateToSettings = { navigateDetail(DetailRouteRequest.Plain(Screen.Settings.route)) },
+                    onNavigateToSuggest = { navigateDetail(DetailRouteRequest.Plain(Screen.Suggest.route)) },
                     onNavigateToLogin = onNavigateToLogin,
+                    tabState = tabState,
                     viewModel = homeViewModel
                 )
             }
+            // The strip the physical hinge occupies stays empty so neither the
+            // drag handle nor any pane content sits under it.
+            if (hingeGapPx > 0) {
+                Spacer(
+                    modifier = Modifier
+                        .animatedWidth(paneProgress, hingeGapPx)
+                        .fillMaxHeight()
+                )
+            }
             // Drag handle: horizontal drag resizes the list pane, double-tap
-            // restores the 9:16 default. The centered pill is the visual
-            // affordance that the divider can be dragged.
+            // restores the default (hinge-aligned on a book-mode foldable, 9:16
+            // elsewhere). The centered pill is the visual affordance that the
+            // divider can be dragged.
             Box(
                 modifier = Modifier
-                    .handleWidth(paneProgress, handleWidthPx)
+                    .animatedWidth(paneProgress, handleWidthPx)
                     .fillMaxHeight()
                     .clipToBounds()
                     .draggable(
@@ -281,7 +327,9 @@ internal fun ExpandedHomeScreen(
                     outer = outerNavController,
                     b30Navigation = b30Navigation,
                     reducedMotionEnabled = reducedMotionEnabled,
-                    settingsRepository = settingsRepository
+                    settingsRepository = settingsRepository,
+                    detailPaneState = detailPaneState,
+                    migrateOnExpanded = false
                 )
             }
         }
