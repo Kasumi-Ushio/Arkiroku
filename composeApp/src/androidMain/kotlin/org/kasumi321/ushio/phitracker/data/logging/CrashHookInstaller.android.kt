@@ -5,6 +5,7 @@ import okio.buffer
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import org.kasumi321.ushio.phitracker.data.platform.AndroidPlatformContext
 
 actual object CrashHookInstaller {
 
@@ -20,6 +21,11 @@ actual object CrashHookInstaller {
                 writeCrashLog(store, thread, throwable)
             } catch (writeFailure: Exception) {
                 writeFailure.printStackTrace()
+            }
+            runCatching {
+                val context = AndroidPlatformContext.currentActivity
+                    ?: AndroidPlatformContext.applicationContext
+                context?.let(CrashNotifier::notifyCrash)
             }
             originalHandler?.uncaughtException(thread, throwable)
         }

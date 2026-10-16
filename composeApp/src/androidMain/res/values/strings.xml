@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="crash_notification_channel_name">Crash alerts</string>
+    <string name="crash_notification_channel_description">Local alerts shown after the app crashes</string>
+    <string name="crash_notification_title">Phi Tracker crashed</string>
+    <string name="crash_notification_text">A crash report has been saved. Export it from Settings → Diagnostics to send feedback.</string>
+</resources>

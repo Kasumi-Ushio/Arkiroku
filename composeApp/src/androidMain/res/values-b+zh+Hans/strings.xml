@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="crash_notification_channel_name">崩溃提醒</string>
+    <string name="crash_notification_channel_description">应用崩溃后的本地提示通知</string>
+    <string name="crash_notification_title">Phi Tracker 发生异常</string>
+    <string name="crash_notification_text">崩溃报告已保存，可在「设置 → 诊断」中导出反馈。</string>
+</resources>
