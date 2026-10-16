@@ -205,7 +205,10 @@ private fun MainBottomBar(
     }
 }
 
-/** Circular avatar pinned to the top of the rail; taps open the avatar picker. */
+/**
+ * Circular avatar pinned to the top of the rail. With no avatar set, taps open
+ * the avatar picker; once set, taps switch to the Profile tab instead.
+ */
 @Composable
 private fun RailAvatar(
     avatarUri: String?,
@@ -624,7 +627,13 @@ fun MainScreen(
                     navItems = navItems,
                     selectedTab = selectedTab,
                     avatarUri = state.profile.avatarUri,
-                    onAvatarClick = { launchAvatarPicker() },
+                    onAvatarClick = {
+                        if (state.profile.avatarUri == null) {
+                            launchAvatarPicker()
+                        } else {
+                            tabState.select(HomeTab.Profile)
+                        }
+                    },
                     reducedMotionEnabled = reducedMotionEnabled,
                     onTabSelected = tabState::select
                 )
