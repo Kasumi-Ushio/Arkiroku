@@ -139,7 +139,7 @@ class SettingsMaintenanceViewModelTest {
     @Test
     fun runtimeAndCrashExportsClearAndActionsEmitNoDuplicates(): Unit = runTest(dispatcher) {
         val viewModel = createViewModel(prepareLogStore = { store ->
-            store.fileSystem.write(store.runtimeCurrentFile()) { writeUtf8("runtime-entry") }
+            store.fileSystem.write(store.prepareRuntimeLogDir() / "runtime.log") { writeUtf8("runtime-entry") }
             store.fileSystem.write(store.crashLogPath()) { writeUtf8("crash-entry") }
         })
         advanceUntilIdle()

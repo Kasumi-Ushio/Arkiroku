@@ -3,7 +3,7 @@ package org.kasumi321.ushio.phitracker.data.platform
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Log
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,7 +45,7 @@ actual fun rememberThemeImageColorPicker(onResult: (ThemeImageColorPickResult?) 
                     ?: error("Unable to decode selected image")
                 ThemeImageColorPickResult(uri = uri.toString(), image = image)
             }.onFailure {
-                Log.e(THEME_PICKER_TAG, "Failed to decode theme image", it)
+                AppLogger.e(THEME_PICKER_TAG, "Failed to decode theme image", it)
             }.getOrNull()
             withContext(Dispatchers.Main) {
                 onResult(result)

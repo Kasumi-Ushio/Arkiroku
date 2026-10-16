@@ -39,6 +39,7 @@
     <string name="settings_category_b30">B30 settings</string>
     <string name="settings_category_data_cache">Data and cache</string>
     <string name="settings_category_debug">Debug options</string>
+    <string name="settings_category_diagnostics">Diagnostics</string>
     <string name="settings_category_interface_theme">Interface and theme</string>
     <string name="settings_category_score_api">Score lookup API</string>
     <string name="settings_category_updates">App updates</string>

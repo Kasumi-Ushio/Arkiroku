@@ -257,7 +257,7 @@ class HomeViewModel(
                         if (changed) updateSongs { it.copy(songDataUpdateAvailable = true) }
                     },
                     onFailure = { error ->
-                        AppLogger.event("data", "song_data_upstream_check_failed", mapOf("error" to (error.message ?: "unknown")))
+                        AppLogger.event("data", "song_data_upstream_check_failed", mapOf("error" to (error.message ?: "unknown")), throwable = error)
                     }
                 )
             }
@@ -329,7 +329,7 @@ class HomeViewModel(
                 applyFilters()
                 AppLogger.event("data", "song_data_loaded", mapOf("count" to songs.size.toString()))
             } catch (e: Exception) {
-                AppLogger.event("data", "song_data_load_failed", mapOf("error" to (e.message ?: "unknown")))
+                AppLogger.event("data", "song_data_load_failed", mapOf("error" to (e.message ?: "unknown")), throwable = e)
             }
         }
     }
@@ -684,13 +684,13 @@ class HomeViewModel(
                             error = result.exceptionOrNull()?.message?.let(UiText::Raw)
                         )
                     }
-                    AppLogger.event("sync", "refresh_failed", mapOf("error" to (result.exceptionOrNull()?.message ?: "unknown")))
+                    AppLogger.event("sync", "refresh_failed", mapOf("error" to (result.exceptionOrNull()?.message ?: "unknown")), throwable = result.exceptionOrNull())
                 }
             } catch (e: Exception) {
                 updateSync {
                     it.copy(isSyncing = false, error = e.message?.let(UiText::Raw))
                 }
-                AppLogger.event("sync", "refresh_failed", mapOf("error" to (e.message ?: "unknown")))
+                AppLogger.event("sync", "refresh_failed", mapOf("error" to (e.message ?: "unknown")), throwable = e)
             }
         }
     }
@@ -1161,7 +1161,8 @@ class HomeViewModel(
                             AppLogger.event(
                                 "data",
                                 "game_update_info_cache_write_failed",
-                                mapOf("error" to (e.message ?: "unknown"))
+                                mapOf("error" to (e.message ?: "unknown")),
+                                throwable = e
                             )
                         }
                     }
@@ -1172,7 +1173,8 @@ class HomeViewModel(
                     AppLogger.event(
                         "data",
                         "game_update_info_load_failed",
-                        mapOf("error" to (e.message ?: "unknown"))
+                        mapOf("error" to (e.message ?: "unknown")),
+                        throwable = e
                     )
                 }
             )

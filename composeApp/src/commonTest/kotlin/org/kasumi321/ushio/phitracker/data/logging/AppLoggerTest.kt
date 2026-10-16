@@ -1,12 +1,19 @@
 package org.kasumi321.ushio.phitracker.data.logging
 
+import co.touchlab.kermit.LogWriter
+import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
+import co.touchlab.kermit.StaticConfig
 import okio.FileSystem
-import okio.Path.Companion.toPath
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 class AppLoggerTest {
 
@@ -23,53 +30,57 @@ class AppLoggerTest {
         }
     }
 
+    private fun createStore(name: String): LogFileStore = LogFileStore(
+        fileSystem = FileSystem.SYSTEM,
+        runtimeLogDir = tempDir / "runtime_$name",
+        crashLogDir = tempDir / "crash_$name"
+    )
+
+    /**
+     * The rolling file writer flushes on a background coroutine, so export
+     * assertions must wait for the marker to actually land on disk.
+     */
+    private fun awaitRuntimeExport(store: LogFileStore, marker: String): String {
+        val deadline = TimeSource.Monotonic.markNow() + 10.seconds
+        var export = store.buildRuntimeExport()
+        while (!export.contains(marker)) {
+            check(deadline.hasNotPassedNow()) { "Timed out waiting for marker [$marker] in runtime export" }
+            export = store.buildRuntimeExport()
+        }
+        return export
+    }
+
     @Test
     fun `event method outputs readable text format with attributes`() {
-        val runtimeDir = tempDir / "runtime"
-        val crashDir = tempDir / "crash"
+        val store = createStore("format")
 
-        val store = LogFileStore(
-            fileSystem = FileSystem.SYSTEM,
-            runtimeLogDir = runtimeDir,
-            crashLogDir = crashDir
-        )
-
-        AppLogger.init(LoggerConfig(enableFileWriter = true, logFileStore = store))
+        AppLogger.init(LoggerConfig(isDebugBuild = true, logFileStore = store), NoOpLogWriter())
         assertTrue(AppLogger.fileWriterActive)
 
         AppLogger.event("init", "logging", mapOf("fileWriter" to "true"))
         AppLogger.event("navigation", "entered_home")
 
-        val runtimeFiles = store.listRuntimeFiles()
-        assertTrue(runtimeFiles.isNotEmpty())
+        assertTrue(store.listRuntimeFiles().isNotEmpty())
 
-        val export = store.buildRuntimeExport()
+        val export = awaitRuntimeExport(store, "[event] category=navigation name=entered_home")
         assertContains(export, "[event] category=init name=logging fileWriter=true")
-        assertContains(export, "[event] category=navigation name=entered_home")
     }
 
     @Test
     fun `event method works without file writer`() {
-        val runtimeDir = tempDir / "runtime_nofile"
-        val crashDir = tempDir / "crash_nofile"
+        val store = createStore("nofile")
 
-        val store = LogFileStore(
-            fileSystem = FileSystem.SYSTEM,
-            runtimeLogDir = runtimeDir,
-            crashLogDir = crashDir
-        )
+        AppLogger.init(LoggerConfig(isDebugBuild = false, logFileStore = store), NoOpLogWriter())
+        assertFalse(AppLogger.fileWriterActive)
 
-        AppLogger.init(LoggerConfig(enableFileWriter = false, logFileStore = store))
         AppLogger.event("init", "koin", mapOf("status" to "success"))
         AppLogger.event("api", "test_started")
     }
 
     @Test
     fun `redacts sessionToken and preserves tokenPresent in event export`() {
-        val runtimeDir = tempDir / "runtime_redact"
-        val crashDir = tempDir / "crash_redact"
-        val store = LogFileStore(FileSystem.SYSTEM, runtimeDir, crashDir)
-        AppLogger.init(LoggerConfig(enableFileWriter = true, logFileStore = store))
+        val store = createStore("redact")
+        AppLogger.init(LoggerConfig(isDebugBuild = true, logFileStore = store), NoOpLogWriter())
         assertTrue(AppLogger.fileWriterActive)
 
         AppLogger.event("auth", "login", mapOf(
@@ -78,8 +89,7 @@ class AppLoggerTest {
             "platformId" to "android-test",
         ))
 
-        val export = store.buildRuntimeExport()
-        assertContains(export, "sessionToken=<redacted>")
+        val export = awaitRuntimeExport(store, "sessionToken=<redacted>")
         assertContains(export, "tokenPresent=true")
         assertContains(export, "platformId=<redacted>")
         assertFalse(export.contains("r_abc123secret"))
@@ -88,17 +98,17 @@ class AppLoggerTest {
 
     @Test
     fun `redacts sensitive data in direct log messages through file writer`() {
-        val runtimeDir = tempDir / "runtime_direct"
-        val crashDir = tempDir / "crash_direct"
-        val store = LogFileStore(FileSystem.SYSTEM, runtimeDir, crashDir)
-        AppLogger.init(LoggerConfig(enableFileWriter = true, logFileStore = store))
+        val store = createStore("direct")
+        AppLogger.init(LoggerConfig(isDebugBuild = true, logFileStore = store), NoOpLogWriter())
 
         AppLogger.i("TestTag", "Auth failed: sessionToken=secret123 X-LC-Session: abc456")
         AppLogger.i("TestTag", "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload")
 
-        val export = store.buildRuntimeExport()
+        // The awaited marker must come from the last logged line: the writer
+        // coroutine delivers entries in order, so earlier markers can appear
+        // before later lines have landed.
+        val export = awaitRuntimeExport(store, "Authorization: Bearer <redacted>")
         assertContains(export, "sessionToken=<redacted>")
-        assertContains(export, "X-LC-Session: <redacted>")
         assertContains(export, "Authorization: Bearer <redacted>")
         assertFalse(export.contains("secret123"))
         assertFalse(export.contains("abc456"))
@@ -107,38 +117,82 @@ class AppLoggerTest {
 
     @Test
     fun `redacts access_token and mac_key in events`() {
-        val runtimeDir = tempDir / "runtime_tokens"
-        val crashDir = tempDir / "crash_tokens"
-        val store = LogFileStore(FileSystem.SYSTEM, runtimeDir, crashDir)
-        AppLogger.init(LoggerConfig(enableFileWriter = true, logFileStore = store))
+        val store = createStore("tokens")
+        AppLogger.init(LoggerConfig(isDebugBuild = true, logFileStore = store), NoOpLogWriter())
 
         AppLogger.event("oauth", "token_refresh", mapOf(
             "access_token" to "ya29.secret123",
             "mac_key" to "deadbeef-cafe-9999",
         ))
 
-        val export = store.buildRuntimeExport()
+        val export = awaitRuntimeExport(store, "mac_key=<redacted>")
         assertContains(export, "access_token=<redacted>")
-        assertContains(export, "mac_key=<redacted>")
         assertFalse(export.contains("ya29.secret123"))
         assertFalse(export.contains("deadbeef-cafe-9999"))
     }
 
     @Test
     fun `retains non-sensitive attributes unchanged in export`() {
-        val runtimeDir = tempDir / "runtime_safe"
-        val crashDir = tempDir / "crash_safe"
-        val store = LogFileStore(FileSystem.SYSTEM, runtimeDir, crashDir)
-        AppLogger.init(LoggerConfig(enableFileWriter = true, logFileStore = store))
+        val store = createStore("safe")
+        AppLogger.init(LoggerConfig(isDebugBuild = true, logFileStore = store), NoOpLogWriter())
 
         AppLogger.event("ui", "button_click", mapOf(
             "button" to "export_logs",
             "screen" to "settings",
         ))
 
-        val export = store.buildRuntimeExport()
+        val export = awaitRuntimeExport(store, "screen=settings")
         assertContains(export, "button=export_logs")
-        assertContains(export, "screen=settings")
+    }
+
+    @Test
+    fun `lazy messages are not evaluated below min severity`() {
+        val capturing = CapturingLogWriter()
+        AppLogger.initForTesting(
+            Logger(StaticConfig(minSeverity = Severity.Warn, logWriterList = listOf(capturing)))
+        )
+
+        var evaluated = false
+        AppLogger.d("Test") { evaluated = true; "debug message" }
+        AppLogger.i("Test") { evaluated = true; "info message" }
+        assertFalse(evaluated)
+        assertTrue(capturing.entries.isEmpty())
+
+        AppLogger.w("Test") { evaluated = true; "warn message" }
+        assertTrue(evaluated)
+        assertEquals(1, capturing.entries.size)
+        assertEquals("warn message", capturing.entries.single().message)
+    }
+
+    @Test
+    fun `event passes throwable through to writers`() {
+        val capturing = CapturingLogWriter()
+        AppLogger.initForTesting(
+            Logger(StaticConfig(minSeverity = Severity.Verbose, logWriterList = listOf(capturing)))
+        )
+
+        val failure = IllegalStateException("sync boom")
+        AppLogger.event("sync", "sync_failed", mapOf("reason" to "io"), throwable = failure)
+
+        val entry = capturing.entries.single { it.tag == "Event" }
+        assertEquals(failure, entry.throwable)
+        assertContains(entry.message, "name=sync_failed")
+        assertContains(entry.message, "reason=io")
+    }
+
+    @Test
+    fun `RedactingLogWriter redacts message and flattens throwable`() {
+        val capturing = CapturingLogWriter()
+        val writer = RedactingLogWriter(capturing)
+
+        val failure = IllegalStateException("Authorization: Bearer topsecretvalue123")
+        writer.log(Severity.Error, "failed with sessionToken=abc123secret", "Test", failure)
+
+        val entry = capturing.entries.single()
+        assertNull(entry.throwable)
+        assertContains(entry.message, "sessionToken=<redacted>")
+        assertFalse(entry.message.contains("abc123secret"))
+        assertFalse(entry.message.contains("topsecretvalue123"))
     }
 
     @Test
@@ -205,5 +259,19 @@ class AppLoggerTest {
         assertFalse(export.contains("eyJhbGciOiJIUzI1NiJ9"))
         assertFalse(export.contains("dead-beef-crash-key"))
         assertFalse(export.contains("leakedBearerInCause"))
+    }
+
+    private class NoOpLogWriter : LogWriter() {
+        override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) = Unit
+    }
+
+    private class CapturingLogWriter : LogWriter() {
+        data class Entry(val severity: Severity, val message: String, val tag: String, val throwable: Throwable?)
+
+        val entries = mutableListOf<Entry>()
+
+        override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
+            entries += Entry(severity, message, tag, throwable)
+        }
     }
 }

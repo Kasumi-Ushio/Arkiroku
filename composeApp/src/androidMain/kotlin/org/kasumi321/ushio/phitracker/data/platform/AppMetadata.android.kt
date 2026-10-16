@@ -8,6 +8,7 @@ import java.util.Locale
 actual fun getAppMetadata(): AppMetadata {
     val context = AndroidPlatformContext.applicationContext
     if (context == null) {
+        appMetadataFallbackUsed = true
         return AppMetadata(
             versionName = "0.1.0",
             buildTime = formatBuildTime(),
@@ -23,6 +24,7 @@ actual fun getAppMetadata(): AppMetadata {
             buildType = if (isDebuggable) "Debug" else "Release"
         )
     } catch (e: Exception) {
+        appMetadataFallbackUsed = true
         AppMetadata(
             versionName = "0.1.0",
             buildTime = formatBuildTime(),
@@ -30,6 +32,15 @@ actual fun getAppMetadata(): AppMetadata {
         )
     }
 }
+
+/**
+ * Set when [getAppMetadata] fell back to defaults (which also forces
+ * `buildType = "Release"` and thus disables the file log writer). Logging is
+ * not yet initialised when the fallback happens, so [MainActivity] consumes
+ * this flag right after `createLoggingState` and reports it as an event.
+ */
+var appMetadataFallbackUsed: Boolean = false
+    private set
 
 private fun formatBuildTime(): String =
     SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(ANDROID_BUILD_TIME_MILLIS))

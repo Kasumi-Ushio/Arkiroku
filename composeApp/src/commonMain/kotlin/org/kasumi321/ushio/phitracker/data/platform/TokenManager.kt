@@ -1,5 +1,6 @@
 package org.kasumi321.ushio.phitracker.data.platform
 
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.domain.model.Server
 
 /**
@@ -25,6 +26,7 @@ class TokenManager(
         val server = try {
             Server.valueOf(serverName)
         } catch (_: Exception) {
+            AppLogger.w("TokenManager") { "Unknown stored server name, falling back to CN" }
             Server.CN
         }
         return token to server

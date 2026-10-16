@@ -94,6 +94,7 @@ import phitracker.composeapp.generated.resources.settings_category_about
 import phitracker.composeapp.generated.resources.settings_category_b30
 import phitracker.composeapp.generated.resources.settings_category_data_cache
 import phitracker.composeapp.generated.resources.settings_category_debug
+import phitracker.composeapp.generated.resources.settings_category_diagnostics
 import phitracker.composeapp.generated.resources.settings_category_interface_theme
 import phitracker.composeapp.generated.resources.settings_category_score_api
 import phitracker.composeapp.generated.resources.settings_category_updates
@@ -924,6 +925,74 @@ fun SettingsTab(
                         modifier = Modifier.clickable { showUpdateDataDialog = true }
                 )
 
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                CategoryTitle(stringResource(Res.string.settings_category_diagnostics))
+
+                CenteredListItem(
+                        headlineContent = {
+                            Text(stringResource(Res.string.settings_export_crash_log))
+                        },
+                        supportingContent = {
+                            Text(stringResource(Res.string.settings_export_crash_log_desc))
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.BugReport, contentDescription = null)
+                        },
+                        modifier =
+                                Modifier.clickable {
+                                    if (!hasCrashLogs) {
+                                        showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
+                                        return@clickable
+                                    }
+                                    val text = onExportCrashLog()
+                                    if (text.isBlank()) {
+                                        showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
+                                        return@clickable
+                                    }
+                                    coroutineScope.launch {
+                                        val result =
+                                                shareTextLog(text, "phitracker_crash_reports.txt")
+                                        if (result.isFailure) {
+                                            showPlatformAlert(
+                                                    exportCrashLogFailedTitle,
+                                                    getString(
+                                                            Res.string
+                                                                    .settings_export_crash_failed_message,
+                                                            result.exceptionOrNull()?.message
+                                                                    ?: exportFailedUnknownError
+                                                    )
+                                            )
+                                        }
+                                    }
+                                }
+                )
+
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.settings_clear_logs)) },
+                        supportingContent = {
+                            Text(stringResource(Res.string.settings_clear_logs_desc))
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                        },
+                        modifier =
+                                Modifier.clickable {
+                                    val ok = onClearAllLogs()
+                                    if (ok) {
+                                        showPlatformAlert(
+                                                clearLogsDoneTitle,
+                                                clearLogsDoneMessage
+                                        )
+                                    } else {
+                                        showPlatformAlert(
+                                                clearLogsFailedTitle,
+                                                clearLogsFailedMessage
+                                        )
+                                    }
+                                }
+                )
+
                 if (isDebugBuild) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
@@ -1001,69 +1070,6 @@ fun SettingsTab(
                                     }
                     )
 
-                    CenteredListItem(
-                            headlineContent = {
-                                Text(stringResource(Res.string.settings_export_crash_log))
-                            },
-                            supportingContent = {
-                                Text(stringResource(Res.string.settings_export_crash_log_desc))
-                            },
-                            leadingContent = {
-                                Icon(Icons.Default.BugReport, contentDescription = null)
-                            },
-                            modifier =
-                                    Modifier.clickable {
-                                        if (!hasCrashLogs) {
-                                            showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
-                                            return@clickable
-                                        }
-                                        val text = onExportCrashLog()
-                                        if (text.isBlank()) {
-                                            showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
-                                            return@clickable
-                                        }
-                                        coroutineScope.launch {
-                                            val result =
-                                                    shareTextLog(text, "phitracker_crash_reports.txt")
-                                            if (result.isFailure) {
-                                                showPlatformAlert(
-                                                        exportCrashLogFailedTitle,
-                                                        getString(
-                                                                Res.string
-                                                                        .settings_export_crash_failed_message,
-                                                                result.exceptionOrNull()?.message
-                                                                        ?: exportFailedUnknownError
-                                                        )
-                                                )
-                                            }
-                                        }
-                                    }
-                    )
-
-                    CenteredListItem(
-                            headlineContent = { Text(stringResource(Res.string.settings_clear_logs)) },
-                            supportingContent = {
-                                Text(stringResource(Res.string.settings_clear_logs_desc))
-                            },
-                            leadingContent = {
-                                Icon(Icons.Default.DeleteSweep, contentDescription = null)
-                            },
-                            modifier =
-                                    Modifier.clickable {
-                                        val ok = onClearAllLogs()
-                                        if (ok) {
-                                            showPlatformAlert(
-                                                    clearLogsDoneTitle,
-                                                    clearLogsDoneMessage
-                                            )
-                                        } else {
-                                            showPlatformAlert(
-                                                    clearLogsFailedTitle,
-                                                    clearLogsFailedMessage
-                                            )
-                                        }
-                                    }
-                    )
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))

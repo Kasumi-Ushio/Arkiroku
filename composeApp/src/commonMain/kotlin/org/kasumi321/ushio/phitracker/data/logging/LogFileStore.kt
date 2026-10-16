@@ -3,6 +3,9 @@ package org.kasumi321.ushio.phitracker.data.logging
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 /**
  * Manages the runtime and crash log files with rotation.
@@ -23,20 +26,19 @@ class LogFileStore(
 
     // ── Runtime log ──────────────────────────────────────────────
 
-    private val runtimeCurrent get() = runtimeDir / "runtime_current.txt"
-
-    /** Return the current runtime log file path (for the [FileLogWriter]). */
-    fun runtimeCurrentFile(): Path {
+    /** Ensure the runtime log directory exists and return it (for the rolling file writer). */
+    fun prepareRuntimeLogDir(): Path {
         ensureDir(runtimeDir)
-        return runtimeCurrent
+        return runtimeDir
     }
 
-    /** List all runtime log files, newest first. */
+    /** List all runtime log files, newest first. `.log` is the rolling writer's
+     *  extension; `.txt` covers files written by app versions before the switch. */
     fun listRuntimeFiles(): List<Path> {
         val dir = runtimeDir
         if (!fileSystem.exists(dir)) return emptyList()
         return fileSystem.list(dir)
-            .filter { it.name.startsWith("runtime") && it.name.endsWith(".txt") }
+            .filter { it.name.startsWith("runtime") && (it.name.endsWith(".log") || it.name.endsWith(".txt")) }
             .sortedByDescending { fileSystem.metadataOrNull(it)?.lastModifiedAtMillis ?: 0L }
     }
 
@@ -70,6 +72,24 @@ class LogFileStore(
     fun crashLogPath(name: String = "crash_report.txt"): Path {
         ensureDir(crashDir)
         return crashFile(name)
+    }
+
+    /** Timestamped crash report file name, e.g. `kotlin_crash_20261016_153000.txt`. */
+    fun newCrashReportName(prefix: String): String {
+        val local = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        val stamp = local.date.toString().replace("-", "") +
+                "_${local.hour.toString().padStart(2, '0')}" +
+                local.minute.toString().padStart(2, '0') +
+                local.second.toString().padStart(2, '0')
+        return "${prefix}_$stamp.txt"
+    }
+
+    /** Delete all but the newest [keep] crash files whose name starts with [prefix]. */
+    fun pruneCrashReports(prefix: String, keep: Int) {
+        listCrashFiles()
+            .filter { it.name.startsWith(prefix) }
+            .drop(keep)
+            .forEach { fileSystem.delete(it, mustExist = false) }
     }
 
     /** List crash log files, newest first. */

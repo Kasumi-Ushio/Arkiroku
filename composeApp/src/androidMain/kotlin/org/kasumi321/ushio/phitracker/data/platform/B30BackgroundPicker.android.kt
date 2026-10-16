@@ -3,7 +3,7 @@ package org.kasumi321.ushio.phitracker.data.platform
 import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
-import android.util.Log
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,7 +26,7 @@ private fun tryOpenInputStream(resolver: android.content.ContentResolver, uri: U
     return try {
         resolver.openInputStream(uri)
     } catch (e: Exception) {
-        Log.w(TAG, "openInputStream threw for $uri: ${e.javaClass.simpleName}: ${e.message}")
+        AppLogger.w(TAG, "openInputStream threw for $uri: ${e.javaClass.simpleName}: ${e.message}")
         null
     }
 }
@@ -42,11 +42,11 @@ private fun tryOpenFileDescriptor(resolver: android.content.ContentResolver, uri
         if (pfd != null) {
             ParcelFileDescriptor.AutoCloseInputStream(pfd)
         } else {
-            Log.w(TAG, "openFileDescriptor returned null for $uri")
+            AppLogger.w(TAG, "openFileDescriptor returned null for $uri")
             null
         }
     } catch (e: Exception) {
-        Log.w(TAG, "openFileDescriptor threw for $uri: ${e.javaClass.simpleName}: ${e.message}")
+        AppLogger.w(TAG, "openFileDescriptor threw for $uri: ${e.javaClass.simpleName}: ${e.message}")
         null
     }
 }
@@ -65,7 +65,7 @@ private fun copyBackgroundToPrivateStorage(context: Context, sourceUri: Uri): St
 
         // Strategy 2: openFileDescriptor (DocumentsProvider, MediaDocuments, etc.)
         if (input == null) {
-            Log.d(TAG, "openInputStream unavailable, trying openFileDescriptor for $sourceUri")
+            AppLogger.d(TAG, "openInputStream unavailable, trying openFileDescriptor for $sourceUri")
             input = tryOpenFileDescriptor(context.contentResolver, sourceUri)
         }
 
@@ -79,7 +79,7 @@ private fun copyBackgroundToPrivateStorage(context: Context, sourceUri: Uri): St
             }
         }
 
-        Log.d(
+        AppLogger.d(
             TAG,
             "Copied background to ${targetFile.absolutePath} (${targetFile.length()} bytes)"
         )
@@ -90,12 +90,12 @@ private fun copyBackgroundToPrivateStorage(context: Context, sourceUri: Uri): St
             ?.drop(3)
             ?.forEach { file ->
                 file.delete()
-                Log.d(TAG, "Cleaned up old background: ${file.name}")
+                AppLogger.d(TAG, "Cleaned up old background: ${file.name}")
             }
 
         Uri.fromFile(targetFile).toString()
     }.onFailure { e ->
-        Log.e(TAG, "Failed to copy background from $sourceUri to app-private storage", e)
+        AppLogger.e(TAG, "Failed to copy background from $sourceUri to app-private storage", e)
     }.getOrNull()
 }
 
@@ -111,7 +111,7 @@ actual fun rememberB30BackgroundPicker(onResult: (String?) -> Unit): () -> Unit 
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri == null) {
-            Log.d(TAG, "Picker returned null URI (cancelled or failed)")
+            AppLogger.d(TAG, "Picker returned null URI (cancelled or failed)")
             onResult(null)
             return@rememberLauncherForActivityResult
         }
@@ -121,14 +121,14 @@ actual fun rememberB30BackgroundPicker(onResult: (String?) -> Unit): () -> Unit 
         val context = AndroidPlatformContext.currentActivity
             ?: AndroidPlatformContext.applicationContext
         if (context == null) {
-            Log.e(TAG, "No Context available -- background cannot be copied")
+            AppLogger.e(TAG, "No Context available -- background cannot be copied")
             onResult(null)
             return@rememberLauncherForActivityResult
         }
 
         scope.launch(Dispatchers.IO) {
             val result = copyBackgroundToPrivateStorage(context, uri)
-            Log.d(TAG, "copyBackgroundToPrivateStorage: $result")
+            AppLogger.d(TAG, "copyBackgroundToPrivateStorage: $result")
             withContext(Dispatchers.Main) {
                 onResult(result)
             }

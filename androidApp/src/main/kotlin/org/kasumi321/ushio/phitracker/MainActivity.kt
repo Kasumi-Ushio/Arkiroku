@@ -11,11 +11,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import okio.Path.Companion.toPath
 import org.kasumi321.ushio.phitracker.data.logging.AnrWatchDog
 import org.kasumi321.ushio.phitracker.data.logging.AndroidLogContext
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.logging.LoggingState
+import org.kasumi321.ushio.phitracker.data.logging.SystemAnrExitReporter
 import org.kasumi321.ushio.phitracker.data.logging.createLoggingState
 import org.kasumi321.ushio.phitracker.data.platform.AndroidPlatformContext
 import org.kasumi321.ushio.phitracker.data.platform.NotificationPermissionRequester
 import org.kasumi321.ushio.phitracker.data.platform.SafTreeManager
+import org.kasumi321.ushio.phitracker.data.platform.appMetadataFallbackUsed
 import org.kasumi321.ushio.phitracker.data.platform.getAppMetadata
 import org.kasumi321.ushio.phitracker.data.platform.wrapWithAppLocale
 import org.kasumi321.ushio.phitracker.di.initKoin
@@ -41,6 +44,10 @@ class MainActivity : ComponentActivity() {
         AndroidLogContext.init(filesDir.absolutePath.toPath())
 
         val loggingState = createLoggingState(isDebug)
+        if (appMetadataFallbackUsed) {
+            AppLogger.event("init", "app_metadata_fallback")
+        }
+        SystemAnrExitReporter.reportRecentAnrs()
 
         val anr = AnrWatchDog(store = loggingState.store)
         anr.start()

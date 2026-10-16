@@ -139,7 +139,7 @@ class SettingsViewModel(
                         apiTestMessage = UiText.Res(Res.string.settings_api_test_failed, message)
                     )
                 }
-                AppLogger.event("api", "test_failed", mapOf("error" to message))
+                AppLogger.event("api", "test_failed", mapOf("error" to message), throwable = status.exceptionOrNull())
                 return@launch
             }
             val accountLookup = repository.apiGetRankByUser(platform, platformId, apiUserId)
@@ -234,7 +234,7 @@ class SettingsViewModel(
                 artworkFileCache.clearAllStandard()
                 clearCacheUrls(songDataProvider.getSongs().keys.map(illustrationProvider::getStandardUrl))
             }
-            AppLogger.event("cache", if (result.isSuccess) "high_res_clear_success" else "high_res_clear_failed", mapOf("error" to (result.exceptionOrNull()?.message ?: "")))
+            AppLogger.event("cache", if (result.isSuccess) "high_res_clear_success" else "high_res_clear_failed", mapOf("error" to (result.exceptionOrNull()?.message ?: "")), throwable = result.exceptionOrNull())
             onComplete(result)
         }
     }
@@ -253,7 +253,7 @@ class SettingsViewModel(
                 eventChannel.send(SettingsEvent.RestartRequested)
             } else {
                 val message = result.exceptionOrNull()?.message ?: "unknown"
-                AppLogger.event("cache", "redownload_reset_failed", mapOf("error" to message))
+                AppLogger.event("cache", "redownload_reset_failed", mapOf("error" to message), throwable = result.exceptionOrNull())
                 val errorText = UiText.Res(Res.string.settings_redownload_failed, message)
                 platformMessage(errorText.resolve())
                 mutableUiState.update { it.copy(updateDataError = errorText) }
@@ -298,7 +298,7 @@ class SettingsViewModel(
                 onFailure = { error ->
                     val message = error.message
                     mutableUiState.update { it.copy(isUpdatingData = false, updateDataError = message?.let(UiText::Raw)) }
-                    AppLogger.event("data", "update_song_data_failed", mapOf("error" to (message ?: "unknown")))
+                    AppLogger.event("data", "update_song_data_failed", mapOf("error" to (message ?: "unknown")), throwable = error)
                 }
             )
         }

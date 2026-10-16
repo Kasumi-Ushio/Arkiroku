@@ -2,6 +2,8 @@ package org.kasumi321.ushio.phitracker.data.di
 
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import org.kasumi321.ushio.phitracker.data.api.PhiPluginApi
@@ -11,6 +13,8 @@ import org.kasumi321.ushio.phitracker.data.api.TapTapQrLoginApi
 import org.kasumi321.ushio.phitracker.data.TipsProvider
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
 import org.kasumi321.ushio.phitracker.data.database.createAppDatabase
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
+import org.kasumi321.ushio.phitracker.data.logging.LoggingStateHolder
 import org.kasumi321.ushio.phitracker.data.parser.AesDecryptor
 import org.kasumi321.ushio.phitracker.data.parser.SaveParser
 import org.kasumi321.ushio.phitracker.data.platform.CoilIllustrationThumbnailPreloader
@@ -44,6 +48,19 @@ val dataModule = module {
     single {
         HttpClient {
             install(ContentNegotiation) { json(get()) }
+            // Debug builds only: request/response metadata goes through AppLogger
+            // (file writer + Logcat/OSLog). Release installs nothing, so there is
+            // no overhead and no header-leak surface.
+            if (LoggingStateHolder.state?.isDebugBuild == true) {
+                install(Logging) {
+                    logger = object : io.ktor.client.plugins.logging.Logger {
+                        override fun log(message: String) = AppLogger.d("Http", message)
+                    }
+                    level = LogLevel.INFO
+                    listOf("Authorization", "X-LC-Session", "X-LC-Id", "X-LC-Sign", "token")
+                        .forEach { header -> sanitizeHeader(header) { true } }
+                }
+            }
         }
     }
     single { TapTapApiClient(get()) }

@@ -18,7 +18,7 @@ fun createLoggingState(isDebugBuild: Boolean): LoggingState {
 
     AppLogger.init(
         LoggerConfig(
-            enableFileWriter = isDebugBuild,
+            isDebugBuild = isDebugBuild,
             logFileStore = store,
         )
     )

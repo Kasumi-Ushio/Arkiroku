@@ -70,7 +70,7 @@ class AnrWatchDog(
                     "${local.minute.toString().padStart(2, '0')}:${local.second.toString().padStart(2, '0')}"
 
             val sb = StringBuilder()
-            sb.appendLine("=== ANR WatchDog Alert ===")
+            sb.appendLine("=== Suspected ANR (watchdog-based) ===")
             sb.appendLine("Time: $time")
             sb.appendLine("Threshold: ${thresholdMs}ms")
             sb.appendLine("Thread: ${mainThread.name}")

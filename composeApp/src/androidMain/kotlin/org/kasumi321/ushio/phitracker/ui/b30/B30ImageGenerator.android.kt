@@ -2,7 +2,7 @@ package org.kasumi321.ushio.phitracker.ui.b30
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.util.Log
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import android.view.View
 import android.view.View.MeasureSpec
 import android.view.ViewGroup
@@ -51,7 +51,7 @@ actual object B30ImageGenerator {
                 )
             }
         } catch (e: Exception) {
-            Log.e("B30ImageGenerator", "generate failed: ${e.message}", e)
+            AppLogger.e("B30ImageGenerator", "generate failed: ${e.message}", e)
             throw e
         }
     }
@@ -196,7 +196,7 @@ actual object B30ImageGenerator {
             if (bounded !== loaded && blurred !== bounded) bounded.recycle()
             blurred
         } catch (e: Exception) {
-            Log.e("B30ImageGenerator", "Failed to preload/blur background: ${e.message}", e)
+            AppLogger.e("B30ImageGenerator", "Failed to preload/blur background: ${e.message}", e)
             bounded?.let { if (it !== loaded) it.recycle() }
             null
         }

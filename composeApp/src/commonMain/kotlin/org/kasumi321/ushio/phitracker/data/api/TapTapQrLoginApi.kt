@@ -22,6 +22,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.ApiCrypto
 import org.kasumi321.ushio.phitracker.data.platform.createApiCrypto
 import org.kasumi321.ushio.phitracker.domain.model.Server
@@ -87,7 +88,8 @@ class TapTapQrLoginApi(
                     }
                 }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLogger.w("TapTapQrLoginApi", e) { "QR polling request failed, returning network_error" }
             QrCheckResult(success = false, error = "network_error")
         }
     }

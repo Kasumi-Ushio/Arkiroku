@@ -5,6 +5,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.kasumi321.ushio.phitracker.data.api.GitHubReleaseDto
 import org.kasumi321.ushio.phitracker.data.api.toDomain
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.domain.model.ReleaseInfo
 
 internal fun parseGitHubReleaseResponse(
@@ -23,7 +24,8 @@ internal fun parseGitHubReleaseResponse(
     val releases = try {
         json.decodeFromString<List<GitHubReleaseDto>>(responseText)
     } catch (e: SerializationException) {
-        error("GitHub 返回数据格式异常，请稍后再试")
+        AppLogger.e("GitHubReleaseParser", e) { "Failed to parse GitHub releases JSON" }
+        throw IllegalStateException("GitHub 返回数据格式异常，请稍后再试", e)
     }
 
     val candidates = if (includePreRelease) releases else releases.filter { !it.prerelease }

@@ -27,6 +27,7 @@ import org.kasumi321.ushio.phitracker.data.database.SongSyncHistoryDao
 import org.kasumi321.ushio.phitracker.data.database.SyncSnapshotDao
 import org.kasumi321.ushio.phitracker.data.database.SyncWriter
 import org.kasumi321.ushio.phitracker.data.database.UserDao
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.mapper.EntityMapper.toSongRecordMap
 import org.kasumi321.ushio.phitracker.data.mapper.EntityMapper.toDomain
 import org.kasumi321.ushio.phitracker.data.mapper.EntityMapper.toUserProfile
@@ -92,7 +93,7 @@ class PhigrosRepositoryImpl(
             gameVersion = 0,
             updatedAt = ""
         )
-    }
+    }.logFailure("validateToken")
 
     override suspend fun syncSave(
         sessionToken: String,
@@ -130,7 +131,7 @@ class PhigrosRepositoryImpl(
                 invalidateApiDetailCache()
             }
         }
-    }
+    }.logFailure("syncSave")
 
     override fun getCachedSave(): Flow<Save?> = combine(recordDao.getAllRecords(), userDao.getUser()) { records, user ->
         if (records.isEmpty()) return@combine null
@@ -208,10 +209,10 @@ class PhigrosRepositoryImpl(
         songSyncHistoryDao.getBySnapshotId(snapshotId).map { it.toDomain() }
 
     override suspend fun apiTest(): Result<JsonObject> =
-        runCatching { phiPluginApi.test() }
+        runCatching { phiPluginApi.test() }.logFailure("apiTest")
 
     override suspend fun apiGetBindInfo(platform: String, platformId: String): Result<JsonObject> =
-        runCatching { phiPluginApi.getBindInfo(platform.trim(), platformId.trim()) }
+        runCatching { phiPluginApi.getBindInfo(platform.trim(), platformId.trim()) }.logFailure("apiGetBindInfo")
 
     override suspend fun getSongApiDetail(key: ApiDetailCacheKey): Result<SongApiDetail> {
         val normalizedKey = key.copy(
@@ -263,11 +264,11 @@ class PhigrosRepositoryImpl(
                 }
             }
         }
-        return result
+        return result.logFailure("getSongApiDetail")
     }
 
     override suspend fun apiGetRksAbove(rks: Float): Result<JsonObject> =
-        runCatching { phiPluginApi.getRksAbove(rks) }
+        runCatching { phiPluginApi.getRksAbove(rks) }.logFailure("apiGetRksAbove")
 
     override suspend fun apiGetSaveHistory(
         platform: String,
@@ -282,17 +283,17 @@ class PhigrosRepositoryImpl(
                 apiUserId.trim(),
                 request.map { it.trim() }
             )
-        }
+        }.logFailure("apiGetSaveHistory")
 
     override suspend fun apiGetRankByUser(
         platform: String,
         platformId: String,
         apiUserId: String
     ): Result<JsonObject> =
-        runCatching { phiPluginApi.getRankByUser(platform.trim(), platformId.trim(), apiUserId.trim()) }
+        runCatching { phiPluginApi.getRankByUser(platform.trim(), platformId.trim(), apiUserId.trim()) }.logFailure("apiGetRankByUser")
 
     override suspend fun apiGetRankByPosition(position: Int): Result<JsonObject> =
-        runCatching { phiPluginApi.getRankByPosition(position) }
+        runCatching { phiPluginApi.getRankByPosition(position) }.logFailure("apiGetRankByPosition")
 
     // ── Chart tags (chartsTag) ──────────────────────────────────────
 
@@ -307,7 +308,7 @@ class PhigrosRepositoryImpl(
                 ?.mapNotNull { parseTagTreeNode(it) }
                 .orEmpty()
                 .also { chartTagTreeCache = now to it }
-        }
+        }.logFailure("getChartTagTree")
     }
 
     override suspend fun getChartTags(songId: String, difficulty: Difficulty): Result<ChartTagSongData> =
@@ -321,7 +322,7 @@ class PhigrosRepositoryImpl(
                 secondary = parseVoteMap(response["secondary"]),
                 categories = response["tree"].asArray()?.mapNotNull { parseTagTreeNode(it) }.orEmpty()
             )
-        }
+        }.logFailure("getChartTags")
 
     override suspend fun getMyChartTagVotes(
         songId: String,
@@ -346,7 +347,7 @@ class PhigrosRepositoryImpl(
             fun names(key: String) = obj[key].asArray().orEmpty().mapNotNull { it.asString() }
             names("primaryTags") + names("secondaryTags") + names("tags")
         }.toSet()
-    }
+    }.logFailure("getMyChartTagVotes")
 
     override suspend fun getB30ChartTags(records: List<BestRecord>): Result<B30ChartTagBatch> = runCatching {
         val requests = records
@@ -369,7 +370,7 @@ class PhigrosRepositoryImpl(
             }?.toMap().orEmpty()
         }
         B30ChartTagBatch(tags, categories)
-    }
+    }.logFailure("getB30ChartTags")
 
     override suspend fun voteChartTags(
         songId: String,
@@ -395,16 +396,16 @@ class PhigrosRepositoryImpl(
                 secondaryTags.distinct()
             ).also { it.throwOnApiError() }
             chartTagTreeCache = null
-        }
+        }.logFailure("voteChartTags")
     }
 
     override suspend fun proposeSongAlias(songId: String, alias: String, note: String?): Result<Unit> =
-        runCatching {
+        runCatching<Unit> {
             val (sessionToken, _) = tokenManager.getToken()
                 ?: error("需要先登录 TapTap 账号")
             phiPluginApi.proposeAlias(sessionToken, songId.trim(), alias.trim(), note?.trim())
                 .also { it.throwOnApiError() }
-        }
+        }.logFailure("proposeSongAlias")
 
     private var chartTagTreeCache: Pair<Instant, List<ChartTagTreeNode>>? = null
 
@@ -449,11 +450,11 @@ class PhigrosRepositoryImpl(
                 includePreRelease = includePreRelease,
                 json = json,
             ).getOrThrow()
-        }
+        }.logFailure("fetchLatestRelease")
 
     override suspend fun fetchGameUpdateInfo(): Result<GameUpdateInfo> = runCatching {
         tapTapGameApi.fetchLatestUpdate()
-    }
+    }.logFailure("fetchGameUpdateInfo")
 
     private suspend fun invalidateApiDetailCache() {
         apiDetailMutex.withLock { advanceApiDetailEpochLocked() }
@@ -516,4 +517,8 @@ class PhigrosRepositoryImpl(
     private fun JsonElement?.asLong(): Long? = asString()?.toLongOrNull()
     private fun JsonElement?.asFloat(): Float? = asString()?.toFloatOrNull()
     private fun JsonElement?.asBoolean(): Boolean? = asString()?.toBooleanStrictOrNull()
+
+    private fun <T> Result<T>.logFailure(action: String): Result<T> = onFailure {
+        AppLogger.w("PhigrosRepo", it) { "$action failed" }
+    }
 }

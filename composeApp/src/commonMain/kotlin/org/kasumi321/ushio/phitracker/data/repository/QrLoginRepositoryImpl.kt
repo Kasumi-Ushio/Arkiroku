@@ -5,6 +5,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.CancellationException
 import org.kasumi321.ushio.phitracker.data.api.TapTapQrLoginApi
 import org.kasumi321.ushio.phitracker.data.api.TapTapTokenData
+import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.domain.model.QrAuthorizationId
 import org.kasumi321.ushio.phitracker.domain.model.QrChallengeId
 import org.kasumi321.ushio.phitracker.domain.model.QrLoginChallenge
@@ -91,8 +92,9 @@ class QrLoginRepositoryImpl(
         operation()
     } catch (error: CancellationException) {
         throw error
-    } catch (_: Exception) {
-        throw IllegalStateException(message)
+    } catch (error: Exception) {
+        AppLogger.w("QrLoginRepository", error) { message }
+        throw IllegalStateException(message, error)
     }
 
     private suspend fun pruneExpired() {

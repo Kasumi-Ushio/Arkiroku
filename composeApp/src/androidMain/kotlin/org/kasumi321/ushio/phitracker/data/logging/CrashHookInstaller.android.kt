@@ -26,7 +26,7 @@ actual object CrashHookInstaller {
     }
 
     private fun writeCrashLog(store: LogFileStore, thread: Thread, throwable: Throwable) {
-        val path = store.crashLogPath("kotlin_crash.txt")
+        val path = store.crashLogPath(store.newCrashReportName("kotlin_crash"))
         val fs = FileSystem.SYSTEM
         val parent = path.parent ?: return
         if (!fs.exists(parent)) fs.createDirectories(parent)
@@ -51,5 +51,8 @@ actual object CrashHookInstaller {
         }
 
         fs.sink(path).buffer().use { it.writeUtf8(LogRedactor.redact(sb.toString())) }
+        store.pruneCrashReports("kotlin_crash", MAX_CRASH_REPORTS)
     }
+
+    private const val MAX_CRASH_REPORTS = 5
 }

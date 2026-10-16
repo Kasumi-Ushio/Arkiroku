@@ -39,6 +39,7 @@
     <string name="settings_category_b30">B30 設定</string>
     <string name="settings_category_data_cache">資料與快取</string>
     <string name="settings_category_debug">偵錯選項</string>
+    <string name="settings_category_diagnostics">診斷</string>
     <string name="settings_category_interface_theme">介面與主題</string>
     <string name="settings_category_score_api">查分 API</string>
     <string name="settings_category_updates">程式更新</string>

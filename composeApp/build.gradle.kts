@@ -133,6 +133,7 @@ kotlin {
             implementation(libs.coil3.network.ktor3)
             implementation(libs.okio)
             implementation(libs.kermit)
+            implementation(libs.kermit.io)
             implementation(libs.aboutlibraries.compose.m3)
             implementation(libs.multiplatform.markdown.renderer.m3)
             implementation(libs.haze)

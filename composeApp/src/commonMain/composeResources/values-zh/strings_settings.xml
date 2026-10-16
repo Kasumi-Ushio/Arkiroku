@@ -39,6 +39,7 @@
     <string name="settings_category_b30">B30 设置</string>
     <string name="settings_category_data_cache">数据与缓存</string>
     <string name="settings_category_debug">调试选项</string>
+    <string name="settings_category_diagnostics">诊断</string>
     <string name="settings_category_interface_theme">界面与主题</string>
     <string name="settings_category_score_api">查分 API</string>
     <string name="settings_category_updates">程序更新</string>
