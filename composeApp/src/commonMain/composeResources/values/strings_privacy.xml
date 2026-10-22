@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="privacy_title">Privacy Policy</string>
-    <string name="privacy_heading">Phi Tracker Privacy Policy</string>
-    <string name="privacy_updated">Last updated: April 3, 2026</string>
-    <string name="privacy_intro_1">Thank you for using Phi Tracker (hereinafter referred to as &quot;this app&quot;). We take your privacy very seriously and understand that your trust is very important to us. Therefore, in accordance with legal requirements and well-established industry security standards, we protect your personal information in reasonable and effective ways. This Privacy Policy is intended to explain to you how this app collects, uses and protects your data.</string>
+    <string name="privacy_heading">Arkiroku Privacy Policy</string>
+    <string name="privacy_updated">Last updated: October 5, 2026</string>
+    <string name="privacy_intro_1">Thank you for using Arkiroku (hereinafter referred to as &quot;this app&quot;). We take your privacy very seriously and understand that your trust is very important to us. Therefore, in accordance with legal requirements and well-established industry security standards, we protect your personal information in reasonable and effective ways.</string>
     <string name="privacy_intro_2">Through this Privacy Policy, we will help you understand the efforts we make in collecting, using, storing, sharing and protecting your personal information.</string>
     <string name="privacy_intro_3">If you have any questions about the content of this Privacy Policy, please contact us in the manner described in &quot;9. Contact Us&quot; and we will reply to you as soon as possible; if you do not agree with the content of this Privacy Policy, please stop using this app.</string>
 
@@ -13,14 +13,14 @@
     <string name="privacy_section_1_item_2">2. Phigros game save: including your in-game nickname, Course Mode rating, play records (scores, accuracy, Full Combo status, etc.) and RKS values.</string>
     <string name="privacy_section_1_item_3">3. Local settings preferences: including your selected theme mode, the local URI of your custom avatar, B30 overflow display settings, etc.</string>
     <string name="privacy_section_1_item_4">4. Runtime logs (Debug builds only): The Debug build provides a feature to export runtime logs. These logs are used to troubleshoot issues and may contain technical information related to network requests (in certain cases, account credential fields such as the sessionToken may appear). Please share logs only through channels you trust, and review and redact them yourself before making them public.</string>
-    <string name="privacy_section_1_item_5">5. Phi-Plugin &quot;滦鸠&quot; joint score lookup API request credentials (optional): When you choose to enable the &quot;Enable score lookup API&quot; feature on the settings page, this app will send requests to that API based on the &quot;Platform Name&quot;, &quot;Platform ID&quot; and &quot;API User ID&quot; you filled in, to obtain the corresponding score lookup data.</string>
+    <string name="privacy_section_1_item_5">5. Phi-Plugin &quot;滦鸠&quot; joint score lookup API request credentials (optional): When you choose to enable the &quot;Enable score lookup API&quot; feature on the settings page, this app will send requests to that API based on the &quot;Platform Name&quot;, &quot;Platform ID&quot;, &quot;API User ID&quot; and &quot;API Token&quot; you filled in, to obtain the corresponding score lookup data.</string>
 
     <string name="privacy_section_2_title">2. How We Use Your Data</string>
     <string name="privacy_section_2_intro">Your data is used only for the following purposes:</string>
     <string name="privacy_section_2_item_1">• Read and display your Phigros game save and score analysis (B30, RKS calculation, etc.).</string>
     <string name="privacy_section_2_item_2">• Store your personalized settings so that they can be restored the next time the app starts.</string>
     <string name="privacy_section_2_item_3">• Cache illustration resources to reduce network traffic consumption.</string>
-    <string name="privacy_section_2_item_4">• Based on the platform name, platform ID and API user ID you filled in after enabling the score lookup API feature, send requests to that API to obtain the corresponding score lookup data.</string>
+    <string name="privacy_section_2_item_4">• Based on the platform name, platform ID, API user ID and API Token you filled in after enabling the score lookup API feature, send requests to that API to obtain the corresponding score lookup data.</string>
 
     <string name="privacy_section_3_title">3. Data Storage and Security</string>
     <string name="privacy_section_3_intro">All data is stored locally on your device. This app does not upload your data to any remote server under our control.</string>
@@ -28,7 +28,7 @@
     <string name="privacy_section_3_item_1">• Game save and score data are stored in the app's local Room database.</string>
     <string name="privacy_section_3_item_2">• Settings preferences are stored in Android SharedPreferences.</string>
     <string name="privacy_section_3_item_3">• Illustration cache is stored in the app's dedicated cache directory.</string>
-    <string name="privacy_section_3_item_4">• The sessionToken is stored in the app's local database and is not transmitted in any form to any third party other than TapTap.</string>
+    <string name="privacy_section_3_item_4">• Sensitive information such as the sessionToken and API Token is stored in the keystore of the operating system you use, and is not transmitted in any form to any third party other than TapTap or the score lookup API.</string>
     <string name="privacy_section_3_note">However, please understand that the Internet is not an absolutely secure environment, and no security measure is foolproof. We recommend that you take proactive measures to protect the security of your personal information.</string>
 
     <string name="privacy_section_4_title">4. Third-Party Services</string>
@@ -59,9 +59,11 @@
     <string name="privacy_section_8_item_1">1. TapTap OAuth service &amp; LeanCloud: https://www.taptap.cn/doc/privacy-policy/</string>
     <string name="privacy_section_8_item_2">2. Phigros: https://phigros.pigeongames.cn/privacy_policy.txt</string>
     <string name="privacy_section_8_item_3">3. GitHub: https://docs.github.com/zh/site-policy/privacy-policies/github-general-privacy-statement</string>
-    <string name="privacy_section_8_note">Some third-party services currently do not provide privacy policy texts; we will update this Privacy Policy promptly once these third-party services provide them.</string>
+    <string name="privacy_section_8_item_4">4. Gh-Proxy: https://gh-proxy.com/privacy</string>
+    <string name="privacy_section_8_item_5">5. Joint score lookup API: https://www.phib19.top/privacy</string>
 
     <string name="privacy_section_9_title">9. Contact Us</string>
     <string name="privacy_section_9_intro">If you have any questions or suggestions about this Privacy Policy, please contact us through the following:</string>
     <string name="privacy_section_9_item_1">• GitHub Issues: https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros/issues</string>
+    <string name="privacy_section_9_item_2">• Email: asahinahotaruchan@gmail.com</string>
 </resources>

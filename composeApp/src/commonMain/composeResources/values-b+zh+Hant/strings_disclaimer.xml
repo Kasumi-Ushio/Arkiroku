@@ -3,12 +3,12 @@
     <string name="disclaimer_title">著作權、授權條款與免責聲明</string>
     <string name="disclaimer_section_license_header">著作權與授權條款</string>
     <string name="disclaimer_section_copyright_title">著作權</string>
-    <string name="disclaimer_section_copyright_body">著作權所有 (c) 2026 Kasumi's IT Infrastructure。\n\n著作權所有 (c) 2026 鈴螢-RinLin a.k.a. 朝比奈ほたる 及所有 Phi Tracker 貢獻者。</string>
+    <string name="disclaimer_section_copyright_body">著作權所有 (c) 2026 Kasumi's IT Infrastructure。\n\n著作權所有 (c) 2026 鈴螢-RinLin a.k.a. 朝比奈ほたる 及所有 Arkiroku 貢獻者。</string>
     <string name="disclaimer_section_project_license_title">本專案授權條款</string>
-    <string name="disclaimer_section_project_license_body">本專案的全部原始碼、不屬於 Pigeon Games 和 TapTap 的資產以及文件，均為自由軟體。\n\n您可以根據 GNU General Public License 版本 3 的條款，使用、複製、散佈、修改和重新散佈本專案。</string>
+    <string name="disclaimer_section_project_license_body">本專案的全部原始碼、不屬於 Pigeon Games 和 TapTap 的資產以及文件，均為自由軟體。\n\n您可以根據由自由軟體基金會發佈的 GNU General Public License 版本 3 或（如果您願意）更高版本的條款，使用、複製、散佈、修改和重新散佈本專案。\n\n更多資訊，請參閱 GNU General Public License 或本專案的 COPYING 檔案。</string>
     <string name="disclaimer_disclaimer_header">免責聲明</string>
     <string name="disclaimer_body_unofficial">本專案是一個非官方專案，與 Pigeon Games 和 TapTap 之間沒有任何關聯，也不以任何形式受其認可或支援。使用者在使用過程中匯入的所有資源均為其各自所有者的財產，我們不主張也不擁有這些資源的任何權利。</string>
-    <string name="disclaimer_body_commercial">儘管本專案是自由軟體，並依據 GNU 通用公共授權條款的版本 3 允許商業使用，但我們不鼓勵、不支援任何形式的商業用途。任何因商業用途而產生的回饋、問題或爭議，我們概不負責。</string>
-    <string name="disclaimer_body_illegal">我們不支援，且法律明確禁止任何形式的對 TapTap 和/或 Pigeon Games 的網路攻擊或其他非法行為。使用本專案進行此類活動所產生的任何法律風險由使用者自行承擔。絕對禁止將本專案用於在使用者所在國家或地區的刑法所禁止的任何形式的非法活動。</string>
+    <string name="disclaimer_body_commercial">儘管本專案是自由軟體，並依據 GNU 通用公共授權條款允許商業使用，但我們不鼓勵、不支援任何形式的商業用途。任何因商業用途而產生的回饋、問題或爭議，我們概不負責。</string>
+    <string name="disclaimer_body_illegal">我們不支援，且法律明確禁止任何形式的對 TapTap 和/或 Pigeon Games 的網路攻擊或其他非法行為。使用本專案進行此類活動所產生的任何法律風險由使用者自行承擔。將本專案用於在使用者所在國家或地區的刑法所禁止的任何形式的非法活動的後果由使用者自行承擔。</string>
     <string name="disclaimer_body_no_warranty">本專案不提供任何形式的擔保，包括但不限於適銷性、特定用途的適用性和非侵權性。在任何情況下，我們均不對因使用本專案而產生的任何索賠、損害或其他責任負責。</string>
 </resources>

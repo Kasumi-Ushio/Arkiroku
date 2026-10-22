@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		BECD18C58B50043142A2413C /* Phi Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Phi Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BECD18C58B50043142A2413C /* Arkiroku.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Arkiroku.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,7 +59,7 @@
 		DD458200E551CDD6FD2699E2 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				BECD18C58B50043142A2413C /* Phi Tracker.app */,
+				BECD18C58B50043142A2413C /* Arkiroku.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,7 +87,7 @@
 			packageProductDependencies = (
 			);
 			productName = iosApp;
-			productReference = BECD18C58B50043142A2413C /* Phi Tracker.app */;
+			productReference = BECD18C58B50043142A2413C /* Arkiroku.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */

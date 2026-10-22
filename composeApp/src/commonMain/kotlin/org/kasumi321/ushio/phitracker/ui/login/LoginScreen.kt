@@ -154,7 +154,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(36.dp))
 
                 Text(
-                    text = "Phi Tracker",
+                    text = "Arkiroku",
                     style = MaterialTheme.typography.headlineLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.primary

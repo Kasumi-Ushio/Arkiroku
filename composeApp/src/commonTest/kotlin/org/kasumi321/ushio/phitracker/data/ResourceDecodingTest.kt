@@ -100,7 +100,7 @@ class ResourceDecodingTest {
     private companion object {
         val fakeAssets: Map<String, String> = mapOf(
             "tips.txt" to """
-                |Tip: 欢迎使用 Phi Tracker！
+                |Tip: 欢迎使用 Arkiroku！
                 |Tip: もぺもぺで遊ぼう！
                 |Tip: 混乱Confusionは難しい
             """.trimMargin(),

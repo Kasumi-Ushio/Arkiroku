@@ -109,7 +109,7 @@ jobs:
 
       - name: Copy Compose resources into Debug app bundle
         run: |
-          APP_PATH="$RUNNER_TEMP/DerivedDataDebug/Build/Products/Debug-iphoneos/Phi Tracker.app"
+          APP_PATH="$RUNNER_TEMP/DerivedDataDebug/Build/Products/Debug-iphoneos/Arkiroku.app"
           RESOURCE_ROOT="$(pwd)/composeApp/build/kotlin-multiplatform-resources/aggregated-resources/iosArm64"
           test -d "$RESOURCE_ROOT/composeResources"
           mkdir -p "$APP_PATH/compose-resources"
@@ -119,7 +119,7 @@ jobs:
 
       - name: Package unsigned Debug IPA
         run: |
-          APP_PATH="$RUNNER_TEMP/DerivedDataDebug/Build/Products/Debug-iphoneos/Phi Tracker.app"
+          APP_PATH="$RUNNER_TEMP/DerivedDataDebug/Build/Products/Debug-iphoneos/Arkiroku.app"
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
@@ -218,7 +218,7 @@ jobs:
 
       - name: Copy Compose resources into Release app bundle
         run: |
-          APP_PATH="$RUNNER_TEMP/DerivedDataRelease/Build/Products/Release-iphoneos/Phi Tracker.app"
+          APP_PATH="$RUNNER_TEMP/DerivedDataRelease/Build/Products/Release-iphoneos/Arkiroku.app"
           RESOURCE_ROOT="$(pwd)/composeApp/build/kotlin-multiplatform-resources/aggregated-resources/iosArm64"
           test -d "$RESOURCE_ROOT/composeResources"
           mkdir -p "$APP_PATH/compose-resources"
@@ -228,7 +228,7 @@ jobs:
 
       - name: Package unsigned Release IPA
         run: |
-          APP_PATH="$RUNNER_TEMP/DerivedDataRelease/Build/Products/Release-iphoneos/Phi Tracker.app"
+          APP_PATH="$RUNNER_TEMP/DerivedDataRelease/Build/Products/Release-iphoneos/Arkiroku.app"
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="about_title">关于 Phi Tracker</string>
+    <string name="about_title">关于 Arkiroku</string>
     <string name="about_tagline">一款可以用于读取 Phigros 存档并查分的小工具</string>
     <string name="about_version_label">当前软件版本: %1$s</string>
     <string name="about_build_date_label">构建日期: %1$s</string>

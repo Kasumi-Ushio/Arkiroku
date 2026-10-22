@@ -71,10 +71,12 @@ import phitracker.composeapp.generated.resources.privacy_section_8_intro
 import phitracker.composeapp.generated.resources.privacy_section_8_item_1
 import phitracker.composeapp.generated.resources.privacy_section_8_item_2
 import phitracker.composeapp.generated.resources.privacy_section_8_item_3
-import phitracker.composeapp.generated.resources.privacy_section_8_note
+import phitracker.composeapp.generated.resources.privacy_section_8_item_4
+import phitracker.composeapp.generated.resources.privacy_section_8_item_5
 import phitracker.composeapp.generated.resources.privacy_section_8_title
 import phitracker.composeapp.generated.resources.privacy_section_9_intro
 import phitracker.composeapp.generated.resources.privacy_section_9_item_1
+import phitracker.composeapp.generated.resources.privacy_section_9_item_2
 import phitracker.composeapp.generated.resources.privacy_section_9_title
 import phitracker.composeapp.generated.resources.privacy_title
 import phitracker.composeapp.generated.resources.privacy_updated
@@ -169,11 +171,13 @@ fun PrivacyPolicyScreen(
             PolicyText(stringResource(Res.string.privacy_section_8_item_1))
             PolicyText(stringResource(Res.string.privacy_section_8_item_2))
             PolicyText(stringResource(Res.string.privacy_section_8_item_3))
-            PolicyText(stringResource(Res.string.privacy_section_8_note))
+            PolicyText(stringResource(Res.string.privacy_section_8_item_4))
+            PolicyText(stringResource(Res.string.privacy_section_8_item_5))
 
             PolicyTitle(stringResource(Res.string.privacy_section_9_title))
             PolicyText(stringResource(Res.string.privacy_section_9_intro))
             PolicyText(stringResource(Res.string.privacy_section_9_item_1))
+            PolicyText(stringResource(Res.string.privacy_section_9_item_2))
 
             Spacer(modifier = Modifier.height(24.dp))
         }

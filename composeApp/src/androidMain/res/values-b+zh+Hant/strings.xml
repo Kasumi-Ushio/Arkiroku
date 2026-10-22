@@ -2,6 +2,6 @@
 <resources>
     <string name="crash_notification_channel_name">崩潰提醒</string>
     <string name="crash_notification_channel_description">應用程式崩潰後的本機提示通知</string>
-    <string name="crash_notification_title">Phi Tracker 發生異常</string>
+    <string name="crash_notification_title">Arkiroku 發生異常</string>
     <string name="crash_notification_text">崩潰報告已儲存，可在「設定 → 診斷」中匯出回饋。</string>
 </resources>

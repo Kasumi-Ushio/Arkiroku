@@ -3,7 +3,7 @@
     <string name="disclaimer_title">Copyright, Licenses and Disclaimer</string>
     <string name="disclaimer_section_license_header">Copyright and Licenses</string>
     <string name="disclaimer_section_copyright_title">Copyright</string>
-    <string name="disclaimer_section_copyright_body">Copyright (c) 2026 Kasumi's IT Infrastructure.\n\nCopyright (c) 2026 RinLin-NYA a.k.a. Asahina Hotaru and Phi Tracker Contributors.</string>
+    <string name="disclaimer_section_copyright_body">Copyright (c) 2026 Kasumi's IT Infrastructure.\n\nCopyright (c) 2026 RinLin-NYA a.k.a. Asahina Hotaru and Arkiroku Contributors.</string>
     <string name="disclaimer_section_project_license_title">Project License</string>
     <string name="disclaimer_section_project_license_body">This project, include all of its source code, assets not belonging to the Pigeon Games and TapTap, and documentation, is Free-as-in-Freedom software.\n\nYou can use, copy, distribute, modify and redistribute this project under the terms of the GNU General Public License, either version 3, or (at your option) any later version, which is published by the Free Software Foundation.\n\nFor more information, please refer to the GNU General Public License or the COPYING file in this project.</string>
     <string name="disclaimer_disclaimer_header">Disclaimer</string>

@@ -47,7 +47,7 @@ class LogFileStore(
         val files = listRuntimeFiles()
         if (files.isEmpty()) return ""
         val sb = StringBuilder()
-        sb.appendLine("Phi Tracker Runtime Logs")
+        sb.appendLine("Arkiroku Runtime Logs")
         sb.appendLine("Files: ${files.size}")
         sb.appendLine()
         files.forEachIndexed { index, path ->
@@ -105,7 +105,7 @@ class LogFileStore(
         val files = listCrashFiles()
         if (files.isEmpty()) return ""
         val sb = StringBuilder()
-        sb.appendLine("Phi Tracker Crash / ANR Reports")
+        sb.appendLine("Arkiroku Crash / ANR Reports")
         sb.appendLine("Files: ${files.size}")
         sb.appendLine()
         files.forEachIndexed { index, path ->

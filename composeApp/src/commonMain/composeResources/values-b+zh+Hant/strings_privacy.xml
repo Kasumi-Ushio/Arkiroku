@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="privacy_title">隱私權政策</string>
-    <string name="privacy_heading">Phi Tracker 隱私權政策</string>
-    <string name="privacy_updated">最後更新日期：2026 年 4 月 3 日</string>
-    <string name="privacy_intro_1">感謝您使用 Phi Tracker（以下簡稱「本應用程式」）。我們非常重視您的隱私，並深知您的信賴對我們非常重要，因此我們會按照法律要求以及業界成熟的安全標準，透過合理有效的方式保護您的個人資訊。本隱私權政策旨在向您說明本應用程式如何收集、使用和保護您的資料。</string>
+    <string name="privacy_heading">Arkiroku 隱私權政策</string>
+    <string name="privacy_updated">最後更新日期：2026 年 10 月 5 日</string>
+    <string name="privacy_intro_1">感謝您使用 Arkiroku（以下簡稱「本應用程式」）。我們非常重視您的隱私，並深知您的信賴對我們非常重要，因此我們會按照法律要求以及業界成熟的安全標準，透過合理有效的方式保護您的個人資訊。</string>
     <string name="privacy_intro_2">我們將透過本隱私權政策幫助您了解我們在收集、使用、儲存、分享和保護您的個人資訊方面所做的努力。</string>
     <string name="privacy_intro_3">如您對本隱私權政策的內容存在疑問，請您按照「九、聯絡我們」中的方式與我們聯絡，我們將盡快回覆您；如您不同意本隱私權政策的內容，請您停止使用本應用程式。</string>
 
@@ -13,14 +13,14 @@
     <string name="privacy_section_1_item_2">2. Phigros 遊戲存檔：包括您的遊戲暱稱、課題模式評級、遊玩紀錄（成績、準確率、Full Combo 狀態等）和 RKS 數值。</string>
     <string name="privacy_section_1_item_3">3. 本機設定偏好：包括您選擇的主題模式、自訂頭像的本機 URI、B30 溢出顯示設定等。</string>
     <string name="privacy_section_1_item_4">4. 執行日誌（僅 Debug 版本）：Debug 版本提供匯出執行日誌功能。該日誌用於排除故障，可能包含網路請求相關技術資訊（在特定情況下可能出現帳號憑證欄位，如 sessionToken）。請僅在您信任的管道中分享日誌，並在公開前自行檢查和去識別化。</string>
-    <string name="privacy_section_1_item_5">5. Phi-Plugin「灤鳩」聯合查分 API 請求憑證（可選）：當您選擇在設定頁面中開啟「啟用查分 API」功能時，本應用程式將根據您填寫的「平台名稱」、「平台 ID」和「API 使用者 ID」向該 API 發送請求，以取得對應的查分資料。</string>
+    <string name="privacy_section_1_item_5">5. Phi-Plugin「灤鳩」聯合查分 API 請求憑證（可選）：當您選擇在設定頁面中開啟「啟用查分 API」功能時，本應用程式將根據您填寫的「平台名稱」、「平台 ID」、「API 使用者 ID」和「API Token」向該 API 發送請求，以取得對應的查分資料。</string>
 
     <string name="privacy_section_2_title">二、資料的使用方式</string>
     <string name="privacy_section_2_intro">您的資料僅用於以下目的：</string>
     <string name="privacy_section_2_item_1">• 讀取並顯示您的 Phigros 遊戲存檔與成績分析（B30、RKS 計算等）。</string>
     <string name="privacy_section_2_item_2">• 儲存您的個人化設定，以便在下次啟動時還原。</string>
     <string name="privacy_section_2_item_3">• 快取曲繪資源，減少網路流量消耗。</string>
-    <string name="privacy_section_2_item_4">• 根據您開啟查分 API 功能後填寫的平台名稱、平台 ID 和 API 使用者 ID，向該 API 發送請求，以取得對應的查分資料。</string>
+    <string name="privacy_section_2_item_4">• 根據您開啟查分 API 功能後填寫的平台名稱、平台 ID、API 使用者 ID 和 API Token，向該 API 發送請求，以取得對應的查分資料。</string>
 
     <string name="privacy_section_3_title">三、資料的儲存與安全</string>
     <string name="privacy_section_3_intro">所有資料均儲存在您的裝置本機。本應用程式不會將您的資料上傳至任何我們所控制的遠端伺服器。</string>
@@ -28,7 +28,7 @@
     <string name="privacy_section_3_item_1">• 遊戲存檔和成績資料儲存在應用程式本機的 Room 資料庫中。</string>
     <string name="privacy_section_3_item_2">• 設定偏好儲存在 Android SharedPreferences 中。</string>
     <string name="privacy_section_3_item_3">• 曲繪快取儲存在應用程式的專用快取目錄中。</string>
-    <string name="privacy_section_3_item_4">• sessionToken 儲存在應用程式的本機資料庫中，且不會以任何形式被傳輸到除 TapTap 以外的第三方。</string>
+    <string name="privacy_section_3_item_4">• sessionToken、API Token 等敏感資訊儲存在您使用的作業系統的金鑰庫中，且不會以任何形式被傳輸到除 TapTap 或查分 API 以外的第三方。</string>
     <string name="privacy_section_3_note">但請您理解，網際網路並非絕對安全的環境，任何安全措施都無法做到無懈可擊。我們建議您採取積極措施保護個人資訊的安全。</string>
 
     <string name="privacy_section_4_title">四、第三方服務</string>
@@ -59,9 +59,11 @@
     <string name="privacy_section_8_item_1">1. TapTap OAuth 服務 &amp; LeanCloud：https://www.taptap.cn/doc/privacy-policy/</string>
     <string name="privacy_section_8_item_2">2. Phigros：https://phigros.pigeongames.cn/privacy_policy.txt</string>
     <string name="privacy_section_8_item_3">3. GitHub：https://docs.github.com/zh/site-policy/privacy-policies/github-general-privacy-statement</string>
-    <string name="privacy_section_8_note">部分第三方服務目前暫沒有提供隱私權政策文本，我們將在這些第三方服務提供隱私權政策文本後及時更新本隱私權政策。</string>
+    <string name="privacy_section_8_item_4">4. Gh-Proxy：https://gh-proxy.com/privacy</string>
+    <string name="privacy_section_8_item_5">5. 聯合查分 API：https://www.phib19.top/privacy</string>
 
     <string name="privacy_section_9_title">九、聯絡我們</string>
     <string name="privacy_section_9_intro">如果您對本隱私權政策有任何疑問或建議，請透過以下方式與我們聯絡：</string>
     <string name="privacy_section_9_item_1">• GitHub Issues：https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros/issues</string>
+    <string name="privacy_section_9_item_2">• 電子郵件：asahinahotaruchan@gmail.com</string>
 </resources>

@@ -4,7 +4,7 @@
 
 版权所有 (c) 2026 Kasumi's IT Infrastructure。
 
-版权所有 (c) 2026 RinLin-NYA a.k.a. Asahina Hotaru 及 Phi Tracker 贡献者。
+版权所有 (c) 2026 RinLin-NYA a.k.a. Asahina Hotaru 及 Arkiroku 贡献者。
 
 ## 参考项目版权
 
@@ -56,7 +56,7 @@ SPDX-License-Identifier: GPL-3.0-only。
 
 Copyright (c) 2026 Kasumi's IT Infrastructure.
 
-Copyright (c) 2026 RinLin-NYA a.k.a. Asahina Hotaru and Phi Tracker Contributors.
+Copyright (c) 2026 RinLin-NYA a.k.a. Asahina Hotaru and Arkiroku Contributors.
 
 ## References Projects Copyright
 

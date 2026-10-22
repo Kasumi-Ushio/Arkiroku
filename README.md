@@ -1,18 +1,18 @@
 ![Phi-Tracker](https://files.seeusercontent.com/2026/04/04/e5Cc/Phi-Tracker.png)
 
-# Phi Tracker
+# Arkiroku
 
 一款可以用于读取 Phigros TapTap 云存档并查分的小工具。一次导入，随时查分。
 
 ## 项目简述
 
-Phi Tracker 是一个基于 Kotlin Multiplatform 的 Phigros 查分工具，通过读取 TapTap 云存档来获取玩家的游玩数据，并提供查分、统计等功能。
+Arkiroku 是一个基于 Kotlin Multiplatform 的 Phigros 查分工具，通过读取 TapTap 云存档来获取玩家的游玩数据，并提供查分、统计等功能。
 
-当前，Phi Tracker 支持 Android 和 iOS 平台，对于其它平台（例如桌面平台和 Web 端）的支持还在初期调研阶段。
+当前，Arkiroku 支持 Android 和 iOS 平台，对于其它平台（例如桌面平台和 Web 端）的支持还在初期调研阶段。
 
-Phi Tracker 的目标是成为一款功能全面、易用、简洁且美观的 Phigros 查分工具，让玩家能够方便地查看自己的游戏数据，并在现有的 QQ Bot 查分解决方案之外，提供另一种选择。
+Arkiroku 的目标是成为一款功能全面、易用、简洁且美观的 Phigros 查分工具，让玩家能够方便地查看自己的游戏数据，并在现有的 QQ Bot 查分解决方案之外，提供另一种选择。
 
-目前，Phi Tracker 已经支持以下功能：
+目前，Arkiroku 已经支持以下功能：
 
 - 通过 TapTap 扫码登录或 sessionToken 两种方式登录
 - B30 成绩展示与详细的单曲曲目详情
@@ -115,7 +115,7 @@ sudo apt install openjdk-21-jdk unzip wget
     以上的五项配置需要根据您的实际情况填写，其中所有路径必须为**绝对路径**，且**不可**包含空格。
 
 
-5. 构建 Phi Tracker：
+5. 构建 Arkiroku：
 
     若要构建 Debug 版本，请运行：
     ```bash
@@ -138,7 +138,7 @@ sudo apt install openjdk-21-jdk unzip wget
 
 iOS 构建的流程与 Android 构建流程有所不同，其中一个显著区别是：iOS 平台的构建必须且只能在 macOS 环境中完成。
 
-我们用于构建 Phi Tracker 的 macOS 版本为 macOS 26 Tahoe，但截止目前，macOS 15 Sequoia 和 macOS 14 Somona 配合能获得的最新版 Xcode 应该仍能编译本项目。
+我们用于构建 Arkiroku 的 macOS 版本为 macOS 26 Tahoe，但截止目前，macOS 15 Sequoia 和 macOS 14 Somona 配合能获得的最新版 Xcode 应该仍能编译本项目。
 
 _请注意：在 macOS 27 Golden Gate 正式版发布后，macOS 14 Somona 将无法编译本项目。_
 
@@ -194,8 +194,8 @@ _请注意：在 macOS 27 Golden Gate 正式版发布后，macOS 14 Somona 将�
     7. 在顶部选择运行目标。
     8. 选择构建配置：`Product -> Build` 可构建 `Debug` 版本，如需构建 `Release` 版本，则改为 `Product -> Archive`。
     9. 执行构建。
-    10. 若用 Build 构建：左侧 Project Navigator → Products 分组 → 右键 `Phi Tracker.app` → Show in Finder（会定位到 DerivedData 的 `Debug-iphoneos/` 或 `Release-iphoneos/`）；若用 Archive：归档完成后 Organizer 会打开 → 右键该归档 → Show in Finder → 右键 `.xcarchive` → Show Package Contents → `Products/Applications/Phi Tracker.app`。
-    11. 在 `Phi Tracker.app` 所在目录通过访达新建 `Payload` 文件夹 → 放入 `.app` → 压缩 → 把 `.zip` 后缀改为 `.ipa`。
+    10. 若用 Build 构建：左侧 Project Navigator → Products 分组 → 右键 `Arkiroku.app` → Show in Finder（会定位到 DerivedData 的 `Debug-iphoneos/` 或 `Release-iphoneos/`）；若用 Archive：归档完成后 Organizer 会打开 → 右键该归档 → Show in Finder → 右键 `.xcarchive` → Show Package Contents → `Products/Applications/Arkiroku.app`。
+    11. 在 `Arkiroku.app` 所在目录通过访达新建 `Payload` 文件夹 → 放入 `.app` → 压缩 → 把 `.zip` 后缀改为 `.ipa`。
     12. 完成。此法得到的 ipa 包未经签名，需要通过 AltStore/SideStore/LiveContainer 等方式安装。
     </details>
 </details>
@@ -214,6 +214,6 @@ _请注意：在 macOS 27 Golden Gate 正式版发布后，macOS 14 Somona 将�
 
 版权所有 © 2026 Kasumi's IT Infrastructure
 
-版权所有 © 2026 铃萤-RinLin a.k.a. 朝比奈ほたる 及所有 Phi Tracker 贡献者
+版权所有 © 2026 铃萤-RinLin a.k.a. 朝比奈ほたる 及所有 Arkiroku 贡献者
 
-Phi Tracker 是自由软件，请参阅 [LICENSE.md](https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros/blob/main/LICENSE.md) 获取详细的许可协议内容。
+Arkiroku 是自由软件，请参阅 [LICENSE.md](https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros/blob/main/LICENSE.md) 获取详细的许可协议内容。

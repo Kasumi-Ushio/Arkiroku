@@ -1,6 +1,6 @@
 TEAM_ID=
 
-PRODUCT_NAME=Phi Tracker
+PRODUCT_NAME=Arkiroku
 PRODUCT_BUNDLE_IDENTIFIER=org.kasumi321.ushio.phitracker.PhiTracker$(TEAM_ID)
 
 CURRENT_PROJECT_VERSION=11

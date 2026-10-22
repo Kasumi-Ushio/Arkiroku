@@ -96,7 +96,7 @@ fun AboutScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 24.dp)
             ) {
-                Text("Phi Tracker", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                Text("Arkiroku", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(stringResource(Res.string.about_tagline), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(8.dp))
