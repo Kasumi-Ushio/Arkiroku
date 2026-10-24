@@ -67,13 +67,15 @@ class SettingsViewModel(
     private val thumbnailPreloader: IllustrationThumbnailPreloader = CoilIllustrationThumbnailPreloader,
     private val clearCacheUrls: suspend (List<String>) -> Unit = ::clearImageCacheUrls,
     private val clearAllCache: suspend () -> Unit = ::clearAllImageCache,
-    private val platformMessage: (String) -> Unit = ::showPlatformMessage
+    private val platformMessage: (String) -> Unit = ::showPlatformMessage,
+    private val collectibleDataVersionProvider: () -> String = { "" }
 ) : ViewModel() {
     internal val mutableUiState = MutableStateFlow(
         SettingsUiState(
             hasRuntimeLogs = runtimeLogExporter.hasLogs(),
             hasCrashLogs = crashReportExporter.hasReports(),
-            tip = tipsProvider.getRandomTip()
+            tip = tipsProvider.getRandomTip(),
+            collectibleDataVersion = collectibleDataVersionProvider()
         )
     )
     val uiState: StateFlow<SettingsUiState> = mutableUiState.asStateFlow()
@@ -93,6 +95,7 @@ class SettingsViewModel(
 
     private fun observeSettings() {
         viewModelScope.launch { settingsRepository.themeMode.collect { value -> mutableUiState.update { it.copy(themeMode = value) } } }
+        viewModelScope.launch { settingsRepository.amoledBlack.collect { value -> mutableUiState.update { it.copy(amoledBlack = value) } } }
         viewModelScope.launch { settingsRepository.themeColorSource.collect { value -> mutableUiState.update { it.copy(themeColorSource = value) } } }
         viewModelScope.launch { settingsRepository.seedColorArgb.collect { value -> mutableUiState.update { it.copy(seedColorArgb = value) } } }
         viewModelScope.launch { settingsRepository.themeImageSeedColorArgb.collect { value -> mutableUiState.update { it.copy(themeImageSeedColorArgb = value) } } }
@@ -290,14 +293,23 @@ class SettingsViewModel(
                             updateDataProgress = total,
                             updateDataFileName = "",
                             updateDataError = null,
-                            updateResultSongNames = outcome.addedSongNames
+                            updateResultSongNames = outcome.addedSongNames,
+                            collectibleDataVersion = collectibleDataVersionProvider()
                         )
                     }
                     AppLogger.event("data", "update_song_data_success", mapOf("addedSongs" to outcome.addedSongNames.size.toString()))
                 },
                 onFailure = { error ->
                     val message = error.message
-                    mutableUiState.update { it.copy(isUpdatingData = false, updateDataError = message?.let(UiText::Raw)) }
+                    // Files may already be committed before a partial
+                    // illustration failure, so re-read the version as well.
+                    mutableUiState.update {
+                        it.copy(
+                            isUpdatingData = false,
+                            updateDataError = message?.let(UiText::Raw),
+                            collectibleDataVersion = collectibleDataVersionProvider()
+                        )
+                    }
                     AppLogger.event("data", "update_song_data_failed", mapOf("error" to (message ?: "unknown")), throwable = error)
                 }
             )

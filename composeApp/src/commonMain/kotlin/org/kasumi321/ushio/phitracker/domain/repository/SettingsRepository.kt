@@ -4,6 +4,14 @@ import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {
     val themeMode: Flow<Int>
+
+    /**
+     * Use AMOLED pure-black surfaces when the theme mode is "follow system"
+     * and the system is in dark mode. Other modes ignore this flag (mode 3 is
+     * always AMOLED).
+     */
+    val amoledBlack: Flow<Boolean>
+    suspend fun setAmoledBlack(enabled: Boolean)
     val themeColorSource: Flow<String>
     val seedColorArgb: Flow<Int>
     val themeImageSeedColorArgb: Flow<Int?>

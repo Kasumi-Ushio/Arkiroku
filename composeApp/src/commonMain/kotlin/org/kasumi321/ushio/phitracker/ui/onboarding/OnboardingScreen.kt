@@ -191,7 +191,6 @@ fun OnboardingScreen(
                 stepIndex = state.stepIndex,
                 stepCount = state.steps.size,
                 canAdvance = state.canAdvance && !state.isFinishing,
-                busy = state.isPreloadRunning || state.songDataStatus == OnboardingSongDataStatus.Updating,
                 onBack = viewModel::previousStep,
                 onNext = viewModel::nextStep,
                 onFinish = viewModel::finish
@@ -269,9 +268,9 @@ fun OnboardingScreen(
                         total = state.preloadTotal,
                         currentSong = state.preloadCurrentSong,
                         totalCount = state.illustrationTotalCount,
-                        onSelect = viewModel::selectPreloadChoice,
                         onStartDownload = viewModel::startIllustrationPreload,
-                        onCancelDownload = viewModel::cancelIllustrationPreload
+                        onCancelDownload = viewModel::cancelIllustrationPreload,
+                        onSkip = viewModel::skipIllustrationPreload
                     )
                     OnboardingStep.B30Style -> B30StyleStep(
                         b30Records = state.b30Records,
@@ -933,9 +932,9 @@ private fun PreloadChoiceStep(
     total: Int,
     currentSong: String?,
     totalCount: Int,
-    onSelect: (OnboardingPreloadChoice) -> Unit,
     onStartDownload: () -> Unit,
-    onCancelDownload: () -> Unit
+    onCancelDownload: () -> Unit,
+    onSkip: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -956,16 +955,13 @@ private fun PreloadChoiceStep(
                     ChoiceButton(
                         text = stringResource(Res.string.onboarding_preload_download),
                         selected = choice == OnboardingPreloadChoice.Download,
-                        onClick = {
-                            onSelect(OnboardingPreloadChoice.Download)
-                            onStartDownload()
-                        }
+                        onClick = onStartDownload
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     ChoiceButton(
                         text = stringResource(Res.string.onboarding_preload_skip),
                         selected = choice == OnboardingPreloadChoice.Skip,
-                        onClick = { onSelect(OnboardingPreloadChoice.Skip) }
+                        onClick = onSkip
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
@@ -1037,7 +1033,7 @@ private fun PreloadChoiceStep(
                             Text(stringResource(Res.string.onboarding_preload_retry))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        TextButton(onClick = onCancelDownload) {
+                        TextButton(onClick = onSkip) {
                             Text(stringResource(Res.string.onboarding_preload_skip))
                         }
                     }
@@ -1368,7 +1364,6 @@ private fun OnboardingBottomBar(
     stepIndex: Int,
     stepCount: Int,
     canAdvance: Boolean,
-    busy: Boolean,
     onBack: () -> Unit,
     onNext: () -> Unit,
     onFinish: () -> Unit
@@ -1383,7 +1378,7 @@ private fun OnboardingBottomBar(
         ) {
             Button(
                 onClick = onFinish,
-                enabled = canAdvance && !busy,
+                enabled = canAdvance,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(stringResource(Res.string.onboarding_done_start))
@@ -1400,7 +1395,7 @@ private fun OnboardingBottomBar(
     ) {
         Box(modifier = Modifier.width(72.dp), contentAlignment = Alignment.CenterStart) {
             if (stepIndex > 0) {
-                TextButton(onClick = onBack, enabled = !busy) {
+                TextButton(onClick = onBack) {
                     Text(stringResource(Res.string.onboarding_back))
                 }
             }
@@ -1427,7 +1422,7 @@ private fun OnboardingBottomBar(
             // The primary action is a filled button: it is the one CTA that
             // advances the wizard, so it must outrank the plain back button.
             // The opening step says "Get started" instead of a bare "Next".
-            Button(onClick = onNext, enabled = canAdvance && !busy) {
+            Button(onClick = onNext, enabled = canAdvance) {
                 Text(
                     text = stringResource(
                         if (stepIndex == 0) Res.string.onboarding_welcome_start

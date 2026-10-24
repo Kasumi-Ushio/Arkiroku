@@ -1,10 +1,20 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,14 +25,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MusicNote
@@ -31,7 +47,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,8 +59,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -62,40 +79,62 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.stringResource
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.action_settings
 import phitracker.composeapp.generated.resources.action_sync
+import phitracker.composeapp.generated.resources.collectibles_all_items_count
+import phitracker.composeapp.generated.resources.collectibles_search_placeholder
+import phitracker.composeapp.generated.resources.collectibles_subtab_collectibles
+import phitracker.composeapp.generated.resources.collectibles_subtab_songs
+import phitracker.composeapp.generated.resources.home_tab_index
 import phitracker.composeapp.generated.resources.home_tab_profile
-import phitracker.composeapp.generated.resources.home_tab_songs
 import phitracker.composeapp.generated.resources.home_tab_tools
+import phitracker.composeapp.generated.resources.preload_current_song
+import phitracker.composeapp.generated.resources.preload_dialog_cancel
 import phitracker.composeapp.generated.resources.preload_dialog_downloading
 import phitracker.composeapp.generated.resources.preload_dialog_message
+import phitracker.composeapp.generated.resources.preload_dialog_minimize
 import phitracker.composeapp.generated.resources.preload_dialog_skip
 import phitracker.composeapp.generated.resources.preload_dialog_start
 import phitracker.composeapp.generated.resources.preload_dialog_title
 import phitracker.composeapp.generated.resources.profile_avatar
 import phitracker.composeapp.generated.resources.profile_set_avatar
+import phitracker.composeapp.generated.resources.songs_all_songs_count
+import phitracker.composeapp.generated.resources.songs_search_placeholder
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.rememberAvatarPicker
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportPayload
+import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesTab
+import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesViewModel
+import org.kasumi321.ushio.phitracker.ui.collectible.isBrowsingActive
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.components.ElasticPagerPrimaryIndicator
 import org.kasumi321.ushio.phitracker.ui.glass.GlassBottomBar
 import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
 import org.kasumi321.ushio.phitracker.ui.glass.HomeGlassScaffold
@@ -116,7 +155,7 @@ private const val B30_TAG_ANALYSIS_SETTLE_TIMEOUT_MS = 10_000L
 enum class HomeTab {
     Profile,
     B30,
-    Songs,
+    Index,
     Tools
 }
 
@@ -132,6 +171,63 @@ class HomeTabState(initial: HomeTab = HomeTab.Profile) {
         val Saver = Saver<HomeTabState, Int>(
             save = { it.selected.ordinal },
             restore = { HomeTabState(HomeTab.entries[it]) }
+        )
+    }
+}
+
+/** Sub-tabs of the Index page: the original song list and the new collectible index. */
+enum class IndexSubTab {
+    Songs,
+    Collectibles
+}
+
+/**
+ * Sub-tab selection of the Index page, hoisted next to [HomeTabState] so the
+ * selection survives the compact/expanded layout swap (a foldable's
+ * fold/unfold disposes and rebuilds the home composition).
+ */
+class IndexSubTabState(initial: IndexSubTab = IndexSubTab.Songs) {
+    var selected by mutableStateOf(initial)
+        private set
+
+    fun select(subTab: IndexSubTab) {
+        selected = subTab
+    }
+
+    companion object {
+        val Saver = Saver<IndexSubTabState, Int>(
+            save = { it.selected.ordinal },
+            restore = { IndexSubTabState(IndexSubTab.entries[it]) }
+        )
+    }
+}
+
+/**
+ * In-place chapter drill-down state of the collectibles browser: the chapter
+ * list replaces the poster grid inside the Index content area on both compact
+ * and expanded layouts (on expanded it is the left pane while the reading page
+ * stays in the detail pane). Hoisted at the home destination level (next to
+ * [HomeTabState]) so it survives the compact/expanded layout swap,
+ * configuration changes and process death.
+ */
+class CollectiblesChapterState(initialFolderKey: String? = null) {
+    var folderKey by mutableStateOf(initialFolderKey)
+        private set
+
+    val isDrilledDown: Boolean get() = folderKey != null
+
+    fun open(folderKey: String) {
+        this.folderKey = folderKey
+    }
+
+    fun close() {
+        folderKey = null
+    }
+
+    companion object {
+        val Saver = Saver<CollectiblesChapterState, String>(
+            save = { it.folderKey },
+            restore = { saved -> CollectiblesChapterState(saved) }
         )
     }
 }
@@ -337,21 +433,29 @@ private fun MainNavigationRail(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun MainScreen(
     onLogout: () -> Unit,
     onNavigateToB30Image: (B30ExportPayload) -> Unit,
     onNavigateToSongDetail: (String) -> Unit,
     onNavigateToSongDetailWithDifficulty: (String, org.kasumi321.ushio.phitracker.domain.model.Difficulty?) -> Unit,
+    onNavigateToCollectibleDetail: (String, String) -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToSuggest: () -> Unit,
     onNavigateToLogin: () -> Unit,
     tabState: HomeTabState,
+    indexSubTabState: IndexSubTabState,
+    isInExpandedPane: Boolean = false,
+    selectedCollectibleItem: Pair<String, String>? = null,
+    collectiblesChapterState: CollectiblesChapterState =
+        rememberSaveable(saver = CollectiblesChapterState.Saver) { CollectiblesChapterState() },
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val collectiblesViewModel: CollectiblesViewModel = koinViewModel()
+    val collectiblesState by collectiblesViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val selectedTab = tabState.selected
     val tip = remember(selectedTab) { viewModel.getRandomTip() }
@@ -362,7 +466,7 @@ fun MainScreen(
     val navItems = listOf(
         BottomNavItem(HomeTab.Profile, stringResource(Res.string.home_tab_profile), Icons.Filled.Home, Icons.Outlined.Home),
         BottomNavItem(HomeTab.B30, "B30", Icons.Filled.Star, Icons.Outlined.StarBorder),
-        BottomNavItem(HomeTab.Songs, stringResource(Res.string.home_tab_songs), Icons.Filled.MusicNote, Icons.Outlined.MusicNote),
+        BottomNavItem(HomeTab.Index, stringResource(Res.string.home_tab_index), Icons.Filled.AutoStories, Icons.Outlined.AutoStories),
         BottomNavItem(HomeTab.Tools, stringResource(Res.string.home_tab_tools), Icons.Filled.Build, Icons.Outlined.Build)
     )
 
@@ -376,10 +480,18 @@ fun MainScreen(
         val tabName = when (selectedTab) {
             HomeTab.Profile -> "profile"
             HomeTab.B30 -> "b30"
-            HomeTab.Songs -> "songs"
+            HomeTab.Index -> "index"
             HomeTab.Tools -> "tools"
         }
         AppLogger.event("navigation", "tab_switched", mapOf("tab" to tabName))
+    }
+
+    LaunchedEffect(indexSubTabState.selected) {
+        val subTabName = when (indexSubTabState.selected) {
+            IndexSubTab.Songs -> "songs"
+            IndexSubTab.Collectibles -> "collectibles"
+        }
+        AppLogger.event("navigation", "index_subtab_switched", mapOf("subtab" to subTabName))
     }
 
     LaunchedEffect(state.sync.error) {
@@ -418,7 +530,10 @@ fun MainScreen(
             progress = state.songs.preloadProgress,
             completed = state.songs.preloadCompleted,
             total = state.songs.preloadTotal,
+            currentSong = state.songs.preloadCurrentSong,
             onStartDownload = { viewModel.startPreloadIllustrations() },
+            onMinimize = { viewModel.minimizePreload() },
+            onCancelDownload = { viewModel.cancelPreload() },
             onDismiss = { viewModel.dismissPreload() }
         )
     }
@@ -507,9 +622,10 @@ fun MainScreen(
         }
     }
 
-    // Songs header compacts on scroll into a title row with a search icon on
-    // the top right; tapping the icon reopens the full search field until the
-    // list returns to the top
+    // The two Index sub-tabs keep independent list/grid scroll state so
+    // switching between them restores each position. The header shrinks while
+    // the active list is scrolled away from the top; search itself lives in
+    // the FAB-opened panel below.
     val songsListState = rememberLazyListState()
     val songsGridState = rememberLazyGridState()
     val songsUseGrid = windowSizeClass.isAtLeastMedium()
@@ -524,17 +640,54 @@ fun MainScreen(
             }
         }
     }
-    var songsSearchOpen by remember { mutableStateOf(false) }
-    // Any scroll while the reopened search field is visible collapses it again
-    val songsScrollInProgress =
-        if (songsUseGrid) songsGridState.isScrollInProgress else songsListState.isScrollInProgress
-    LaunchedEffect(songsScrollInProgress) {
-        if (songsScrollInProgress) songsSearchOpen = false
+
+    // Collectibles idle mode renders the poster grid (always the grid state);
+    // its flat results list follows the songs sub-tab's list/grid split, so
+    // the at-top probe must read whichever state is actually driving content.
+    val collectiblesBrowsingActive = collectiblesState.isBrowsingActive()
+    val collectiblesListState = rememberLazyListState()
+    val collectiblesGridState = rememberLazyGridState()
+    // The drilled chapter list lives inside the pager page and would lose its
+    // scroll state when the offscreen page is disposed. Keep one state per
+    // chapter so re-entering the same chapter restores its position while a
+    // different chapter still starts at the top.
+    val collectiblesChapterListStates = remember { mutableMapOf<String, LazyListState>() }
+    val collectiblesAtTop by remember(songsUseGrid, collectiblesBrowsingActive) {
+        derivedStateOf {
+            if (!collectiblesBrowsingActive || songsUseGrid) {
+                collectiblesGridState.firstVisibleItemIndex == 0 &&
+                    collectiblesGridState.firstVisibleItemScrollOffset < 48
+            } else {
+                collectiblesListState.firstVisibleItemIndex == 0 &&
+                    collectiblesListState.firstVisibleItemScrollOffset < 48
+            }
+        }
     }
-    // Armed only by the search icon: an icon-triggered reopening focuses the
-    // field (raising the IME), while automatic re-expansion when the list
-    // returns to the top must not pop the keyboard
-    var songsFocusOnExpand by remember { mutableStateOf(false) }
+    val indexShowsCollectibles = indexSubTabState.selected == IndexSubTab.Collectibles
+
+    // The two Index sub-tabs live in a pager. IndexSubTabState stays the
+    // single selection source: a tab click updates it and the effect below
+    // animates the pager; a drag syncs back only once it settles, so passing
+    // through the midpoint reports one switch instead of a stream of them.
+    val indexPagerState = rememberPagerState(initialPage = indexSubTabState.selected.ordinal) {
+        IndexSubTab.entries.size
+    }
+    LaunchedEffect(indexPagerState, indexSubTabState) {
+        snapshotFlow { indexPagerState.settledPage }.collect { page ->
+            val target = IndexSubTab.entries.getOrNull(page) ?: return@collect
+            if (indexSubTabState.selected != target) {
+                indexSubTabState.select(target)
+            }
+        }
+    }
+    LaunchedEffect(indexSubTabState.selected, indexPagerState) {
+        val target = indexSubTabState.selected.ordinal
+        // targetPage covers both a click on a distant tab and a quick
+        // re-click that must cancel an in-flight scroll back to this page.
+        if (indexPagerState.targetPage != target) {
+            indexPagerState.animateScrollToPage(target)
+        }
+    }
 
     // Profile and tools only shrink their top bar titles when scrolled away
     // from the top, no further header changes
@@ -556,20 +709,22 @@ fun MainScreen(
         if (state.songs.minLevel > state.songs.levelMinBound || state.songs.maxLevel < state.songs.levelMaxBound) count++
         count
     }
+    val collectiblesActiveFilterCount = remember(
+        collectiblesState.selectedChapters,
+        collectiblesState.selectedCategories
+    ) {
+        var count = 0
+        if (collectiblesState.selectedChapters.isNotEmpty()) count += collectiblesState.selectedChapters.size
+        if (collectiblesState.selectedCategories.isNotEmpty()) count++
+        count
+    }
 
     HomeGlassScaffold(
         snackbarHostState = snackbarHostState,
         navMode = navMode,
         topBar = { hazeState, glassStyle ->
-            // Keep the bottom edge blurred while the songs search field is
-            // expanded, so the field never sits on the faded-out gradient tail
-            val songsSearchExpanded = selectedTab == HomeTab.Songs &&
-                (songsAtTop || songsSearchOpen)
-            GlassTopBar(
-                hazeState = hazeState,
-                style = glassStyle,
-                progressiveEndIntensity = if (songsSearchExpanded) 0.5f else 0f
-            ) {
+            val indexAtTop = if (indexShowsCollectibles) collectiblesAtTop else songsAtTop
+            GlassTopBar(hazeState = hazeState, style = glassStyle) {
                 when (selectedTab) {
                     HomeTab.B30 -> B30Header(
                         state = state.b30,
@@ -578,20 +733,43 @@ fun MainScreen(
                         onToggle = toggleB30Header,
                         onGenerateImage = generateB30Image
                     )
-                    HomeTab.Songs -> SongsHeader(
-                        songCount = state.songs.filteredSongs.size,
-                        tip = tip,
-                        searchQuery = state.songs.searchQuery,
-                        activeFilterCount = songsActiveFilterCount,
-                        compact = !songsAtTop && !songsSearchOpen,
-                        focusOnExpand = songsFocusOnExpand,
-                        onExpandFocusHandled = { songsFocusOnExpand = false },
-                        onSearchChange = { viewModel.searchSongs(it) },
-                        onSearchExpandRequest = {
-                            songsFocusOnExpand = true
-                            songsSearchOpen = true
+                    HomeTab.Index -> IndexHeader(
+                        countText = if (indexShowsCollectibles) {
+                            stringResource(Res.string.collectibles_all_items_count, collectiblesState.filteredItems.size)
+                        } else {
+                            stringResource(Res.string.songs_all_songs_count, state.songs.filteredSongs.size)
                         },
-                        onOpenFilter = { viewModel.toggleFilterSheet(true) }
+                        tip = tip,
+                        compact = !indexAtTop,
+                        tabRow = {
+                            // Transparent container: the row sits on the glass
+                            // header, so the blurred content shows through. No
+                            // divider either — a hard bottom line would cut the
+                            // glass header off from the content below; the
+                            // indicator floats directly on the glass.
+                            PrimaryTabRow(
+                                selectedTabIndex = indexSubTabState.selected.ordinal,
+                                containerColor = Color.Transparent,
+                                modifier = Modifier.fillMaxWidth(),
+                                indicator = {
+                                    ElasticPagerPrimaryIndicator(pagerState = indexPagerState)
+                                },
+                                divider = {}
+                            ) {
+                                Tab(
+                                    selected = !indexShowsCollectibles,
+                                    onClick = { indexSubTabState.select(IndexSubTab.Songs) },
+                                    text = { Text(stringResource(Res.string.collectibles_subtab_songs)) },
+                                    icon = { Icon(Icons.Filled.MusicNote, contentDescription = null) }
+                                )
+                                Tab(
+                                    selected = indexShowsCollectibles,
+                                    onClick = { indexSubTabState.select(IndexSubTab.Collectibles) },
+                                    text = { Text(stringResource(Res.string.collectibles_subtab_collectibles)) },
+                                    icon = { Icon(Icons.Filled.FolderOpen, contentDescription = null) }
+                                )
+                            }
+                        }
                     )
                     HomeTab.Profile -> HomeGlassTopBar(
                         spec = HomeHeaderSpec(
@@ -685,6 +863,12 @@ fun MainScreen(
                         getIllustrationUrl = { viewModel.getLowIllustrationUrl(it) },
                         histogram = state.b30.histogram,
                         gameUpdateInfo = state.sync.gameUpdateInfo,
+                        showPreloadCard = state.songs.shouldShowPreloadCard(),
+                        preloadCompleted = state.songs.preloadCompleted,
+                        preloadTotal = state.songs.preloadTotal,
+                        preloadProgress = state.songs.preloadProgress,
+                        preloadCurrentSong = state.songs.preloadCurrentSong,
+                        onPreloadCardClick = { viewModel.reopenPreloadDialog() },
                         contentPadding = contentPadding,
                         scrollState = profileScrollState
                     )
@@ -708,58 +892,287 @@ fun MainScreen(
                 gridState = b30GridState,
                 onRetryTagAnalysis = { viewModel.retryTagAnalysis() }
             )
-            HomeTab.Songs -> {
-                val pullRefreshState = rememberPullToRefreshState()
-                PullToRefreshBox(
-                    isRefreshing = state.songs.isSongDataRefreshing,
-                    onRefresh = { viewModel.refreshSongData() },
-                    state = pullRefreshState,
-                    modifier = Modifier.fillMaxSize(),
-                    indicator = {
-                        PullToRefreshDefaults.Indicator(
-                            state = pullRefreshState,
-                            isRefreshing = state.songs.isSongDataRefreshing,
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = contentPadding.calculateTopPadding())
+            HomeTab.Index -> {
+                // The sub-tabs live in the header's slot; the lists consume
+                // the scaffold padding exactly like the other tabs. Search is
+                // a FAB-opened layer inside this content area (the left pane
+                // on the two-pane layout), so it never covers the detail pane.
+                var indexSearchExpanded by rememberSaveable { mutableStateOf(false) }
+                // The panel samples a tab-local source placed on the Index
+                // pager, not the home scaffold's shared HazeState: that source
+                // is an ancestor of this panel, and Haze forbids an effect from
+                // drawing an ancestor source. The pager is a sibling of the
+                // panel, so the panel can sample it safely.
+                val searchHazeState = rememberHazeState()
+                val focusManager = LocalFocusManager.current
+                val indexSubTabName = if (indexShowsCollectibles) "collectibles" else "songs"
+                val indexSearchQuery = if (indexShowsCollectibles) {
+                    collectiblesState.searchQuery
+                } else {
+                    state.songs.searchQuery
+                }
+                // The panel floats above the list rather than occupying layout
+                // space: opening it must not shift the list content, and the
+                // top items being covered while it is open is intentional.
+                val indexContentPadding = PaddingValues(
+                    top = contentPadding.calculateTopPadding(),
+                    // Keep the last item clear of the FAB (it is hidden while
+                    // the panel is open; the extra room is harmless then).
+                    bottom = contentPadding.calculateBottomPadding() + 72.dp
+                )
+                val closeIndexSearch = {
+                    // Drop focus before removing the field so the IME hides.
+                    focusManager.clearFocus()
+                    indexSearchExpanded = false
+                    AppLogger.event(
+                        "navigation",
+                        "index_search_closed",
+                        mapOf("subtab" to indexSubTabName)
+                    )
+                }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    HorizontalPager(
+                        state = indexPagerState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .hazeSource(state = searchHazeState)
+                    ) { page ->
+                        when (IndexSubTab.entries[page]) {
+                            IndexSubTab.Songs -> {
+                                val pullRefreshState = rememberPullToRefreshState()
+                                PullToRefreshBox(
+                                    isRefreshing = state.songs.isSongDataRefreshing,
+                                    onRefresh = { viewModel.refreshSongData() },
+                                    state = pullRefreshState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    indicator = {
+                                        PullToRefreshDefaults.Indicator(
+                                            state = pullRefreshState,
+                                            isRefreshing = state.songs.isSongDataRefreshing,
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(top = indexContentPadding.calculateTopPadding())
+                                        )
+                                    }
+                                ) {
+                                    SongsTab(
+                                        state = state.songs,
+                                        onSearchChange = { viewModel.searchSongs(it) },
+                                        onToggleChapter = { viewModel.toggleChapter(it) },
+                                        onClearChapters = { viewModel.resetFilters() },
+                                        onDifficultySelect = { viewModel.filterByDifficulty(it) },
+                                        onLevelRangeSelect = { min, max -> viewModel.filterByLevelRange(min, max) },
+                                        onToggleFilterSheet = { viewModel.toggleFilterSheet(it) },
+                                        onResetFilters = { viewModel.resetFilters() },
+                                        onRefreshSongData = { viewModel.refreshSongData() },
+                                        getIllustrationUrl = { viewModel.getLowIllustrationUrl(it) },
+                                        onSongClick = { songId, _ -> onNavigateToSongDetail(songId) },
+                                        contentPadding = indexContentPadding,
+                                        listState = songsListState,
+                                        useGrid = songsUseGrid,
+                                        gridState = songsGridState
+                                    )
+                                    // The progress card floats below the glass top bar instead of
+                                    // scrolling with the list, so the pull gesture collapsing the
+                                    // header can never slide it under the blurred area.
+                                    val songDataStatusText = state.songs.songDataStatusText
+                                    if (state.songs.isSongDataRefreshing && songDataStatusText != null) {
+                                        SongDataRefreshProgressCard(
+                                            statusText = songDataStatusText.asString(),
+                                            progressFraction = state.songs.songDataProgressFraction,
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(
+                                                    start = 16.dp,
+                                                    end = 16.dp,
+                                                    top = indexContentPadding.calculateTopPadding() + 8.dp
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                            IndexSubTab.Collectibles -> {
+                                val pullRefreshState = rememberPullToRefreshState()
+                                PullToRefreshBox(
+                                    isRefreshing = state.songs.isSongDataRefreshing,
+                                    onRefresh = { viewModel.refreshSongData() },
+                                    state = pullRefreshState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    indicator = {
+                                        PullToRefreshDefaults.Indicator(
+                                            state = pullRefreshState,
+                                            isRefreshing = state.songs.isSongDataRefreshing,
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(top = indexContentPadding.calculateTopPadding())
+                                        )
+                                    }
+                                ) {
+                                    CollectiblesTab(
+                                        state = collectiblesState,
+                                        updateAvailable = state.songs.songDataUpdateAvailable,
+                                        onToggleChapter = { collectiblesViewModel.toggleChapter(it) },
+                                        onToggleCategory = { collectiblesViewModel.toggleCategory(it) },
+                                        onClearChapters = { collectiblesViewModel.resetFilters() },
+                                        onToggleFilterSheet = { collectiblesViewModel.toggleFilterSheet(it) },
+                                        onResetFilters = { collectiblesViewModel.resetFilters() },
+                                        onUpdateNow = { viewModel.refreshSongData() },
+                                        getCoverUrl = collectiblesViewModel::getCoverUrl,
+                                        getPosterUrl = collectiblesViewModel::getPosterCoverUrl,
+                                        drilledChapterKey = collectiblesChapterState.folderKey,
+                                        splitChapterPane = isInExpandedPane,
+                                        onBackFromChapter = {
+                                            AppLogger.event(
+                                                "navigation",
+                                                "collectible_chapter_closed",
+                                                mapOf("folder" to (collectiblesChapterState.folderKey ?: ""))
+                                            )
+                                            collectiblesChapterState.close()
+                                        },
+                                        selectedItem = if (isInExpandedPane) selectedCollectibleItem else null,
+                                        onChapterClick = { chapter ->
+                                            // Level 2 drills down in place on compact; on
+                                            // expanded it splits the left pane. Tapping the
+                                            // already-open poster collapses the split.
+                                            val alreadyOpen = collectiblesChapterState.folderKey == chapter.folderKey
+                                            if (alreadyOpen) {
+                                                AppLogger.event(
+                                                    "navigation",
+                                                    "collectible_chapter_closed",
+                                                    mapOf("folder" to chapter.folderKey)
+                                                )
+                                                collectiblesChapterState.close()
+                                            } else {
+                                                AppLogger.event(
+                                                    "navigation",
+                                                    "collectible_chapter_opened",
+                                                    mapOf("folder" to chapter.folderKey)
+                                                )
+                                                collectiblesChapterState.open(chapter.folderKey)
+                                            }
+                                        },
+                                        onItemClick = { item ->
+                                            // Result-item taps also record the chapter,
+                                            // so leaving search lands on its inline
+                                            // chapter list on both layouts.
+                                            collectiblesChapterState.open(item.chapterFolderKey)
+                                            onNavigateToCollectibleDetail(item.chapterFolderKey, item.key)
+                                        },
+                                        contentPadding = indexContentPadding,
+                                        listState = collectiblesListState,
+                                        useGrid = songsUseGrid,
+                                        gridState = collectiblesGridState,
+                                        getChapterListState = { chapterKey ->
+                                            collectiblesChapterListStates.getOrPut(chapterKey) {
+                                                LazyListState()
+                                            }
+                                        }
+                                    )
+                                    // The combined index (songs + collectibles)
+                                    // refresh reports through the songs state on
+                                    // both sub-tabs.
+                                    val songDataStatusText = state.songs.songDataStatusText
+                                    if (state.songs.isSongDataRefreshing && songDataStatusText != null) {
+                                        SongDataRefreshProgressCard(
+                                            statusText = songDataStatusText.asString(),
+                                            progressFraction = state.songs.songDataProgressFraction,
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(
+                                                    start = 16.dp,
+                                                    end = 16.dp,
+                                                    top = indexContentPadding.calculateTopPadding() + 8.dp
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = indexSearchExpanded,
+                        enter = if (reducedMotionEnabled) {
+                            EnterTransition.None
+                        } else {
+                            fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+                                scaleIn(
+                                    initialScale = 0.85f,
+                                    transformOrigin = TransformOrigin(0.5f, 0.5f),
+                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                )
+                        },
+                        exit = if (reducedMotionEnabled) {
+                            ExitTransition.None
+                        } else {
+                            fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) +
+                                scaleOut(
+                                    targetScale = 0.85f,
+                                    transformOrigin = TransformOrigin(0.5f, 0.5f),
+                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                )
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = contentPadding.calculateTopPadding() + 8.dp
+                            )
+                    ) {
+                        IndexSearchPanel(
+                            hazeState = searchHazeState,
+                            query = indexSearchQuery,
+                            placeholder = if (indexShowsCollectibles) {
+                                stringResource(Res.string.collectibles_search_placeholder)
+                            } else {
+                                stringResource(Res.string.songs_search_placeholder)
+                            },
+                            activeFilterCount = if (indexShowsCollectibles) {
+                                collectiblesActiveFilterCount
+                            } else {
+                                songsActiveFilterCount
+                            },
+                            onQueryChange = {
+                                if (indexShowsCollectibles) {
+                                    collectiblesViewModel.search(it)
+                                } else {
+                                    viewModel.searchSongs(it)
+                                }
+                            },
+                            onOpenFilter = {
+                                if (indexShowsCollectibles) {
+                                    collectiblesViewModel.toggleFilterSheet(true)
+                                } else {
+                                    viewModel.toggleFilterSheet(true)
+                                }
+                            },
+                            onClose = closeIndexSearch
                         )
                     }
-                ) {
-                    SongsTab(
-                        state = state.songs,
-                        onSearchChange = { viewModel.searchSongs(it) },
-                        onToggleChapter = { viewModel.toggleChapter(it) },
-                        onClearChapters = { viewModel.resetFilters() },
-                        onDifficultySelect = { viewModel.filterByDifficulty(it) },
-                        onLevelRangeSelect = { min, max -> viewModel.filterByLevelRange(min, max) },
-                        onToggleFilterSheet = { viewModel.toggleFilterSheet(it) },
-                        onResetFilters = { viewModel.resetFilters() },
-                        onRefreshSongData = { viewModel.refreshSongData() },
-                        getIllustrationUrl = { viewModel.getLowIllustrationUrl(it) },
-                        onSongClick = { songId, _ -> onNavigateToSongDetail(songId) },
-                        contentPadding = contentPadding,
-                        listState = songsListState,
-                        useGrid = songsUseGrid,
-                        gridState = songsGridState
-                    )
-                    // The progress card floats below the glass top bar instead of
-                    // scrolling with the list, so the pull gesture collapsing the
-                    // header can never slide it under the blurred area.
-                    val songDataStatusText = state.songs.songDataStatusText
-                    if (state.songs.isSongDataRefreshing && songDataStatusText != null) {
-                        SongDataRefreshProgressCard(
-                            statusText = songDataStatusText.asString(),
-                            progressFraction = state.songs.songDataProgressFraction,
+                    if (!indexSearchExpanded) {
+                        IndexSearchFab(
+                            active = indexSearchQuery.isNotEmpty(),
+                            onClick = {
+                                indexSearchExpanded = true
+                                AppLogger.event(
+                                    "navigation",
+                                    "index_search_opened",
+                                    mapOf("subtab" to indexSubTabName)
+                                )
+                            },
                             modifier = Modifier
-                                .align(Alignment.TopCenter)
+                                .align(Alignment.BottomEnd)
                                 .padding(
-                                    start = 16.dp,
                                     end = 16.dp,
-                                    top = contentPadding.calculateTopPadding() + 8.dp
+                                    bottom = contentPadding.calculateBottomPadding() + 16.dp
                                 )
                         )
                     }
                 }
+                // Composed after the pager/chapter BackHandler so an open
+                // search panel consumes back first.
+                BackHandler(enabled = indexSearchExpanded) { closeIndexSearch() }
             }
             HomeTab.Tools -> ToolsTab(
                 state = state.tools,
@@ -782,7 +1195,10 @@ private fun IllustrationPreloadDialog(
     progress: Float,
     completed: Int,
     total: Int,
+    currentSong: String?,
     onStartDownload: () -> Unit,
+    onMinimize: () -> Unit,
+    onCancelDownload: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AnimatedAlertDialog(
@@ -798,6 +1214,18 @@ private fun IllustrationPreloadDialog(
                         text = stringResource(Res.string.preload_dialog_downloading, completed, total),
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    currentSong?.let { song ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(Res.string.preload_current_song, song),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     LinearProgressIndicator(
                         progress = { progress },
@@ -819,14 +1247,22 @@ private fun IllustrationPreloadDialog(
             }
         },
         confirmButton = {
-            if (!isPreloading) {
+            if (isPreloading) {
+                TextButton(onClick = onMinimize) {
+                    Text(stringResource(Res.string.preload_dialog_minimize))
+                }
+            } else {
                 TextButton(onClick = onStartDownload) {
                     Text(stringResource(Res.string.preload_dialog_start))
                 }
             }
         },
         dismissButton = {
-            if (!isPreloading) {
+            if (isPreloading) {
+                TextButton(onClick = onCancelDownload) {
+                    Text(stringResource(Res.string.preload_dialog_cancel))
+                }
+            } else {
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(Res.string.preload_dialog_skip))
                 }

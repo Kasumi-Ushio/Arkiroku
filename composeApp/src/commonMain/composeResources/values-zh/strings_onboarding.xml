@@ -26,8 +26,8 @@
     <string name="onboarding_preload_failed">网络连接可能出现了异常，点击“重试”按钮以再次尝试下载。</string>
     <string name="onboarding_preload_retry">重试</string>
     <string name="onboarding_step_update_title">自动检查更新</string>
-    <string name="onboarding_step_song_data_title">曲库数据</string>
-    <string name="onboarding_step_song_data_message">您可以在此检查当前曲目数据是否有更新，当存在更新时，您可以点击“立即更新”按钮下载最新的曲目数据。</string>
+    <string name="onboarding_step_song_data_title">图鉴信息</string>
+    <string name="onboarding_step_song_data_message">您可以在此检查当前图鉴信息是否有更新，当存在更新时，您可以点击“立即更新”按钮下载最新的曲目与收藏品图鉴信息。</string>
     <string name="onboarding_song_data_update_now">立即更新</string>
     <string name="onboarding_song_data_failed">网络连接可能出现了异常，点击“重试”按钮以再次尝试下载。</string>
     <string name="onboarding_step_update_message">您可以在这里指定 Arkiroku 如何检查更新。</string>

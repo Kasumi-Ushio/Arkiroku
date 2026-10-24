@@ -109,6 +109,7 @@ import org.kasumi321.ushio.phitracker.domain.model.ChartTagVoteCount
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.SongInfo
 import org.kasumi321.ushio.phitracker.domain.model.SongSyncHistoryEntry
+import org.kasumi321.ushio.phitracker.ui.components.ElasticPagerPrimaryIndicator
 import org.kasumi321.ushio.phitracker.ui.components.ScoreRating
 import org.kasumi321.ushio.phitracker.ui.components.ScoreRatingTag
 import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
@@ -1375,7 +1376,8 @@ private fun DifficultyTabRow(
 ) {
     PrimaryTabRow(
         selectedTabIndex = pagerState.currentPage,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        indicator = { ElasticPagerPrimaryIndicator(pagerState = pagerState) }
     ) {
         val scope = rememberCoroutineScope()
         availableDifficulties.forEachIndexed { index, diff ->

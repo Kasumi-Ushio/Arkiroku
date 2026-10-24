@@ -35,7 +35,7 @@
     <string name="privacy_section_4_intro">本應用程式在執行過程中會與以下第三方服務進行互動：</string>
     <string name="privacy_section_4_item_1">1. TapTap OAuth 服務：用於實現掃碼登入功能，取得授權憑證。互動過程遵循 TapTap 的隱私權政策。</string>
     <string name="privacy_section_4_item_2">2. Phigros 雲端存檔服務（LeanCloud）：用於讀取您的遊戲存檔資料。</string>
-    <string name="privacy_section_4_item_3">3. GitHub（raw.githubusercontent.com）：用於取得曲繪圖片資源和曲目資料更新。</string>
+    <string name="privacy_section_4_item_3">3. GitHub（raw.githubusercontent.com）：用於取得曲繪圖片和圖鑑資訊更新。</string>
     <string name="privacy_section_4_item_4">4. gh-proxy（gh-proxy.com）：用於在中國大陸環境中加速請求和取得 GitHub 資源。</string>
     <string name="privacy_section_4_item_5">5. Phi-Plugin「灤鳩」聯合查分 API（可選）：用於取得排行榜、RKS 歷史紀錄等資料。</string>
     <string name="privacy_section_4_note">本應用程式不使用任何第三方分析、廣告或追蹤 SDK。</string>

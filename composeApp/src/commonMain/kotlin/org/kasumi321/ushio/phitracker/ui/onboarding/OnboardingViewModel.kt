@@ -2,7 +2,6 @@ package org.kasumi321.ushio.phitracker.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,7 +11,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.setAppLocale
-import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
+import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadRunStatus
+import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationUriResolver
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
@@ -116,10 +116,6 @@ data class OnboardingUiState(
     val step: OnboardingStep
         get() = steps.getOrElse(stepIndex) { OnboardingStep.Language }
 
-    /** While the inline download runs the wizard must not be left (the job lives in this VM's scope). */
-    val isPreloadRunning: Boolean
-        get() = preloadStatus == OnboardingPreloadStatus.Running
-
     val canAdvance: Boolean
         get() = when (step) {
             OnboardingStep.Welcome -> true
@@ -140,7 +136,7 @@ data class OnboardingUiState(
 
 class OnboardingViewModel(
     private val settingsRepository: SettingsRepository,
-    private val illustrationPreloadCoordinator: IllustrationPreloadCoordinator,
+    private val illustrationPreloadSession: IllustrationPreloadSession,
     private val getB30UseCase: GetB30UseCase,
     private val songDataProvider: SongDataProvider,
     private val songDataUpdateCoordinator: SongDataUpdateCoordinator,
@@ -151,7 +147,6 @@ class OnboardingViewModel(
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
-    private var preloadJob: Job? = null
     private var illustrationPreloadDeclined = false
 
     init {
@@ -198,6 +193,34 @@ class OnboardingViewModel(
         viewModelScope.launch {
             settingsRepository.illustrationPreloadDeclined.collect { declined ->
                 illustrationPreloadDeclined = declined
+            }
+        }
+        viewModelScope.launch {
+            // The session lives outside this view-model, so its state is the
+            // single source of truth when the user leaves this step and comes
+            // back (or when a run started on a previous visit is still going).
+            illustrationPreloadSession.state.collect { session ->
+                val status = when (session.status) {
+                    IllustrationPreloadRunStatus.Idle -> OnboardingPreloadStatus.Idle
+                    IllustrationPreloadRunStatus.Running -> OnboardingPreloadStatus.Running
+                    IllustrationPreloadRunStatus.Succeeded -> OnboardingPreloadStatus.Succeeded
+                    IllustrationPreloadRunStatus.Failed -> OnboardingPreloadStatus.Failed
+                }
+                _uiState.update {
+                    refreshed(
+                        it.copy(
+                            preloadStatus = status,
+                            preloadChoice = if (session.status == IllustrationPreloadRunStatus.Idle) {
+                                it.preloadChoice
+                            } else {
+                                OnboardingPreloadChoice.Download
+                            },
+                            preloadCompleted = session.completed,
+                            preloadTotal = session.total,
+                            preloadCurrentSong = session.currentSong
+                        )
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -258,76 +281,61 @@ class OnboardingViewModel(
         _uiState.update { it.copy(preloadChoice = choice) }
     }
 
-    /** Start (or retry) the inline illustration download for the preload step. */
+    /**
+     * Start (or retry) the illustration download. The shared session owns the
+     * coroutine, so leaving this step (or the wizard) no longer cancels it.
+     */
     fun startIllustrationPreload() {
         if (_uiState.value.preloadStatus == OnboardingPreloadStatus.Running) return
-        preloadJob?.cancel()
         AppLogger.event("onboarding", "preload_started")
+        _uiState.update { refreshed(it.copy(preloadChoice = OnboardingPreloadChoice.Download)) }
+        illustrationPreloadSession.start()
+    }
+
+    /**
+     * Cancel a running download or give up after a failure. Both are treated
+     * as "later": the home re-prompt is permanently suppressed and the step
+     * resolves to Skip. The UI state is resolved synchronously (the flag write
+     * happens in the app-scoped session) so the next tap is never left behind
+     * a stale Running/busy state.
+     */
+    fun cancelIllustrationPreload() {
+        val status = _uiState.value.preloadStatus
+        if (status != OnboardingPreloadStatus.Running && status != OnboardingPreloadStatus.Failed) return
+        AppLogger.event("onboarding", "preload_cancelled")
+        illustrationPreloadSession.cancel()
         _uiState.update {
             refreshed(
                 it.copy(
-                    preloadStatus = OnboardingPreloadStatus.Running,
+                    preloadStatus = OnboardingPreloadStatus.Idle,
+                    preloadChoice = OnboardingPreloadChoice.Skip,
                     preloadCompleted = 0,
                     preloadTotal = 0,
                     preloadCurrentSong = null
                 )
             )
         }
-        preloadJob = viewModelScope.launch {
-            val result = illustrationPreloadCoordinator.preloadLowRes { done, total, currentSong ->
-                _uiState.update {
-                    refreshed(
-                        it.copy(
-                            preloadCompleted = done,
-                            preloadTotal = total,
-                            preloadCurrentSong = currentSong
-                        )
-                    )
-                }
-            }
-            preloadJob = null
-            if (result.isFullySuccessful) {
-                settingsRepository.setPreloadDone(true)
-                settingsRepository.setIllustrationPreloadDeclined(false)
-                AppLogger.event("onboarding", "preload_completed", mapOf("total" to result.completed.toString()))
-                _uiState.update {
-                    refreshed(it.copy(preloadStatus = OnboardingPreloadStatus.Succeeded, preloadChoice = OnboardingPreloadChoice.Download))
-                }
-            } else {
-                AppLogger.event(
-                    "onboarding",
-                    "preload_failed",
-                    mapOf("completed" to result.completed.toString(), "failed" to result.failed.toString())
-                )
-                _uiState.update { refreshed(it.copy(preloadStatus = OnboardingPreloadStatus.Failed)) }
-            }
-        }
     }
 
     /**
-     * Cancel a running download or give up after a failure. Both are treated
-     * as "later": the home re-prompt is permanently suppressed and the step
-     * resolves to Skip so the wizard can advance.
+     * The preload step's "later" action: stop any run, persist the declined
+     * marker through the shared session, and advance immediately. This is also
+     * the recovery path after [cancelIllustrationPreload].
      */
-    fun cancelIllustrationPreload() {
-        val status = _uiState.value.preloadStatus
-        if (status != OnboardingPreloadStatus.Running && status != OnboardingPreloadStatus.Failed) return
-        preloadJob?.cancel()
-        preloadJob = null
-        AppLogger.event("onboarding", "preload_cancelled")
-        viewModelScope.launch {
-            settingsRepository.setIllustrationPreloadDeclined(true)
-            _uiState.update {
-                refreshed(
-                    it.copy(
-                        preloadStatus = OnboardingPreloadStatus.Idle,
-                        preloadChoice = OnboardingPreloadChoice.Skip,
-                        preloadCompleted = 0,
-                        preloadTotal = 0,
-                        preloadCurrentSong = null
-                    )
+    fun skipIllustrationPreload() {
+        AppLogger.event("onboarding", "preload_skipped")
+        illustrationPreloadSession.decline()
+        _uiState.update { state ->
+            refreshed(
+                state.copy(
+                    preloadStatus = OnboardingPreloadStatus.Idle,
+                    preloadChoice = OnboardingPreloadChoice.Skip,
+                    preloadCompleted = 0,
+                    preloadTotal = 0,
+                    preloadCurrentSong = null,
+                    stepIndex = (state.stepIndex + 1).coerceAtMost(state.steps.lastIndex)
                 )
-            }
+            )
         }
     }
 
@@ -392,10 +400,10 @@ class OnboardingViewModel(
     }
 
     /**
-     * Probe the upstream song database. Runs whenever the user is on the
-     * song-data step, independent of the auto-check toggle — being on the
-     * step IS the explicit request. Safe to re-enter: a failed or up-to-date
-     * result can be probed again (retry).
+     * Probe the upstream index (song `info.csv` + collectible set). Runs
+     * whenever the user is on the index step, independent of the auto-check
+     * toggle — being on the step IS the explicit request. Safe to re-enter: a
+     * failed or up-to-date result can be probed again (retry).
      */
     fun checkSongDataUpdate() {
         val status = _uiState.value.songDataStatus
@@ -420,7 +428,11 @@ class OnboardingViewModel(
         }
     }
 
-    /** Download the song database inline; refreshes the disclosed song count on success. */
+    /**
+     * Download the complete index inline (song files + collectible CSVs) and
+     * reconcile added/removed song illustrations, mirroring the home
+     * pull-to-refresh path; refreshes the disclosed song count on success.
+     */
     fun startSongDataUpdate() {
         if (_uiState.value.songDataStatus == OnboardingSongDataStatus.Updating) return
         viewModelScope.launch {
@@ -435,7 +447,6 @@ class OnboardingViewModel(
                 )
             }
             songDataUpdateCoordinator.update(
-                syncIllustrations = false,
                 onFileProgress = { done, total, file ->
                     _uiState.update {
                         refreshed(
@@ -559,9 +570,8 @@ class OnboardingViewModel(
 
     fun previousStep() {
         _uiState.update { state ->
-            // Never walk away from a running download: the job lives in this
-            // VM's scope and would be destroyed with it.
-            if (state.isPreloadRunning) return@update state
+            // The preload session owns any running download, so stepping back
+            // is safe: progress resumes from the shared state on return.
             refreshed(state.copy(stepIndex = (state.stepIndex - 1).coerceAtLeast(0)))
         }
     }
@@ -593,17 +603,15 @@ class OnboardingViewModel(
     fun finish() {
         val state = _uiState.value
         if (state.isFinishing || state.finished) return
-        if (state.isPreloadRunning) return
         // The login step never blocks finishing: an unfinished or skipped
         // inline login simply means "continue without login".
         if (state.preloadChoice == OnboardingPreloadChoice.Undecided) return
         _uiState.update { it.copy(isFinishing = true) }
         viewModelScope.launch {
             when (state.preloadChoice) {
-                // Choosing Download now means the preload step already ran the
-                // download inline and persisted preloadDone; the home page's
-                // illustrationPreloadRequested auto-start stays a fallback for
-                // legacy flags only, so the wizard no longer sets it.
+                // A Download choice may still be running in the app-scoped
+                // session; finishing must neither cancel it nor write flags —
+                // the session owns preloadDone/declined and keeps running.
                 OnboardingPreloadChoice.Download -> Unit
                 OnboardingPreloadChoice.Skip ->
                     settingsRepository.setIllustrationPreloadDeclined(true)

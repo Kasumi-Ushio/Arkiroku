@@ -6,6 +6,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.CoilIllustrationThumbnailPreloader
 import org.kasumi321.ushio.phitracker.data.platform.IllustrationThumbnailPreloader
@@ -14,15 +15,20 @@ import org.kasumi321.ushio.phitracker.data.platform.clearImageCacheUrls
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 
 /**
- * Shared song-data update flow used by both the settings entry and the songs
- * tab pull-to-refresh: downloads the four data files, then reconciles the
- * illustration cache for added/removed songs, reporting per-phase progress.
+ * Shared song-data update flow used by the settings entry, the songs tab
+ * pull-to-refresh and the onboarding wizard: checks and downloads the song
+ * data files AND the collectible CSV set (one update covers both datasets),
+ * then reconciles the illustration cache for added/removed songs, reporting
+ * per-phase progress. Each dataset keeps its own updater discipline:
+ * staging → backup → atomic commit → cache invalidation only after its own
+ * full success, so one dataset's failure never commits the other.
  */
 class SongDataUpdateCoordinator(
     private val songDataUpdater: SongDataUpdater,
     private val songDataProvider: SongDataProvider,
     private val illustrationProvider: IllustrationProvider,
     private val artworkFileCache: StandardArtworkCache,
+    private val collectibleDataUpdater: CollectibleDataUpdater,
     private val thumbnailPreloader: IllustrationThumbnailPreloader = CoilIllustrationThumbnailPreloader,
     private val clearCacheUrls: suspend (List<String>) -> Unit = ::clearImageCacheUrls
 ) {
@@ -37,17 +43,29 @@ class SongDataUpdateCoordinator(
         val removedCount: Int
     )
 
-    suspend fun checkUpstreamChanged(): Result<Boolean> = songDataUpdater.checkUpstreamChanged()
+    /**
+     * Combined upstream-change probe: true when EITHER the song data
+     * (info.csv compare) or the collectible data (collection_version.txt
+     * compare) changed upstream. A failure in either probe fails the whole
+     * check, so a broken network is never misread as "up to date".
+     */
+    suspend fun checkUpstreamChanged(): Result<Boolean> = runCatching {
+        val songsChanged = songDataUpdater.checkUpstreamChanged().getOrThrow()
+        val collectiblesChanged = collectibleDataUpdater.checkUpstreamChanged().getOrThrow()
+        songsChanged || collectiblesChanged
+    }
 
     /**
-     * Run the full song-data update: download the four data files, then
-     * reconcile the illustration cache for added/removed songs.
+     * Run the full data update: the four song files, then the six
+     * collectible CSVs (progress indices continue across both phases, so the
+     * combined download reads as one 10-file bar), then reconcile the
+     * illustration cache for added/removed songs.
      *
-     * [syncIllustrations] is false only on the onboarding wizard path: the
-     * preload step right after downloads every song's thumbnail from scratch
-     * anyway, so the per-diff downloads (and the removal cleanup) are skipped
-     * there — nothing already on disk is touched. Callers that need the
-     * in-use behavior (home pull-to-refresh, Settings) keep the default.
+     * [syncIllustrations] is false only for callers that immediately download
+     * every thumbnail through [IllustrationPreloadCoordinator] anyway; it then
+     * skips the per-diff downloads (and the removal cleanup) — nothing already
+     * on disk is touched. Callers that need the in-use behavior follow the
+     * default, which matches the home pull-to-refresh and Settings paths.
      */
     suspend fun update(
         syncIllustrations: Boolean = true,
@@ -55,9 +73,19 @@ class SongDataUpdateCoordinator(
         onIllustrationProgress: (IllustrationSyncProgress) -> Unit = {}
     ): Result<UpdateOutcome> {
         val oldSongIds = songDataProvider.getSongs().keys.toSet()
-        val result = songDataUpdater.updateAll(onFileProgress)
-        if (result.isFailure) {
-            return Result.failure(result.exceptionOrNull() ?: RuntimeException("unknown"))
+        val songResult = songDataUpdater.updateAll(onFileProgress)
+        if (songResult.isFailure) {
+            return Result.failure(songResult.exceptionOrNull() ?: RuntimeException("unknown"))
+        }
+        val songFileCount = SongDataUpdater.FILE_NAMES.size
+        val collectibleResult = collectibleDataUpdater.updateAll { index, count, fileName ->
+            onFileProgress(songFileCount + index, songFileCount + count, fileName)
+        }
+        if (collectibleResult.isFailure) {
+            // Song data is already committed (its own discipline completed);
+            // report the failure so the UI says so, but never touch the
+            // collectible dataset's partial state.
+            return Result.failure(collectibleResult.exceptionOrNull() ?: RuntimeException("unknown"))
         }
         if (!syncIllustrations) {
             return runCatching {
@@ -145,7 +173,7 @@ class SongDataUpdateCoordinator(
             artworkFileCache.clearStandard(removedCacheKeys)
         }
         AppLogger.event("cache", "song_data_illustration_reconcile", mapOf("added" to added.size.toString(), "addedSuccess" to (added.size - failures).toString(), "addedFailure" to failures.toString(), "removed" to removed.size.toString()))
-        if (failures > 0) throw IllegalStateException("曲目数据已更新，但部分曲绘未能下载，可稍后在设置中重试")
+        if (failures > 0) throw IllegalStateException("图鉴信息已更新，但部分曲绘未能下载，可稍后在设置中重试")
         return UpdateOutcome(
             addedSongNames = added.map { songNames[it] ?: it },
             removedCount = removed.size

@@ -2,6 +2,7 @@ package org.kasumi321.ushio.phitracker.ui.home
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -25,11 +26,14 @@ import org.kasumi321.ushio.phitracker.data.database.RecordEntity
 import org.kasumi321.ushio.phitracker.data.logging.CrashReportExporter
 import org.kasumi321.ushio.phitracker.data.logging.LogFileStore
 import org.kasumi321.ushio.phitracker.data.logging.RuntimeLogExporter
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.platform.TextAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.IllustrationThumbnailPreloader
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
+import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
@@ -215,6 +219,95 @@ class HomeViewModelPreloadTest {
     }
 
     @Test
+    fun preloadCardShowsOnlyForBackgroundRuns() {
+        assertFalse(SongsUiState().shouldShowPreloadCard())
+        assertTrue(
+            SongsUiState(isPreloading = true, showPreloadDialog = false).shouldShowPreloadCard()
+        )
+        assertFalse(
+            SongsUiState(isPreloading = true, showPreloadDialog = true).shouldShowPreloadCard()
+        )
+        assertFalse(
+            SongsUiState(isPreloading = false, showPreloadDialog = false).shouldShowPreloadCard()
+        )
+    }
+
+    @Test
+    fun currentSongIsExposedWhilePreloadingAndClearedAfter(): Unit = runTest(dispatcher) {
+        val settings = FakeSettingsRepository(preloadDone = false)
+        val cache = ControlledThumbnailCache()
+        val viewModel = createViewModel(settings, artworkFileCache = cache)
+        advanceUntilIdle()
+
+        viewModel.startPreloadIllustrations()
+        runCurrent()
+        // The coordinator only reports progress (and the current song) when an
+        // attempt finishes; nothing has finished while both downloads are gated.
+        assertNull(viewModel.uiState.value.songs.preloadCurrentSong)
+        assertFalse(viewModel.uiState.value.songs.shouldShowPreloadCard())
+
+        cache.complete("song-a.0")
+        runCurrent()
+        val current = viewModel.uiState.value.songs.preloadCurrentSong
+        assertNotNull(current)
+        assertTrue(current in setOf("Song A", "Song B"))
+
+        cache.complete("song-b.0")
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.songs.preloadCurrentSong)
+    }
+
+    @Test
+    fun minimizingKeepsPreloadRunningAndDoesNotReopenTheDialog(): Unit = runTest(dispatcher) {
+        val settings = FakeSettingsRepository(preloadDone = false)
+        val cache = GatedSuccessThumbnailCache()
+        val viewModel = createViewModel(settings, artworkFileCache = cache)
+        advanceUntilIdle()
+
+        viewModel.startPreloadIllustrations()
+        runCurrent()
+        assertTrue(viewModel.uiState.value.songs.isPreloading)
+        assertFalse(viewModel.uiState.value.songs.shouldShowPreloadCard())
+
+        viewModel.minimizePreload()
+        assertFalse(viewModel.uiState.value.songs.showPreloadDialog)
+        assertTrue(viewModel.uiState.value.songs.isPreloading)
+        assertTrue(viewModel.uiState.value.songs.shouldShowPreloadCard())
+
+        cache.release()
+        advanceUntilIdle()
+
+        assertTrue(settings.preloadDone)
+        assertFalse(viewModel.uiState.value.songs.isPreloading)
+        assertFalse(viewModel.uiState.value.songs.showPreloadDialog)
+        assertFalse(viewModel.uiState.value.songs.shouldShowPreloadCard())
+        assertEquals(1f, viewModel.uiState.value.songs.preloadProgress)
+    }
+
+    @Test
+    fun cancellingFromTheDialogStopsTheRunAndDeclines(): Unit = runTest(dispatcher) {
+        val settings = FakeSettingsRepository(preloadDone = false)
+        val cache = GatedSuccessThumbnailCache()
+        val viewModel = createViewModel(settings, artworkFileCache = cache)
+        advanceUntilIdle()
+
+        viewModel.startPreloadIllustrations()
+        runCurrent()
+        assertTrue(viewModel.uiState.value.songs.isPreloading)
+
+        viewModel.cancelPreload()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.songs.isPreloading)
+        assertFalse(viewModel.uiState.value.songs.showPreloadDialog)
+        assertFalse(viewModel.uiState.value.songs.shouldShowPreloadCard())
+        assertNull(viewModel.uiState.value.songs.preloadCurrentSong)
+        assertEquals(0f, viewModel.uiState.value.songs.preloadProgress)
+        assertTrue(settings.illustrationPreloadDeclined.first())
+        assertFalse(settings.preloadDone)
+    }
+
+    @Test
     fun tabTransitionsDoNotRestartActiveHomeWorkOrResetSiblingState(): Unit = runTest(dispatcher) {
         val repository = ControlledHomeWorkRepository()
         val artworkCache = ControlledThumbnailCache()
@@ -239,7 +332,7 @@ class HomeViewModelPreloadTest {
         assertTrue(viewModel.uiState.value.songs.isPreloading)
 
         repeat(3) {
-            tabs.select(HomeTab.Songs)
+            tabs.select(HomeTab.Index)
             tabs.select(HomeTab.Tools)
             tabs.select(HomeTab.Profile)
             tabs.select(HomeTab.B30)
@@ -258,7 +351,7 @@ class HomeViewModelPreloadTest {
 
         repeat(2) {
             tabs.select(HomeTab.Tools)
-            tabs.select(HomeTab.Songs)
+            tabs.select(HomeTab.Index)
         }
         assertEquals(1, repository.syncCallCount)
         assertEquals(1, repository.rankByPositionCallCount)
@@ -667,6 +760,11 @@ class HomeViewModelPreloadTest {
         songDataUpdater: FakeSongDataUpdater = FakeSongDataUpdater()
     ): HomeViewModel {
         val illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") }
+        val coordinator = preloadCoordinator(
+            songDataProvider = songDataProvider,
+            artworkFileCache = artworkFileCache,
+            preloader = preloader
+        )
         return HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
@@ -677,16 +775,17 @@ class HomeViewModelPreloadTest {
             tipsProvider = TipsProvider(FakeTextAssetReader),
             settingsRepository = settingsRepository,
             artworkFileCache = artworkFileCache,
-            illustrationPreloadCoordinator = preloadCoordinator(
-                songDataProvider = songDataProvider,
-                artworkFileCache = artworkFileCache,
-                preloader = preloader
-            ),
+            illustrationPreloadCoordinator = coordinator,
             appVersionNameProvider = { appVersionName },
             songDataUpdateCoordinator = fakeSongDataUpdateCoordinator(
                 songDataProvider = songDataProvider,
                 artworkFileCache = artworkFileCache,
                 updater = songDataUpdater
+            ),
+            preloadSession = IllustrationPreloadSession(
+                coordinator = coordinator,
+                settingsRepository = settingsRepository,
+                scope = CoroutineScope(dispatcher)
             )
         ).let(viewModelLifecycle::track)
     }
@@ -700,9 +799,20 @@ class HomeViewModelPreloadTest {
         songDataProvider = songDataProvider,
         illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
         artworkFileCache = artworkFileCache,
+        collectibleDataUpdater = FakeCollectibleDataUpdater(),
         thumbnailPreloader = RecordingPreloader(),
         clearCacheUrls = {}
     )
+
+    private class FakeCollectibleDataUpdater : CollectibleDataUpdater(
+        io.ktor.client.HttpClient(),
+        PlatformPaths("/tmp/test", "/tmp/test_cache"),
+        CollectibleDataProvider(FakeTextAssetReader, PlatformPaths("/tmp/test", "/tmp/test_cache"))
+    ) {
+        override suspend fun checkUpstreamChanged(): Result<Boolean> = Result.success(false)
+        override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> =
+            Result.success(Unit)
+    }
 
     private fun preloadCoordinator(
         songDataProvider: SongDataProvider = testSongDataProvider,
@@ -758,6 +868,30 @@ class HomeViewModelPreloadTest {
         fun completeRankByPosition() {
             rankGate.complete(Unit)
         }
+    }
+
+    private class GatedSuccessThumbnailCache : StandardArtworkCache {
+        private val gate = CompletableDeferred<Unit>()
+        val requests = mutableListOf<String>()
+
+        fun release() {
+            gate.complete(Unit)
+        }
+
+        override suspend fun getOrDownloadThumbnail(songId: String, url: String): String {
+            requests += songId
+            gate.await()
+            return url
+        }
+
+        override fun getThumbnailIfPresent(songId: String): String? = null
+        override fun hasAllThumbnails(songIds: Iterable<String>): Boolean = false
+        override fun clearThumbnails(songIds: Iterable<String>) = Unit
+        override fun clearAllThumbnails() = Unit
+        override suspend fun getOrDownloadStandard(songId: String, url: String): String = url
+        override fun getStandardIfPresent(songId: String): String? = null
+        override fun clearStandard(songIds: Iterable<String>) = Unit
+        override fun clearAllStandard() = Unit
     }
 
     private class ControlledThumbnailCache : StandardArtworkCache {
@@ -844,6 +978,8 @@ class HomeViewModelPreloadTest {
         illustrationPreloadDeclined: Boolean = false
     ) : SettingsRepository {
         override val themeMode: Flow<Int> = flowOf(0)
+        override val amoledBlack: Flow<Boolean> = flowOf(false)
+        override suspend fun setAmoledBlack(enabled: Boolean) = Unit
         override val themeColorSource: Flow<String> = flowOf("system")
         override val seedColorArgb: Flow<Int> = flowOf(-10011977)
         override val themeImageSeedColorArgb: Flow<Int?> = flowOf(null)

@@ -5,7 +5,8 @@
     <string name="songs_cd_expand_search">Expand search</string>
     <string name="songs_cd_clear_search">Clear search</string>
     <string name="songs_cd_filter">Filter</string>
-    <string name="songs_data_update_available">Song data update available</string>
+    <string name="index_search_close">Close search</string>
+    <string name="songs_data_update_available">Index data update available</string>
     <string name="songs_update_now">Update now</string>
     <string name="songs_filter_title">Filter Songs</string>
     <string name="songs_action_reset">Reset</string>
@@ -18,13 +19,13 @@
     <string name="songs_chapters_selected_count">%1$d selected</string>
     <string name="songs_select_chapters_title">Select Chapters</string>
     <string name="songs_clear_all_count">Clear all (%1$d)</string>
-    <string name="songs_songdata_checking">Checking for song data updates…</string>
-    <string name="songs_songdata_check_failed">Failed to check for song data updates: %1$s</string>
-    <string name="songs_songdata_up_to_date">Song data is already up to date</string>
+    <string name="songs_songdata_checking">Checking for index data updates…</string>
+    <string name="songs_songdata_check_failed">Failed to check for index data updates: %1$s</string>
+    <string name="songs_songdata_up_to_date">Index data is already up to date</string>
     <string name="songs_songdata_downloading">Downloading: %1$s (%2$d/%3$d)</string>
     <string name="songs_songdata_syncing_illustrations">Syncing new illustrations: %1$s (%2$d/%3$d)</string>
-    <string name="songs_songdata_updated_count">Song data updated — %1$d new songs added</string>
-    <string name="songs_songdata_updated">Song data updated</string>
-    <string name="songs_songdata_update_failed">Failed to update song data</string>
+    <string name="songs_songdata_updated_count">Index data updated — %1$d new songs added</string>
+    <string name="songs_songdata_updated">Index data updated</string>
+    <string name="songs_songdata_update_failed">Failed to update index data</string>
     <string name="songs_preload_partial_failed">Some illustrations could not be loaded</string>
 </resources>

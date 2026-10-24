@@ -98,6 +98,8 @@ internal fun b30FixtureSave(): Save = Save(
 internal class FakeSettingsRepository : SettingsRepository {
     private val themeModeState = MutableStateFlow(0)
     override val themeMode: Flow<Int> = themeModeState
+    private val amoledBlackState = MutableStateFlow(false)
+    override val amoledBlack: Flow<Boolean> = amoledBlackState
     private val colorSourceState = MutableStateFlow("system")
     override val themeColorSource: Flow<String> = colorSourceState
     private val seedState = MutableStateFlow(-10011977)
@@ -161,6 +163,7 @@ internal class FakeSettingsRepository : SettingsRepository {
     override val avatarUri: Flow<String?> = flowOf(null)
     override val moneyString: Flow<String> = flowOf("")
     override suspend fun setThemeMode(mode: Int) { themeModeState.value = mode }
+    override suspend fun setAmoledBlack(enabled: Boolean) { amoledBlackState.value = enabled }
     override suspend fun setThemeColorSource(source: String) { colorSourceState.value = source }
     override suspend fun setSeedColorArgb(argb: Int) { seedState.value = argb }
     override suspend fun setThemeImageColor(uri: String?, seedColorArgb: Int) { imageUriState.value = uri; imageSeedState.value = seedColorArgb }

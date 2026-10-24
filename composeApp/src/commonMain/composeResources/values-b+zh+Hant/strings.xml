@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home_tab_profile">首頁</string>
-    <string name="home_tab_songs">曲目</string>
+    <string name="home_tab_index">圖鑑</string>
     <string name="home_tab_tools">工具</string>
     <string name="action_sync">同步</string>
     <string name="action_settings">設定</string>
     <string name="preload_dialog_title">下載曲繪資源</string>
     <string name="preload_dialog_downloading">正在下載曲繪縮圖… (%1$d/%2$d)</string>
+    <string name="preload_dialog_minimize">最小化</string>
+    <string name="preload_dialog_cancel">取消</string>
+    <string name="preload_current_song">正在下載：%1$s</string>
+    <string name="preload_card_title">正在下載曲繪</string>
+    <string name="preload_card_progress">%1$d / %2$d</string>
     <string name="preload_dialog_message">首次使用需要下載曲繪縮圖資源包以正常顯示曲目封面。\n\n預計約 60 MB，建議在 Wi-Fi 下完成。</string>
     <string name="preload_dialog_start">開始下載</string>
     <string name="preload_dialog_skip">略過</string>

@@ -11,6 +11,8 @@
     <string name="settings_about_app">關於 Arkiroku</string>
     <string name="settings_about_app_desc">了解有關本應用程式的更多資訊，包括作者、著作權和第三方元件</string>
     <string name="settings_already_latest">已是最新版本</string>
+    <string name="settings_amoled_black">AMOLED 純黑</string>
+    <string name="settings_amoled_black_desc">跟隨系統且處於深色模式時，使用純黑背景</string>
     <string name="settings_api_credentials">API 憑證</string>
     <string name="settings_api_credentials_configured">已設定，點擊檢視或修改</string>
     <string name="settings_api_credentials_dialog_title">查分 API 憑證</string>
@@ -28,8 +30,8 @@
     <string name="settings_artwork_preload_failed">預先載入失敗，請重試</string>
     <string name="settings_auto_check_update">啟動時自動檢查更新</string>
     <string name="settings_auto_check_update_desc">應用程式啟動時自動檢查是否有新版本</string>
-    <string name="settings_auto_check_song_data_update">自動檢查曲目更新</string>
-    <string name="settings_auto_check_song_data_update_desc">啟動時自動檢查曲庫資料更新</string>
+    <string name="settings_auto_check_song_data_update">自動檢查圖鑑資訊更新</string>
+    <string name="settings_auto_check_song_data_update_desc">啟動時自動檢查圖鑑資訊更新</string>
     <string name="settings_blur_strength">模糊強度</string>
     <string name="settings_cache_b30_artwork">快取 B30 高畫質曲繪</string>
     <string name="settings_cache_b30_artwork_desc">提前下載目前 B30 中曲目的高畫質封面，離線也能產生圖片</string>
@@ -38,7 +40,6 @@
     <string name="settings_category_about">關於</string>
     <string name="settings_category_b30">B30 設定</string>
     <string name="settings_category_data_cache">資料與快取</string>
-    <string name="settings_category_debug">偵錯選項</string>
     <string name="settings_category_diagnostics">診斷</string>
     <string name="settings_category_interface_theme">介面與主題</string>
     <string name="settings_category_score_api">查分 API</string>
@@ -61,6 +62,7 @@
     <string name="settings_clear_logs_done_title">執行日誌已清除</string>
     <string name="settings_clear_logs_failed_message">Arkiroku 未能清除執行日誌，請稍後重試。\n\n錯誤資訊：%1$s</string>
     <string name="settings_clear_logs_failed_title">清除執行日誌失敗</string>
+    <string name="settings_collectible_data_version">圖鑑版本：%1$s</string>
     <string name="settings_crash_notification_denied">未開啟，建議開啟以便在崩潰後及時收到提示</string>
     <string name="settings_crash_notification_granted">已開啟，可在應用程式崩潰後顯示提醒通知</string>
     <string name="settings_crash_notification_guide_text">為確保應用程式崩潰後能及時提醒並引導回饋，建議開啟通知權限。</string>
@@ -122,13 +124,13 @@
     <string name="settings_theme_follow_system">跟隨系統</string>
     <string name="settings_theme_light">一律淺色</string>
     <string name="settings_update_complete">更新完成</string>
-    <string name="settings_update_data_dialog_text">將從遠端倉庫下載最新的曲目資料，之後將自動重新整理本機曲目資料。\n下載完畢後，建議重新下載所有曲繪。</string>
+    <string name="settings_update_data_dialog_text">將從遠端倉庫下載最新的圖鑑資訊（包含曲目與收藏品），之後將自動重新整理本機圖鑑資訊。\n下載完畢後，建議重新下載所有曲繪。</string>
     <string name="settings_update_error_message">發生了錯誤：\n%1$s</string>
     <string name="settings_update_failed">更新失敗</string>
     <string name="settings_update_new_songs">本次更新新增 %1$d 首曲目：\n</string>
     <string name="settings_update_no_new_songs">本次更新無新增曲目。</string>
-    <string name="settings_update_song_data">更新曲目資料</string>
-    <string name="settings_update_song_data_desc">下載最新的 Phigros 全曲目資訊</string>
+    <string name="settings_update_song_data">更新圖鑑資訊</string>
+    <string name="settings_update_song_data_desc">下載最新的 Phigros 曲目與收藏品圖鑑資訊</string>
     <string name="settings_use_api_data">使用查分 API 資料</string>
     <string name="settings_use_api_data_desc">開啟後優先顯示社群統計資料</string>
 </resources>

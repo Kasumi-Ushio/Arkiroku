@@ -27,6 +27,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -69,6 +70,9 @@ import org.kasumi321.ushio.phitracker.ui.utils.expandCollapseTransition
 import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.action_go_login
+import phitracker.composeapp.generated.resources.preload_card_progress
+import phitracker.composeapp.generated.resources.preload_card_title
+import phitracker.composeapp.generated.resources.preload_current_song
 import phitracker.composeapp.generated.resources.profile_avatar
 import phitracker.composeapp.generated.resources.profile_collapse
 import phitracker.composeapp.generated.resources.profile_data_label
@@ -120,6 +124,12 @@ fun ProfileTab(
     getIllustrationUrl: (String) -> String?,
     histogram: B30RksHistogram? = null,
     gameUpdateInfo: GameUpdateInfo? = null,
+    showPreloadCard: Boolean = false,
+    preloadCompleted: Int = 0,
+    preloadTotal: Int = 0,
+    preloadProgress: Float = 0f,
+    preloadCurrentSong: String? = null,
+    onPreloadCardClick: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
     scrollState: ScrollState = rememberScrollState(),
     modifier: Modifier = Modifier
@@ -176,6 +186,17 @@ fun ProfileTab(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            if (showPreloadCard) {
+                PreloadProgressCard(
+                    completed = preloadCompleted,
+                    total = preloadTotal,
+                    progress = preloadProgress,
+                    currentSong = preloadCurrentSong,
+                    onClick = onPreloadCardClick
+                )
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
@@ -281,6 +302,64 @@ fun ProfileTab(
 
             Spacer(modifier = Modifier.height(24.dp))
             Spacer(modifier = Modifier.height(contentPadding.calculateBottomPadding()))
+        }
+    }
+}
+
+/**
+ * Compact background-download card shown above the profile card after the
+ * progress dialog is minimized. Tapping it reopens the dialog. It intentionally
+ * mirrors the dialog's data (progress + current song) and disappears as soon as
+ * the shared session stops running.
+ */
+@Composable
+private fun PreloadProgressCard(
+    completed: Int,
+    total: Int,
+    progress: Float,
+    currentSong: String?,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(Res.string.preload_card_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = stringResource(Res.string.preload_card_progress, completed, total),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            currentSong?.let { song ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(Res.string.preload_current_song, song),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

@@ -5,6 +5,7 @@ import org.kasumi321.ushio.phitracker.ui.utils.UiText
 
 data class SettingsUiState(
     val themeMode: Int = 0,
+    val amoledBlack: Boolean = false,
     val themeColorSource: String = "system",
     val seedColorArgb: Int = -10011977,
     val themeImageSeedColorArgb: Int? = null,
@@ -33,6 +34,9 @@ data class SettingsUiState(
     val updateDataTotal: Int = 0,
     val updateDataFileName: String = "",
     val updateDataError: UiText? = null,
+    // Text of the currently effective collection_version.txt, shown alongside
+    // the index-data update row in Settings.
+    val collectibleDataVersion: String = "",
     // Non-null after a successful song-data update; lists the newly added
     // songs whose illustrations were synced, shown in the result dialog.
     val updateResultSongNames: List<String>? = null,

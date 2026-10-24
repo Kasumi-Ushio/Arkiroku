@@ -60,12 +60,17 @@ import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
 import org.kasumi321.ushio.phitracker.ui.b30.B30ImageScreen
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationGateway
+import org.kasumi321.ushio.phitracker.ui.collectible.CollectibleDetailScreen
+import org.kasumi321.ushio.phitracker.ui.collectible.CollectibleDetailViewModel
 import org.kasumi321.ushio.phitracker.ui.home.ExpandedHomeScreen
+import org.kasumi321.ushio.phitracker.ui.home.CollectiblesChapterState
 import org.kasumi321.ushio.phitracker.ui.home.HomeTabState
 import org.kasumi321.ushio.phitracker.ui.home.HomeViewModel
+import org.kasumi321.ushio.phitracker.ui.home.IndexSubTabState
 import org.kasumi321.ushio.phitracker.ui.home.MainScreen
 import org.kasumi321.ushio.phitracker.ui.login.LoginScreen
 import org.kasumi321.ushio.phitracker.ui.login.LoginViewModel
+import org.kasumi321.ushio.phitracker.ui.navigation.CollectibleDetailRoute
 import org.kasumi321.ushio.phitracker.ui.navigation.IllustrationPreviewRoute
 import org.kasumi321.ushio.phitracker.ui.navigation.SongDetailRoute
 import org.kasumi321.ushio.phitracker.ui.onboarding.OnboardingScreen
@@ -92,6 +97,9 @@ import org.koin.core.parameter.parametersOf
 import org.jetbrains.compose.resources.stringResource
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.action_back
+import phitracker.composeapp.generated.resources.collectible_detail_key_label
+import phitracker.composeapp.generated.resources.collectible_detail_title
+import phitracker.composeapp.generated.resources.collectible_not_found
 import phitracker.composeapp.generated.resources.nav_song_detail_title
 import phitracker.composeapp.generated.resources.nav_song_id
 import phitracker.composeapp.generated.resources.nav_song_not_found
@@ -129,6 +137,9 @@ internal sealed interface DetailRouteRequest {
 
     @Serializable
     data class SongDetail(val songId: String, val difficultyName: String?) : DetailRouteRequest
+
+    @Serializable
+    data class Collectible(val folderKey: String, val key: String) : DetailRouteRequest
 }
 
 /**
@@ -188,6 +199,11 @@ internal fun NavBackStackEntry.toDetailRouteRequest(): DetailRouteRequest? = whe
         DetailRouteRequest.SongDetail(route.songId, route.difficultyName)
     }
 
+    destination.hasRoute<CollectibleDetailRoute>() -> {
+        val route = toRoute<CollectibleDetailRoute>()
+        DetailRouteRequest.Collectible(route.folderKey, route.key)
+    }
+
     else -> migratableDetailRoute(destination.route)?.let(DetailRouteRequest::Plain)
 }
 
@@ -217,6 +233,10 @@ internal fun NavHostController.navigateDetailRequest(
         is DetailRouteRequest.Plain -> navigate(request.route, builder)
         is DetailRouteRequest.SongDetail -> navigate(
             SongDetailRoute(songId = request.songId, difficultyName = request.difficultyName),
+            builder
+        )
+        is DetailRouteRequest.Collectible -> navigate(
+            CollectibleDetailRoute(folderKey = request.folderKey, key = request.key),
             builder
         )
     }
@@ -330,6 +350,12 @@ fun PhiTrackerNavHost() {
     }
 
     val detailPaneState = rememberSaveable(saver = DetailPaneState.Saver) { DetailPaneState() }
+    // Collectibles chapter drill-down state: used inline by the compact Index
+    // content and the expanded home's left pane. Hoisted at the NavHost level
+    // so both layouts share one instance; it survives configuration changes
+    // and process death via the Saver.
+    val collectiblesChapterState =
+        rememberSaveable(saver = CollectiblesChapterState.Saver) { CollectiblesChapterState() }
     val b30Navigation = remember(navController, detailPaneState) {
         B30NavigationCoordinator(
             object : B30NavigationGateway {
@@ -455,6 +481,8 @@ fun PhiTrackerNavHost() {
             // foldable's fold/unfold swaps them without recreating this
             // destination).
             val tabState = rememberSaveable(saver = HomeTabState.Saver) { HomeTabState() }
+            // Same hoisting for the Index page's sub-tab selection.
+            val indexSubTabState = rememberSaveable(saver = IndexSubTabState.Saver) { IndexSubTabState() }
             if (windowSizeClass.isExpanded()) {
                 // Expanded: rail + home tabs stay pinned on the left while
                 // secondary pages open in the detail pane on the right.
@@ -466,14 +494,20 @@ fun PhiTrackerNavHost() {
                     reducedMotionEnabled = reducedMotionEnabled,
                     outerNavController = navController,
                     tabState = tabState,
+                    indexSubTabState = indexSubTabState,
+                    collectiblesChapterState = collectiblesChapterState,
                     onLogout = b30Navigation::homeLogout,
                     onNavigateToLogin = { navController.navigate(Screen.Login.route) }
                 )
             } else {
                 // Shrunk below Expanded (e.g. foldable closed): reopen the page
-                // the detail pane was showing, now full-screen.
+                // the detail pane was showing, now full-screen. The collectible
+                // chapter is already held by CollectiblesChapterState, so only
+                // the detail destination needs restoring.
                 LaunchedEffect(Unit) {
-                    detailPaneState.consumePendingRoute()?.let { navController.navigateDetailRequest(it) }
+                    detailPaneState.consumePendingRoute()?.let {
+                        navController.navigateDetailRequest(it)
+                    }
                 }
                 MainScreen(
                     onLogout = b30Navigation::homeLogout,
@@ -483,6 +517,9 @@ fun PhiTrackerNavHost() {
                     },
                     onNavigateToSongDetailWithDifficulty = { songId, difficulty ->
                         navController.navigate(SongDetailRoute.from(songId = songId, difficulty = difficulty))
+                    },
+                    onNavigateToCollectibleDetail = { folderKey, key ->
+                        navController.navigate(CollectibleDetailRoute(folderKey = folderKey, key = key))
                     },
                     onNavigateToAbout = {
                         navController.navigate(Screen.About.route)
@@ -497,6 +534,8 @@ fun PhiTrackerNavHost() {
                         navController.navigate(Screen.Login.route)
                     },
                     tabState = tabState,
+                    indexSubTabState = indexSubTabState,
+                    collectiblesChapterState = collectiblesChapterState,
                     viewModel = homeViewModel
                 )
             }
@@ -841,6 +880,93 @@ internal fun NavGraphBuilder.secondaryDestinations(
                 onBack = { host.popBackStack() }
             )
             else -> SongDetailNotFound(songId = songId, onBack = { host.popBackStack() })
+        }
+    }
+    composable<CollectibleDetailRoute>(
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+    ) { backStackEntry ->
+        val route = backStackEntry.toRoute<CollectibleDetailRoute>()
+        MigrateSecondaryToDetailOnExpanded(
+            request = DetailRouteRequest.Collectible(route.folderKey, route.key),
+            enabled = migrateOnExpanded,
+            detailPaneState = detailPaneState,
+            host = host
+        )
+        val viewModel: CollectibleDetailViewModel = koinViewModel(
+            viewModelStoreOwner = backStackEntry,
+            parameters = { parametersOf(route.folderKey, route.key) }
+        )
+        val state by viewModel.uiState.collectAsState()
+        LaunchedEffect(route.folderKey, route.key) {
+            AppLogger.event(
+                "navigation",
+                "entered_collectibledetail",
+                mapOf("folder" to route.folderKey, "key" to route.key)
+            )
+        }
+        when {
+            state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            state.item != null -> CollectibleDetailScreen(
+                state = state,
+                onBack = { host.popBackStack() }
+            )
+            else -> CollectibleDetailNotFound(
+                folderKey = route.folderKey,
+                key = route.key,
+                onBack = { host.popBackStack() }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CollectibleDetailNotFound(folderKey: String, key: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(Res.string.collectible_detail_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(Res.string.action_back)
+                        )
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = stringResource(Res.string.collectible_not_found),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = stringResource(Res.string.collectible_detail_key_label, "$folderKey · $key"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            )
+            Button(
+                onClick = onBack,
+                modifier = Modifier.padding(top = 24.dp)
+            ) {
+                Text(stringResource(Res.string.action_back))
+            }
         }
     }
 }

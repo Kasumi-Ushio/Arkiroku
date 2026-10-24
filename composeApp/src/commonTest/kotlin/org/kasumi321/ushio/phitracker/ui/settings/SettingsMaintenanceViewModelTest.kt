@@ -14,6 +14,8 @@ import kotlinx.serialization.json.JsonObject
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import org.kasumi321.ushio.phitracker.data.TipsProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.logging.CrashReportExporter
 import org.kasumi321.ushio.phitracker.data.logging.LogFileStore
 import org.kasumi321.ushio.phitracker.data.logging.RuntimeLogExporter
@@ -174,6 +176,16 @@ class SettingsMaintenanceViewModelTest {
         assertEquals(null, viewModel.uiState.value.updateDataError)
     }
 
+    private class FakeCollectibleDataUpdater : CollectibleDataUpdater(
+        HttpClient(MockEngine { error("unused") }),
+        PlatformPaths("/tmp/settings-test", "/tmp/settings-cache"),
+        CollectibleDataProvider(TestAssets)
+    ) {
+        override suspend fun checkUpstreamChanged(): Result<Boolean> = Result.success(false)
+        override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> =
+            Result.success(Unit)
+    }
+
     private fun createViewModel(
         repository: FakePhigrosRepository = FakePhigrosRepository(),
         updaterResult: Result<Unit> = Result.success(Unit),
@@ -190,7 +202,15 @@ class SettingsMaintenanceViewModelTest {
         val store = LogFileStore(FileSystem.SYSTEM, "$root/runtime".toPath(), "$root/crash".toPath()).also(prepareLogStore)
         return SettingsViewModel(
             repository, FakeSettingsRepository(), CheckForUpdateUseCase(repository), GetB30UseCase(repository), provider,
-            SongDataUpdateCoordinator(updater, provider, IllustrationProvider(), artworkCache, thumbnailPreloader, clearCacheUrls),
+            SongDataUpdateCoordinator(
+                songDataUpdater = updater,
+                songDataProvider = provider,
+                illustrationProvider = IllustrationProvider(),
+                artworkFileCache = artworkCache,
+                collectibleDataUpdater = FakeCollectibleDataUpdater(),
+                thumbnailPreloader = thumbnailPreloader,
+                clearCacheUrls = clearCacheUrls
+            ),
             IllustrationProvider(), artworkCache, RuntimeLogExporter(store), CrashReportExporter(store), TipsProvider(TestAssets),
             thumbnailPreloader, clearCacheUrls, {}, {}
         ).let(viewModelLifecycle::track)

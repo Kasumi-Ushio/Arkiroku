@@ -123,8 +123,9 @@ fun SongsTab(
     val levelMaxBound = state.levelMaxBound
     val showFilterSheet = state.showFilterSheet
 
-    // Title, tip, search and filter live in the floating SongsHeader; the list
-    // scrolls behind it, padded so the first and last songs stay clear
+    // Title, tip and sub-tabs live in the floating IndexHeader; search/filter
+    // open from the FAB panel below it. The list scrolls behind the header,
+    // padded so the first and last songs stay clear.
     val listContentPadding = PaddingValues(
         start = 16.dp,
         end = 16.dp,

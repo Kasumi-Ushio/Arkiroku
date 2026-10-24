@@ -30,6 +30,8 @@ import org.kasumi321.ushio.phitracker.data.platform.NoOpStandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.platform.getAppMetadata
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
+import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadRunStatus
+import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
@@ -119,6 +121,10 @@ class HomeViewModel(
     private val analyzeB30TagsUseCase: AnalyzeB30TagsUseCase = AnalyzeB30TagsUseCase(),
     private val fetchGameUpdateInfoUseCase: FetchGameUpdateInfoUseCase = FetchGameUpdateInfoUseCase(repository),
     private val songDataUpdateCoordinator: SongDataUpdateCoordinator,
+    // Koin passes the app-scoped singleton; the default keeps direct test
+    // constructions working (they never start this session).
+    private val preloadSession: IllustrationPreloadSession =
+        IllustrationPreloadSession(illustrationPreloadCoordinator, settingsRepository),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -134,6 +140,55 @@ class HomeViewModel(
         observeB30()
         observeUserProfile()
         checkIllustrationState()
+        viewModelScope.launch {
+            // The app-scoped session may have been started by onboarding (or
+            // survive a minimized home dialog). Its state is the single source
+            // for progress and completion; a minimized dialog is never reopened.
+            preloadSession.state.collect { session ->
+                when (session.status) {
+                    IllustrationPreloadRunStatus.Idle ->
+                        updateSongs { it.copy(isPreloading = false, preloadCurrentSong = null) }
+
+                    IllustrationPreloadRunStatus.Running ->
+                        updateSongs {
+                            it.copy(
+                                isPreloading = true,
+                                preloadCompleted = session.completed,
+                                preloadTotal = session.total,
+                                preloadCurrentSong = session.currentSong,
+                                preloadProgress = if (session.total > 0) {
+                                    session.completed.toFloat() / session.total
+                                } else {
+                                    0f
+                                }
+                            )
+                        }
+
+                    IllustrationPreloadRunStatus.Succeeded ->
+                        updateSongs {
+                            it.copy(
+                                isPreloading = false,
+                                showPreloadDialog = false,
+                                illustrationReady = true,
+                                preloadProgress = 1f,
+                                preloadCurrentSong = null
+                            )
+                        }
+
+                    IllustrationPreloadRunStatus.Failed -> {
+                        updateSongs {
+                            it.copy(
+                                isPreloading = false,
+                                showPreloadDialog = false,
+                                illustrationReady = true,
+                                preloadCurrentSong = null
+                            )
+                        }
+                        updateSync { it.copy(error = UiText.Res(Res.string.songs_preload_partial_failed)) }
+                    }
+                }
+            }
+        }
         viewModelScope.launch {
             songDataProvider.cacheInvalidations.collect {
                 loadSongs()
@@ -525,6 +580,12 @@ class HomeViewModel(
      */
     private fun checkIllustrationState() {
         viewModelScope.launch {
+            if (preloadSession.state.value.status == IllustrationPreloadRunStatus.Running) {
+                // The onboarding wizard left a download running in the shared
+                // session; don't prompt for a second, competing run.
+                updateSongs { it.copy(illustrationReady = true) }
+                return@launch
+            }
             val alreadyDone = settingsRepository.getPreloadDone()
             val songIds = songDataProvider.getSongs().keys
             // Per-difficulty variants are part of the durable set too, so
@@ -568,40 +629,51 @@ class HomeViewModel(
         }
     }
 
-    /** Download low-res illustrations to persistent storage, then warm Coil for the current UI. */
+    /**
+     * Start the shared preload session and show progress. The session owns the
+     * job, so closing the dialog (minimize) does not interrupt the download.
+     */
     fun startPreloadIllustrations() {
-        viewModelScope.launch {
-            updateSongs {
-                it.copy(isPreloading = true, preloadTotal = 0, preloadCompleted = 0, preloadProgress = 0f)
-            }
+        updateSongs {
+            it.copy(
+                showPreloadDialog = true,
+                isPreloading = true,
+                preloadTotal = 0,
+                preloadCompleted = 0,
+                preloadProgress = 0f,
+                preloadCurrentSong = null
+            )
+        }
+        preloadSession.start()
+    }
 
-            val result = illustrationPreloadCoordinator.preloadLowRes { done, total, _ ->
-                updateSongs {
-                    it.copy(
-                        preloadCompleted = done,
-                        preloadTotal = total,
-                        preloadProgress = if (total == 0) 1f else done.toFloat() / total
-                    )
-                }
-            }
+    /** Close the progress dialog without interrupting the shared session. */
+    fun minimizePreload() {
+        updateSongs { it.copy(showPreloadDialog = false) }
+    }
 
-            val errorMessage = if (result.failed > 0) {
-                UiText.Res(Res.string.songs_preload_partial_failed)
-            } else {
-                val persistResult = runCatching { settingsRepository.setPreloadDone(true) }
-                persistResult.exceptionOrNull()?.message?.let(UiText::Raw)
-            }
+    /**
+     * Reopen the progress dialog from the compact Profile card. A completed
+     * run has nothing left to show, so only a running session qualifies.
+     */
+    fun reopenPreloadDialog() {
+        if (!_uiState.value.songs.isPreloading) return
+        updateSongs { it.copy(showPreloadDialog = true) }
+    }
 
-            _uiState.update { state ->
-                state.copy(
-                    songs = state.songs.copy(
-                    isPreloading = false,
-                    showPreloadDialog = false,
-                        illustrationReady = true
-                    ),
-                    sync = state.sync.copy(error = errorMessage)
-                )
-            }
+    /** Cancel the download and reset progress; the session writes the declined marker. */
+    fun cancelPreload() {
+        preloadSession.cancel()
+        updateSongs {
+            it.copy(
+                showPreloadDialog = false,
+                isPreloading = false,
+                preloadTotal = 0,
+                preloadCompleted = 0,
+                preloadProgress = 0f,
+                preloadCurrentSong = null,
+                illustrationReady = true
+            )
         }
     }
 

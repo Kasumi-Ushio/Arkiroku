@@ -26,8 +26,8 @@
     <string name="onboarding_preload_failed">網路連線可能出現了異常，點擊「重試」按鈕以再次嘗試下載。</string>
     <string name="onboarding_preload_retry">重試</string>
     <string name="onboarding_step_update_title">自動檢查更新</string>
-    <string name="onboarding_step_song_data_title">曲庫資料</string>
-    <string name="onboarding_step_song_data_message">您可以在此檢查目前曲目資料是否有更新，當有更新時，您可以點擊「立即更新」按鈕下載最新的曲目資料。</string>
+    <string name="onboarding_step_song_data_title">圖鑑資訊</string>
+    <string name="onboarding_step_song_data_message">您可以在此檢查目前圖鑑資訊是否有更新，當有更新時，您可以點擊「立即更新」按鈕下載最新的曲目與收藏品圖鑑資訊。</string>
     <string name="onboarding_song_data_update_now">立即更新</string>
     <string name="onboarding_song_data_failed">網路連線可能出現了異常，點擊「重試」按鈕以再次嘗試下載。</string>
     <string name="onboarding_step_update_message">您可以在這裡指定 Arkiroku 如何檢查更新。</string>

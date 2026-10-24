@@ -24,6 +24,8 @@ import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdater
 import org.kasumi321.ushio.phitracker.domain.model.ReleaseInfo
@@ -72,6 +74,7 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         first.setThemeMode(2)
+        first.setAmoledBlack(true)
         first.setThemeColorSource("image")
         first.setSeedColorArgb(123)
         first.setThemeImageColor("content://theme", 456)
@@ -92,6 +95,7 @@ class SettingsViewModelTest {
         val recreated = createViewModel(settings = settings)
         advanceUntilIdle()
         assertEquals(2, recreated.uiState.value.themeMode)
+        assertTrue(recreated.uiState.value.amoledBlack)
         assertEquals("image", recreated.uiState.value.themeColorSource)
         assertEquals(123, recreated.uiState.value.seedColorArgb)
         assertEquals("content://theme", recreated.uiState.value.themeImageUri)
@@ -176,6 +180,30 @@ class SettingsViewModelTest {
         assertEquals(3, recreated.uiState.value.themeMode)
     }
 
+    @Test
+    fun collectibleVersionRefreshesAfterSuccessfulIndexUpdate(): Unit = runTest(dispatcher) {
+        var version = "v1"
+        val viewModel = createViewModel(collectibleDataVersionProvider = { version })
+        advanceUntilIdle()
+        assertEquals("v1", viewModel.uiState.value.collectibleDataVersion)
+
+        version = "v2"
+        viewModel.updateSongData()
+        advanceUntilIdle()
+
+        assertEquals("v2", viewModel.uiState.value.collectibleDataVersion)
+    }
+
+    private class FakeCollectibleDataUpdater : CollectibleDataUpdater(
+        HttpClient(MockEngine { error("unused") }),
+        PlatformPaths("/tmp/settings-test", "/tmp/settings-test-cache"),
+        CollectibleDataProvider(TestAssets)
+    ) {
+        override suspend fun checkUpstreamChanged(): Result<Boolean> = Result.success(false)
+        override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> =
+            Result.success(Unit)
+    }
+
     private fun createViewModel(
         settings: FakeSettingsRepository = FakeSettingsRepository(),
         repository: FakePhigrosRepository = FakePhigrosRepository(),
@@ -185,7 +213,8 @@ class SettingsViewModelTest {
             override suspend fun preload(url: String): Result<Unit> = Result.success(Unit)
         },
         clearCacheUrls: suspend (List<String>) -> Unit = {},
-        prepareLogStore: (LogFileStore) -> Unit = {}
+        prepareLogStore: (LogFileStore) -> Unit = {},
+        collectibleDataVersionProvider: () -> String = { "" }
     ): SettingsViewModel {
         val provider = SongDataProvider(TestAssets)
         val paths = PlatformPaths("/tmp/settings-test", "/tmp/settings-test-cache")
@@ -204,7 +233,15 @@ class SettingsViewModelTest {
             checkForUpdateUseCase = CheckForUpdateUseCase(repository),
             getB30UseCase = GetB30UseCase(repository),
             songDataProvider = provider,
-            songDataUpdateCoordinator = SongDataUpdateCoordinator(updater, provider, IllustrationProvider(), artworkCache, thumbnailPreloader, clearCacheUrls),
+            songDataUpdateCoordinator = SongDataUpdateCoordinator(
+                songDataUpdater = updater,
+                songDataProvider = provider,
+                illustrationProvider = IllustrationProvider(),
+                artworkFileCache = artworkCache,
+                collectibleDataUpdater = FakeCollectibleDataUpdater(),
+                thumbnailPreloader = thumbnailPreloader,
+                clearCacheUrls = clearCacheUrls
+            ),
             illustrationProvider = IllustrationProvider(),
             artworkFileCache = artworkCache,
             runtimeLogExporter = RuntimeLogExporter(store),
@@ -213,7 +250,8 @@ class SettingsViewModelTest {
             thumbnailPreloader = thumbnailPreloader,
             clearCacheUrls = clearCacheUrls,
             clearAllCache = {},
-            platformMessage = {}
+            platformMessage = {},
+            collectibleDataVersionProvider = collectibleDataVersionProvider
         ).let(viewModelLifecycle::track)
     }
 

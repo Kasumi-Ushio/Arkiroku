@@ -35,7 +35,7 @@
     <string name="privacy_section_4_intro">During operation, this app interacts with the following third-party services:</string>
     <string name="privacy_section_4_item_1">1. TapTap OAuth service: used to implement QR code login and obtain authorization credentials. The interaction process follows TapTap's privacy policy.</string>
     <string name="privacy_section_4_item_2">2. Phigros cloud save service (LeanCloud): used to read your game save data.</string>
-    <string name="privacy_section_4_item_3">3. GitHub (raw.githubusercontent.com): used to fetch illustration image resources and song data updates.</string>
+    <string name="privacy_section_4_item_3">3. GitHub (raw.githubusercontent.com): used to fetch illustration image resources and index data updates.</string>
     <string name="privacy_section_4_item_4">4. gh-proxy (gh-proxy.com): used to speed up requests and obtain GitHub resources in mainland China.</string>
     <string name="privacy_section_4_item_5">5. Phi-Plugin &quot;滦鸠&quot; joint score lookup API (optional): used to obtain leaderboards, RKS history and other data.</string>
     <string name="privacy_section_4_note">This app does not use any third-party analytics, advertising or tracking SDKs.</string>

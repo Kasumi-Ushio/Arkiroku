@@ -1,8 +1,15 @@
 package org.kasumi321.ushio.phitracker.ui.onboarding
 
+import androidx.lifecycle.viewModelScope
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respondError
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -11,11 +18,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.setMain
 import okio.Path.Companion.toPath
 import okio.buffer
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.platform.IllustrationThumbnailPreloader
 import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
+import org.kasumi321.ushio.phitracker.data.platform.TextAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.platformFileSystem
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
+import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.IllustrationUriResolver
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
@@ -61,11 +72,16 @@ class OnboardingViewModelTest {
         songDataProvider: SongDataProvider = this.songDataProvider,
         songDataUpdateCoordinator: SongDataUpdateCoordinator = songDataCoordinator(songDataProvider),
         illustrationUriResolver: IllustrationUriResolver = previewResolver(),
-        applyLocale: (String?) -> Boolean = { false }
+        applyLocale: (String?) -> Boolean = { false },
+        preloadSession: IllustrationPreloadSession? = null
     ): OnboardingViewModel = viewModelLifecycle.track(
         OnboardingViewModel(
             settingsRepository = settings,
-            illustrationPreloadCoordinator = coordinator,
+            illustrationPreloadSession = preloadSession ?: IllustrationPreloadSession(
+                coordinator = coordinator,
+                settingsRepository = settings,
+                scope = CoroutineScope(dispatcher)
+            ),
             getB30UseCase = GetB30UseCase(repository),
             songDataProvider = songDataProvider,
             songDataUpdateCoordinator = songDataUpdateCoordinator,
@@ -83,9 +99,22 @@ class OnboardingViewModelTest {
         songDataProvider = provider,
         illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
         artworkFileCache = artworkCache,
+        collectibleDataUpdater = FakeCollectibleDataUpdater(),
         thumbnailPreloader = SuccessPreloader(),
         clearCacheUrls = {}
     )
+
+    private class FakeCollectibleDataUpdater : CollectibleDataUpdater(
+        HttpClient(MockEngine { respondError(HttpStatusCode.NotFound) }),
+        PlatformPaths(filesDir = "/tmp/unused-collectible", cacheDir = "/tmp/unused-collectible"),
+        CollectibleDataProvider(assetReader = object : TextAssetReader {
+            override fun readText(name: String): String = error("unused")
+        })
+    ) {
+        override suspend fun checkUpstreamChanged(): Result<Boolean> = Result.success(false)
+        override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> =
+            Result.success(Unit)
+    }
 
     private fun preloadCoordinator(
         preloader: IllustrationThumbnailPreloader = SuccessPreloader()
@@ -364,7 +393,7 @@ class OnboardingViewModelTest {
         runCurrent()
 
         assertEquals(OnboardingPreloadStatus.Running, vm.uiState.value.preloadStatus)
-        assertFalse(vm.uiState.value.canAdvance)
+        assertTrue(vm.uiState.value.canAdvance, "a running download must not block the wizard")
 
         vm.cancelIllustrationPreload()
         advanceUntilIdle()
@@ -394,7 +423,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         assertEquals(OnboardingPreloadStatus.Failed, vm.uiState.value.preloadStatus)
-        assertFalse(vm.uiState.value.canAdvance)
+        assertTrue(vm.uiState.value.canAdvance, "a failed download must not block the wizard")
         assertFalse(settings.illustrationPreloadDeclined.first())
         assertFalse(settings.getPreloadDone())
 
@@ -427,26 +456,130 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun navigationIsBlockedWhilePreloadIsRunning() = runTest(dispatcher) {
+    fun preloadKeepsRunningInBackgroundWhenLeavingTheStep() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        settings.setPreloadDone(false)
+        val vm = viewModel(settings, coordinator = preloadCoordinator(GateSecondPreloader()))
+        advanceUntilIdle()
+        vm.onLoggedIn()
+
+        repeat(4) { vm.nextStep() }
+        assertEquals(OnboardingStep.IllustrationPreload, vm.uiState.value.step)
+
+        vm.startIllustrationPreload()
+        advanceUntilIdle()
+        assertEquals(OnboardingPreloadStatus.Running, vm.uiState.value.preloadStatus)
+        assertEquals(1, vm.uiState.value.preloadCompleted)
+        assertEquals(2, vm.uiState.value.preloadTotal)
+
+        // Leaving the step neither cancels the shared session nor resets its
+        // progress; coming back restores the same running state.
+        vm.nextStep()
+        assertEquals(OnboardingStep.B30Style, vm.uiState.value.step)
+        advanceUntilIdle()
+        assertEquals(OnboardingPreloadStatus.Running, vm.uiState.value.preloadStatus)
+        assertEquals(1, vm.uiState.value.preloadCompleted)
+
+        vm.previousStep()
+        assertEquals(OnboardingStep.IllustrationPreload, vm.uiState.value.step)
+        assertEquals(OnboardingPreloadStatus.Running, vm.uiState.value.preloadStatus)
+        assertEquals(1, vm.uiState.value.preloadCompleted)
+        assertEquals(2, vm.uiState.value.preloadTotal)
+        assertFalse(settings.getPreloadDone())
+
+        vm.cancelIllustrationPreload()
+        advanceUntilIdle()
+        assertTrue(settings.illustrationPreloadDeclined.first())
+    }
+
+    @Test
+    fun preloadSessionSurvivesViewModelRecreation() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        settings.setPreloadDone(false)
+        val coordinator = preloadCoordinator(GateSecondPreloader())
+        val session = IllustrationPreloadSession(
+            coordinator = coordinator,
+            settingsRepository = settings,
+            scope = CoroutineScope(dispatcher)
+        )
+        val first = viewModel(settings, coordinator = coordinator, preloadSession = session)
+        advanceUntilIdle()
+
+        first.startIllustrationPreload()
+        advanceUntilIdle()
+        assertEquals(OnboardingPreloadStatus.Running, first.uiState.value.preloadStatus)
+        assertEquals(1, first.uiState.value.preloadCompleted)
+
+        // Simulate the wizard destination going away: only the view-model
+        // scope is cancelled, the app-scoped session must keep running.
+        first.viewModelScope.cancel()
+        advanceUntilIdle()
+
+        val recreated = viewModel(settings, coordinator = coordinator, preloadSession = session)
+        advanceUntilIdle()
+        assertEquals(OnboardingPreloadStatus.Running, recreated.uiState.value.preloadStatus)
+        assertEquals(1, recreated.uiState.value.preloadCompleted)
+        assertEquals(2, recreated.uiState.value.preloadTotal)
+        assertEquals(OnboardingPreloadChoice.Download, recreated.uiState.value.preloadChoice)
+
+        session.decline()
+        advanceUntilIdle()
+        assertTrue(settings.illustrationPreloadDeclined.first())
+        assertFalse(settings.getPreloadDone())
+    }
+
+    @Test
+    fun cancelThenSkipAdvancesToTheNextStep() = runTest(dispatcher) {
         val settings = FakeSettingsRepository()
         settings.setPreloadDone(false)
         val vm = viewModel(settings, coordinator = preloadCoordinator(GatedPreloader()))
         advanceUntilIdle()
         vm.onLoggedIn()
-
-        vm.nextStep()
-        vm.nextStep()
-        vm.nextStep()
-        vm.nextStep()
+        repeat(4) { vm.nextStep() }
         assertEquals(OnboardingStep.IllustrationPreload, vm.uiState.value.step)
 
         vm.startIllustrationPreload()
         runCurrent()
+        assertEquals(OnboardingPreloadStatus.Running, vm.uiState.value.preloadStatus)
 
-        vm.previousStep()
+        vm.cancelIllustrationPreload()
+        advanceUntilIdle()
+        assertEquals(OnboardingPreloadStatus.Idle, vm.uiState.value.preloadStatus)
+        assertEquals(OnboardingPreloadChoice.Skip, vm.uiState.value.preloadChoice)
+
+        // Cancelling resolves the step but stays put; the explicit "later"
+        // action is what advances.
         assertEquals(OnboardingStep.IllustrationPreload, vm.uiState.value.step)
+
+        vm.skipIllustrationPreload()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.B30Style, vm.uiState.value.step)
+        assertTrue(settings.illustrationPreloadDeclined.first())
+        assertFalse(settings.getPreloadDone())
+    }
+
+    @Test
+    fun finishIsAllowedWhilePreloadRunsAndLeavesTheSessionAlive() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        settings.setPreloadDone(false)
+        val vm = viewModel(settings, coordinator = preloadCoordinator(GatedPreloader()))
+        advanceUntilIdle()
+        vm.onLoggedIn()
+        repeat(4) { vm.nextStep() }
+        vm.startIllustrationPreload()
+        runCurrent()
+        assertEquals(OnboardingPreloadStatus.Running, vm.uiState.value.preloadStatus)
+
         vm.nextStep()
-        assertEquals(OnboardingStep.IllustrationPreload, vm.uiState.value.step)
+        vm.nextStep()
+        vm.nextStep()
+        assertEquals(OnboardingStep.Completion, vm.uiState.value.step)
+        vm.finish()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.finished)
+        assertFalse(settings.getPreloadDone())
+        assertFalse(settings.illustrationPreloadDeclined.first())
     }
 
     @Test

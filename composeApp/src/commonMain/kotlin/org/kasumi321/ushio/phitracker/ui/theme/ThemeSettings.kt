@@ -21,6 +21,15 @@ data class PhiTrackerThemeSettings(
 fun resolvePaletteStyle(name: String): PaletteStyle =
     PaletteStyle.entries.firstOrNull { it.name == name } ?: PaletteStyle.TonalSpot
 
+/**
+ * Whether the dark scheme should use the AMOLED variant. Theme mode 3 is the
+ * dedicated AMOLED mode and always wins; the separate switch only applies to
+ * follow-system mode (0). [PhiTrackerTheme] still requires the effective
+ * theme to be dark, so a light system keeps the light scheme.
+ */
+fun resolveAmoled(themeMode: Int, amoledBlack: Boolean): Boolean =
+    themeMode == 3 || (themeMode == 0 && amoledBlack)
+
 fun argbToColor(argb: Int): Color {
     val alpha = (argb ushr 24 and 0xFF) / 255f
     val red = (argb ushr 16 and 0xFF) / 255f

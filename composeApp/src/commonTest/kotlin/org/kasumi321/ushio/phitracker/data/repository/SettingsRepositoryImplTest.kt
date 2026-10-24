@@ -29,6 +29,21 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
+    fun defaultsAmoledBlackFalse(): Unit = runTest {
+        val repo = createRepo()
+        assertEquals(false, repo.amoledBlack.first())
+    }
+
+    @Test
+    fun setAndReadAmoledBlack(): Unit = runTest {
+        val repo = createRepo()
+        repo.setAmoledBlack(true)
+        assertEquals(true, repo.amoledBlack.first())
+        repo.setAmoledBlack(false)
+        assertEquals(false, repo.amoledBlack.first())
+    }
+
+    @Test
     fun defaultsThemeColorSettings(): Unit = runTest {
         val repo = createRepo()
         assertEquals("system", repo.themeColorSource.first())

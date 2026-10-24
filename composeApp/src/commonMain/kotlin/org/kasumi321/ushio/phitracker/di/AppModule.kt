@@ -1,5 +1,6 @@
 package org.kasumi321.ushio.phitracker.di
 
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
 import org.kasumi321.ushio.phitracker.data.logging.CrashReportExporter
 import org.kasumi321.ushio.phitracker.data.logging.LoggingStateHolder
 import org.kasumi321.ushio.phitracker.data.logging.RuntimeLogExporter
@@ -14,6 +15,9 @@ import org.kasumi321.ushio.phitracker.domain.usecase.AnalyzeB30TagsUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.CheckForUpdateUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.FetchGameUpdateInfoUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.VoteChartTagsUseCase
+import org.kasumi321.ushio.phitracker.domain.usecase.SearchCollectibleUseCase
+import org.kasumi321.ushio.phitracker.ui.collectible.CollectibleDetailViewModel
+import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesViewModel
 import org.kasumi321.ushio.phitracker.ui.home.HomeViewModel
 import org.kasumi321.ushio.phitracker.ui.login.LoginViewModel
 import org.kasumi321.ushio.phitracker.ui.onboarding.OnboardingViewModel
@@ -35,6 +39,7 @@ val appModule = module {
     single { VoteChartTagsUseCase(get()) }
     single { ProposeSongAliasUseCase(get()) }
     single { AnalyzeB30TagsUseCase() }
+    single { SearchCollectibleUseCase() }
     single {
         val store = LoggingStateHolder.state?.store
             ?: error("LoggingState not initialised. Call createLoggingState() before initKoin().")
@@ -49,7 +54,7 @@ val appModule = module {
     viewModel {
         OnboardingViewModel(
             settingsRepository = get(),
-            illustrationPreloadCoordinator = get(),
+            illustrationPreloadSession = get(),
             getB30UseCase = get(),
             songDataProvider = get(),
             songDataUpdateCoordinator = get(),
@@ -81,7 +86,8 @@ val appModule = module {
             artworkFileCache = get(),
             runtimeLogExporter = get(),
             crashReportExporter = get(),
-            tipsProvider = get()
+            tipsProvider = get(),
+            collectibleDataVersionProvider = get<CollectibleDataProvider>()::currentVersionText
         )
     }
     viewModel {
@@ -108,6 +114,24 @@ val appModule = module {
             checkForUpdateUseCase = get(),
             fetchGameUpdateInfoUseCase = get(),
             songDataUpdateCoordinator = get(),
+            preloadSession = get(),
+        )
+    }
+    viewModel {
+        CollectiblesViewModel(
+            collectibleDataProvider = get(),
+            searchCollectibleUseCase = get(),
+            settingsRepository = get(),
+            illustrationUriResolver = get()
+        )
+    }
+    viewModel { parameters ->
+        CollectibleDetailViewModel(
+            folderKey = parameters.get(),
+            key = parameters.get(),
+            collectibleDataProvider = get(),
+            illustrationUriResolver = get(),
+            settingsRepository = get()
         )
     }
 }

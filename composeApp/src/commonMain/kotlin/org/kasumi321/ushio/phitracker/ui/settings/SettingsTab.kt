@@ -66,6 +66,8 @@ import phitracker.composeapp.generated.resources.common_unknown_error
 import phitracker.composeapp.generated.resources.settings_about_app
 import phitracker.composeapp.generated.resources.settings_about_app_desc
 import phitracker.composeapp.generated.resources.settings_already_latest
+import phitracker.composeapp.generated.resources.settings_amoled_black
+import phitracker.composeapp.generated.resources.settings_amoled_black_desc
 import phitracker.composeapp.generated.resources.settings_api_credentials
 import phitracker.composeapp.generated.resources.settings_api_credentials_configured
 import phitracker.composeapp.generated.resources.settings_api_credentials_dialog_title
@@ -93,7 +95,6 @@ import phitracker.composeapp.generated.resources.settings_cancel
 import phitracker.composeapp.generated.resources.settings_category_about
 import phitracker.composeapp.generated.resources.settings_category_b30
 import phitracker.composeapp.generated.resources.settings_category_data_cache
-import phitracker.composeapp.generated.resources.settings_category_debug
 import phitracker.composeapp.generated.resources.settings_category_diagnostics
 import phitracker.composeapp.generated.resources.settings_category_interface_theme
 import phitracker.composeapp.generated.resources.settings_category_score_api
@@ -116,6 +117,7 @@ import phitracker.composeapp.generated.resources.settings_clear_logs_done_messag
 import phitracker.composeapp.generated.resources.settings_clear_logs_done_title
 import phitracker.composeapp.generated.resources.settings_clear_logs_failed_message
 import phitracker.composeapp.generated.resources.settings_clear_logs_failed_title
+import phitracker.composeapp.generated.resources.settings_collectible_data_version
 import phitracker.composeapp.generated.resources.settings_crash_notification_denied
 import phitracker.composeapp.generated.resources.settings_crash_notification_granted
 import phitracker.composeapp.generated.resources.settings_crash_notification_guide_text
@@ -187,6 +189,7 @@ import phitracker.composeapp.generated.resources.settings_use_api_data_desc
 @Composable
 fun SettingsTab(
         themeMode: Int,
+        amoledBlack: Boolean = false,
         themeColorSource: String = THEME_COLOR_SOURCE_SYSTEM,
         seedColorArgb: Int = -10011977,
         themeImageSeedColorArgb: Int? = null,
@@ -199,6 +202,7 @@ fun SettingsTab(
         appLanguage: String = "system",
         onAppLanguageChange: (String) -> Unit = {},
         onThemeModeChange: (Int) -> Unit,
+        onAmoledBlackChange: (Boolean) -> Unit = {},
         onThemeColorSourceChange: (String) -> Unit = {},
         onSeedColorArgbChange: (Int) -> Unit = {},
         onThemeImageColorSelected: (String?, Int) -> Unit = { _, _ -> },
@@ -240,6 +244,7 @@ fun SettingsTab(
         updateDataPhase: UpdateDataPhase = UpdateDataPhase.Files,
         updateDataError: UiText? = null,
         updateResultSongNames: List<String>? = null,
+        collectibleDataVersion: String = "",
         onUpdateSongData: () -> Unit = {},
         onDismissUpdateError: () -> Unit = {},
         includePreRelease: Boolean = false,
@@ -429,6 +434,32 @@ fun SettingsTab(
                                 )
                             }
                         }
+                    }
+                }
+
+                // The switch only has an effect in follow-system mode; the
+                // dedicated AMOLED mode (3) always uses pure black.
+                if (themeMode == 0) {
+                    Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                    stringResource(Res.string.settings_amoled_black),
+                                    style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                    text = stringResource(Res.string.settings_amoled_black_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                                checked = amoledBlack,
+                                onCheckedChange = { onAmoledBlackChange(it) }
+                        )
                     }
                 }
 
@@ -917,7 +948,16 @@ fun SettingsTab(
                 CenteredListItem(
                         headlineContent = { Text(stringResource(Res.string.settings_update_song_data)) },
                         supportingContent = {
-                            Text(stringResource(Res.string.settings_update_song_data_desc))
+                            Column {
+                                Text(stringResource(Res.string.settings_update_song_data_desc))
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                        stringResource(
+                                                Res.string.settings_collectible_data_version,
+                                                collectibleDataVersion.ifBlank { "—" }
+                                        )
+                                )
+                            }
                         },
                         leadingContent = {
                             Icon(Icons.Default.CloudDownload, contentDescription = null)
@@ -994,10 +1034,6 @@ fun SettingsTab(
                 )
 
                 if (isDebugBuild) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-                    CategoryTitle(stringResource(Res.string.settings_category_debug))
-
                     CenteredListItem(
                             headlineContent = {
                                 Text(stringResource(Res.string.settings_crash_notification_permission))

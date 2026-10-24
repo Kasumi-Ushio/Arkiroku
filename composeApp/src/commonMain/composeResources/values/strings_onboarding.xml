@@ -26,8 +26,8 @@
     <string name="onboarding_preload_failed">The network connection may have run into a problem — tap &quot;Retry&quot; to try downloading again.</string>
     <string name="onboarding_preload_retry">Retry</string>
     <string name="onboarding_step_update_title">Automatic update checks</string>
-    <string name="onboarding_step_song_data_title">Song database</string>
-    <string name="onboarding_step_song_data_message">You can check here whether the song data has an update. When one is available, tap &quot;Update now&quot; to download the latest song data.</string>
+    <string name="onboarding_step_song_data_title">Index data</string>
+    <string name="onboarding_step_song_data_message">You can check here whether the index data has an update. When one is available, tap &quot;Update now&quot; to download the latest song and collectible index data.</string>
     <string name="onboarding_song_data_update_now">Update now</string>
     <string name="onboarding_song_data_failed">The network connection may have run into a problem — tap &quot;Retry&quot; to try downloading again.</string>
     <string name="onboarding_step_update_message">You can specify here how Arkiroku checks for updates.</string>

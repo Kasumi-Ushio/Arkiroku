@@ -21,6 +21,7 @@ import org.kasumi321.ushio.phitracker.ui.glass.LocalGlassSettings
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerTheme
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerThemeSettings
 import org.kasumi321.ushio.phitracker.ui.theme.SystemBarAppearanceEffect
+import org.kasumi321.ushio.phitracker.ui.theme.resolveAmoled
 import org.koin.compose.koinInject
 
 @Composable
@@ -32,6 +33,7 @@ fun App() {
     val settingsRepository: SettingsRepository = koinInject()
     AppLogger.event("startup", "App.afterSettingsInject")
     val themeMode by settingsRepository.themeMode.collectAsState(initial = 0)
+    val amoledBlack by settingsRepository.amoledBlack.collectAsState(initial = false)
     val themeColorSource by settingsRepository.themeColorSource.collectAsState(initial = "system")
     val seedColorArgb by settingsRepository.seedColorArgb.collectAsState(initial = -10011977)
     val imageSeedColorArgb by settingsRepository.themeImageSeedColorArgb.collectAsState(initial = null)
@@ -45,7 +47,7 @@ fun App() {
         2, 3 -> true
         else -> isSystemInDarkTheme()
     }
-    val isAmoled = themeMode == 3
+    val isAmoled = resolveAmoled(themeMode, amoledBlack)
     val themeSettings = PhiTrackerThemeSettings(
         themeMode = themeMode,
         colorSource = themeColorSource,

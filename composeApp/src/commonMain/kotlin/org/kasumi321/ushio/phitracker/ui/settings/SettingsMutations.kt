@@ -5,6 +5,11 @@ import org.kasumi321.ushio.phitracker.data.platform.setAppLocale
 
 fun SettingsViewModel.setThemeMode(value: Int) = launchSetting { settingsRepository.setThemeMode(value) }
 
+fun SettingsViewModel.setAmoledBlack(value: Boolean) = launchSetting {
+    AppLogger.event("settings", "amoled_black_changed", mapOf("enabled" to value.toString()))
+    settingsRepository.setAmoledBlack(value)
+}
+
 fun SettingsViewModel.setThemeColorSource(value: String) = launchSetting {
     AppLogger.event("settings", "theme_color_source_changed", mapOf("source" to value))
     settingsRepository.setThemeColorSource(value)

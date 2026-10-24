@@ -11,6 +11,8 @@ import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
 import org.kasumi321.ushio.phitracker.data.api.TapTapQrLoginApi
 import org.kasumi321.ushio.phitracker.data.TipsProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
+import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
 import org.kasumi321.ushio.phitracker.data.database.createAppDatabase
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
@@ -27,6 +29,7 @@ import org.kasumi321.ushio.phitracker.data.repository.PhigrosRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.repository.QrLoginRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.repository.SettingsRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
+import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.IllustrationUriResolver
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
@@ -106,7 +109,17 @@ val dataModule = module {
     single { IllustrationUriResolver(get(), get()) }
     single { TipsProvider() }
     single { SongDataUpdater(get(), get(), get()) }
-    single { SongDataUpdateCoordinator(get(), get(), get(), get()) }
+    single { CollectibleDataProvider(paths = get()) }
+    single { CollectibleDataUpdater(get(), get(), get()) }
+    single {
+        SongDataUpdateCoordinator(
+            songDataUpdater = get(),
+            songDataProvider = get(),
+            illustrationProvider = get(),
+            artworkFileCache = get(),
+            collectibleDataUpdater = get()
+        )
+    }
     single {
         IllustrationPreloadCoordinator(
             songDataProvider = get(),
@@ -115,4 +128,5 @@ val dataModule = module {
             thumbnailPreloader = CoilIllustrationThumbnailPreloader
         )
     }
+    single { IllustrationPreloadSession(get(), get()) }
 }

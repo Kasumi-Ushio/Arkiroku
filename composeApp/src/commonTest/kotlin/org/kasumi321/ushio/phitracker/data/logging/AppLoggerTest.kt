@@ -60,9 +60,11 @@ class AppLoggerTest {
         AppLogger.event("init", "logging", mapOf("fileWriter" to "true"))
         AppLogger.event("navigation", "entered_home")
 
-        assertTrue(store.listRuntimeFiles().isNotEmpty())
-
+        // The rolling writer flushes asynchronously; wait for the marker
+        // before asserting that the runtime file exists (the old immediate
+        // check raced the writer's first flush).
         val export = awaitRuntimeExport(store, "[event] category=navigation name=entered_home")
+        assertTrue(store.listRuntimeFiles().isNotEmpty())
         assertContains(export, "[event] category=init name=logging fileWriter=true")
     }
 

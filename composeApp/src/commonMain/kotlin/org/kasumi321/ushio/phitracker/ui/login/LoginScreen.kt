@@ -69,6 +69,7 @@ import io.github.alexzhirkevich.qrose.options.solid
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.Server
+import org.kasumi321.ushio.phitracker.ui.components.ElasticClickPrimaryIndicator
 import org.kasumi321.ushio.phitracker.ui.utils.asString
 import org.kasumi321.ushio.phitracker.ui.utils.resolve
 import phitracker.composeapp.generated.resources.Res
@@ -565,7 +566,8 @@ private fun LoginTabRow(
 ) {
     PrimaryTabRow(
         selectedTabIndex = selectedTab,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        indicator = { ElasticClickPrimaryIndicator(selectedTabIndex = selectedTab) }
     ) {
         Tab(
             selected = selectedTab == 0,

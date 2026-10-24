@@ -3,7 +3,7 @@ package org.kasumi321.ushio.phitracker.domain.usecase
 import org.kasumi321.ushio.phitracker.domain.model.SongInfo
 
 /**
- * Supports wildcard search:
+ * Supports wildcard search (see [WildcardQueryMatcher] for the semantics):
  * - `*` matches one or more non-space characters
  * - `?` matches exactly one non-space character
  * - spaces match one or more whitespace characters
@@ -23,14 +23,12 @@ class SearchSongUseCase {
         // Beta5 guard: queries containing consecutive 2+ '*' (e.g. "**", "***")
         // return all songs immediately to avoid pathological regex expansion
         // from \S+\S+ patterns.
-        if (trimmed.contains(Regex("""\*{2,}"""))) {
+        if (WildcardQueryMatcher.isFullResultQuery(trimmed)) {
             return allSongs.values.sortedBy { it.name }
         }
 
-        val hasWildcard = trimmed.contains('*') || trimmed.contains('?')
-
-        return if (hasWildcard) {
-            val regex = buildWildcardRegex(trimmed) ?: return emptyList()
+        return if (WildcardQueryMatcher.hasWildcard(trimmed)) {
+            val regex = WildcardQueryMatcher.buildRegex(trimmed) ?: return emptyList()
             allSongs.values.filter { song ->
                 regex.containsMatchIn(song.name) ||
                 regex.containsMatchIn(song.id) ||
@@ -45,32 +43,6 @@ class SearchSongUseCase {
                 song.composer.lowercase().contains(lowerQuery) ||
                 song.nicknames.any { it.lowercase().contains(lowerQuery) }
             }.sortedBy { it.name }
-        }
-    }
-
-    /**
-     * Convert wildcard query to regex (partial match):
-     * - `*` -> `\S+` (one or more non-whitespace chars)
-     * - `?` -> `\S` (exactly one non-whitespace char)
-     * - space -> `\s+` (one or more whitespace chars)
-     * - other chars escaped
-     *
-     * Returns null if the pattern cannot be compiled.
-     */
-    private fun buildWildcardRegex(query: String): Regex? {
-        val sb = StringBuilder()
-        for (ch in query) {
-            when (ch) {
-                '*' -> sb.append("\\S+")
-                '?' -> sb.append("\\S")
-                ' ' -> sb.append("\\s+")
-                else -> sb.append(Regex.escape(ch.toString()))
-            }
-        }
-        return try {
-            Regex(sb.toString(), RegexOption.IGNORE_CASE)
-        } catch (_: Exception) {
-            null
         }
     }
 }

@@ -32,7 +32,7 @@ class IllustrationUriResolverTest {
         resolver.standardUri(perDifficultySong, Difficulty.AT)
 
         assertEquals(
-            listOf("${perDifficultySong}_EZ", "${perDifficultySong}_AT"),
+            listOf("$perDifficultySong.0_EZ", "$perDifficultySong.0_AT"),
             cache.standardLookups
         )
     }
@@ -45,7 +45,7 @@ class IllustrationUriResolverTest {
         val resolved = resolver.lowUri(perDifficultySong)
 
         assertEquals("https://example.test/illLow/AT/$perDifficultySong.png", resolved)
-        assertEquals(listOf("${perDifficultySong}_AT"), cache.thumbnailLookups)
+        assertEquals(listOf("$perDifficultySong.0_AT"), cache.thumbnailLookups)
     }
 
     @Test
@@ -67,7 +67,62 @@ class IllustrationUriResolverTest {
         val resolved = resolver.lowLocalUri(perDifficultySong, Difficulty.IN)
 
         assertEquals("/local/per-difficulty.png", resolved)
-        assertEquals(listOf("${perDifficultySong}_IN"), cache.thumbnailLookups)
+        assertEquals(listOf("${perDifficultySong}.0_IN"), cache.thumbnailLookups)
+    }
+
+    @Test
+    fun cleanIllustrationIdNormalizesToTheSongDataCacheSlot() {
+        val cache = RecordingArtworkCache()
+        val resolver = resolver(cache)
+
+        resolver.lowLocalUri("song")
+        resolver.lowLocalUri("song.0")
+
+        assertEquals(listOf("song.0", "song.0"), cache.thumbnailLookups)
+    }
+
+    @Test
+    fun standardLocalUriUsesCachedStandardOnly() {
+        val cache = RecordingArtworkCache(standardUri = "/local/standard.png")
+
+        val resolved = resolver(cache).standardLocalUri("song.0")
+
+        assertEquals("/local/standard.png", resolved)
+        assertEquals(0, cache.downloadCalls)
+    }
+
+    @Test
+    fun standardLocalUriReturnsNullWithoutRemoteFallback() {
+        val cache = RecordingArtworkCache()
+
+        val resolved = resolver(cache).standardLocalUri("song.0")
+
+        assertNull(resolved, "local-only lookup must never fall back to the remote URL")
+        assertEquals(0, cache.downloadCalls)
+    }
+
+    @Test
+    fun bestLocalUriPrefersStandardThenFallsBackToThumbnail() {
+        val both = RecordingArtworkCache(
+            thumbnailUri = "/local/thumbnail.png",
+            standardUri = "/local/standard.png"
+        )
+        assertEquals("/local/standard.png", resolver(both).bestLocalUri("song.0"))
+        assertEquals(listOf("song.0"), both.standardLookups)
+        assertEquals(emptyList<String>(), both.thumbnailLookups)
+
+        val thumbnailOnly = RecordingArtworkCache(thumbnailUri = "/local/thumbnail.png")
+        assertEquals("/local/thumbnail.png", resolver(thumbnailOnly).bestLocalUri("song.0"))
+        assertEquals(listOf("song.0"), thumbnailOnly.standardLookups)
+        assertEquals(listOf("song.0"), thumbnailOnly.thumbnailLookups)
+    }
+
+    @Test
+    fun bestLocalUriReturnsNullWhenNothingIsCached() {
+        val cache = RecordingArtworkCache()
+
+        assertNull(resolver(cache).bestLocalUri("song.0"))
+        assertEquals(0, cache.downloadCalls)
     }
 
     @Test

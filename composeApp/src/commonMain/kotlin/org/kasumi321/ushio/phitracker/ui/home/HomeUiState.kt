@@ -51,6 +51,7 @@ data class SongsUiState(
     val preloadProgress: Float = 0f,
     val preloadTotal: Int = 0,
     val preloadCompleted: Int = 0,
+    val preloadCurrentSong: String? = null,
     val isPreloading: Boolean = false,
     val songDataUpdateAvailable: Boolean = false,
     val isSongDataRefreshing: Boolean = false,
@@ -58,6 +59,14 @@ data class SongsUiState(
     val songDataProgressFraction: Float? = null,
     val songDataMessage: UiText? = null
 )
+
+/**
+ * The compact Profile progress card only exists for a background run. While the
+ * progress dialog is open it already shows the same information, so showing
+ * both would duplicate it.
+ */
+internal fun SongsUiState.shouldShowPreloadCard(): Boolean =
+    isPreloading && !showPreloadDialog
 
 data class B30UiState(
     val b30: List<BestRecord> = emptyList(),

@@ -11,6 +11,7 @@ import org.kasumi321.ushio.phitracker.ui.b30.B30ExportPayload
 import org.kasumi321.ushio.phitracker.ui.b30.B30MissingPayloadRecovery
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationGateway
+import org.kasumi321.ushio.phitracker.ui.home.CollectiblesChapterState
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerThemeSettings
 
 class PhiTrackerNavHostTest {
@@ -232,6 +233,40 @@ class PhiTrackerNavHostTest {
             DetailRouteRequest.SongDetail("光.姜米條.0", "AT"),
             restored?.consumePendingRoute()
         )
+    }
+
+    @Test
+    fun detailPaneStateSaverRestoresCollectibleDetailWithArguments() {
+        // The item detail carries a non-ASCII zh_cn folder key and must
+        // survive a recreation. The chapter level is no longer a route.
+        val detailState = DetailPaneState()
+        detailState.setPendingRoute(DetailRouteRequest.Collectible("额外章节", "mope1"))
+        val detailSaved = with(DetailPaneState.Saver) {
+            with(SaverScope { true }) { save(detailState) }
+        }
+        val detailRestored = DetailPaneState.Saver.restore(checkNotNull(detailSaved))
+        assertEquals(
+            DetailRouteRequest.Collectible("额外章节", "mope1"),
+            detailRestored?.consumePendingRoute()
+        )
+    }
+
+    @Test
+    fun collectiblesChapterStateSaverRestoresFolderKeyAcrossRecreation() {
+        val state = CollectiblesChapterState()
+        assertEquals(null, with(CollectiblesChapterState.Saver) {
+            with(SaverScope { true }) { save(state) }
+        }, "No drill-down means nothing to save")
+
+        state.open("冰封世界")
+        val saved = with(CollectiblesChapterState.Saver) {
+            with(SaverScope { true }) { save(state) }
+        }
+        val restored = CollectiblesChapterState.Saver.restore(checkNotNull(saved))
+        assertEquals("冰封世界", restored?.folderKey)
+
+        restored?.close()
+        assertEquals(null, restored?.folderKey)
     }
 
     @Test

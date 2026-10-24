@@ -13,6 +13,11 @@ class SettingsRepositoryImpl(
     private val themeModeState = MutableStateFlow(storage.getString(KEY_THEME_MODE)?.toIntOrNull() ?: 0)
     override val themeMode: Flow<Int> = themeModeState.asStateFlow()
 
+    private val amoledBlackState = MutableStateFlow(
+        storage.getString(KEY_AMOLED_BLACK)?.toBooleanStrictOrNull() ?: false
+    )
+    override val amoledBlack: Flow<Boolean> = amoledBlackState.asStateFlow()
+
     private val themeColorSourceState = MutableStateFlow(storage.getString(KEY_THEME_COLOR_SOURCE) ?: "system")
     override val themeColorSource: Flow<String> = themeColorSourceState.asStateFlow()
 
@@ -50,6 +55,11 @@ class SettingsRepositoryImpl(
     override suspend fun setThemeMode(mode: Int) {
         storage.putString(KEY_THEME_MODE, mode.toString())
         themeModeState.value = mode
+    }
+
+    override suspend fun setAmoledBlack(enabled: Boolean) {
+        storage.putString(KEY_AMOLED_BLACK, enabled.toString())
+        amoledBlackState.value = enabled
     }
 
     override suspend fun setThemeColorSource(source: String) {
@@ -321,6 +331,7 @@ class SettingsRepositoryImpl(
 
     private companion object {
         const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_AMOLED_BLACK = "amoled_black"
         const val KEY_THEME_COLOR_SOURCE = "theme_color_source"
         const val KEY_SEED_COLOR_ARGB = "seed_color_argb"
         const val KEY_THEME_IMAGE_SEED_COLOR_ARGB = "theme_image_seed_color_argb"

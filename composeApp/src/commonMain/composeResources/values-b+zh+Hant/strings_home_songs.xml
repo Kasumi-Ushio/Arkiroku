@@ -5,7 +5,8 @@
     <string name="songs_cd_expand_search">展開搜尋</string>
     <string name="songs_cd_clear_search">清除搜尋</string>
     <string name="songs_cd_filter">篩選</string>
-    <string name="songs_data_update_available">曲目資料有更新</string>
+    <string name="index_search_close">關閉搜尋</string>
+    <string name="songs_data_update_available">圖鑑資訊有更新</string>
     <string name="songs_update_now">立即更新</string>
     <string name="songs_filter_title">篩選曲目</string>
     <string name="songs_action_reset">重置</string>
@@ -18,13 +19,13 @@
     <string name="songs_chapters_selected_count">已選 %1$d 個</string>
     <string name="songs_select_chapters_title">選擇章節</string>
     <string name="songs_clear_all_count">全部清除 (%1$d)</string>
-    <string name="songs_songdata_checking">正在檢查曲目資料更新…</string>
-    <string name="songs_songdata_check_failed">檢查曲目資料更新失敗：%1$s</string>
-    <string name="songs_songdata_up_to_date">曲目資料已是最新</string>
+    <string name="songs_songdata_checking">正在檢查圖鑑資訊更新…</string>
+    <string name="songs_songdata_check_failed">檢查圖鑑資訊更新失敗：%1$s</string>
+    <string name="songs_songdata_up_to_date">圖鑑資訊已是最新</string>
     <string name="songs_songdata_downloading">正在下載: %1$s (%2$d/%3$d)</string>
     <string name="songs_songdata_syncing_illustrations">正在同步新曲繪: %1$s (%2$d/%3$d)</string>
-    <string name="songs_songdata_updated_count">曲目資料已更新，新增 %1$d 首曲目</string>
-    <string name="songs_songdata_updated">曲目資料已更新</string>
-    <string name="songs_songdata_update_failed">曲目資料更新失敗</string>
+    <string name="songs_songdata_updated_count">圖鑑資訊已更新，新增 %1$d 首曲目</string>
+    <string name="songs_songdata_updated">圖鑑資訊已更新</string>
+    <string name="songs_songdata_update_failed">圖鑑資訊更新失敗</string>
     <string name="songs_preload_partial_failed">部分曲繪圖片未能載入</string>
 </resources>

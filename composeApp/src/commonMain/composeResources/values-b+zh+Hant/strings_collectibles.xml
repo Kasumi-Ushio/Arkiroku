@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="collectibles_subtab_songs">曲目</string>
+    <string name="collectibles_subtab_collectibles">收藏品</string>
+    <string name="collectibles_all_items_count">全部收藏品 (%1$d)</string>
+    <string name="collectibles_search_placeholder">搜尋名稱、負責人或編號…</string>
+    <string name="collectibles_group_item_count">%1$d 項</string>
+    <string name="collectibles_poster_count">共 %1$d 項收藏品</string>
+    <string name="collectibles_part_count">%1$d 部分</string>
+    <string name="collectibles_data_update_available">圖鑑資訊有更新</string>
+    <string name="collectibles_update_now">立即更新</string>
+    <string name="collectibles_filter_title">篩選收藏品</string>
+    <string name="collectibles_filter_category_label">類別</string>
+    <string name="collectibles_filter_chapter_label">章節</string>
+    <string name="collectibles_chapters_selected_count">已選 %1$d 個</string>
+    <string name="collectibles_select_chapters_title">選擇章節</string>
+    <string name="collectibles_data_checking">正在檢查收藏品資料更新…</string>
+    <string name="collectibles_data_check_failed">檢查收藏品資料更新失敗：%1$s</string>
+    <string name="collectibles_data_up_to_date">收藏品資料已是最新</string>
+    <string name="collectibles_data_downloading">正在下載: %1$s (%2$d/%3$d)</string>
+    <string name="collectibles_data_updated">收藏品資料已更新</string>
+    <string name="collectibles_data_update_failed">收藏品資料更新失敗</string>
+    <string name="collectible_category_main">主線</string>
+    <string name="collectible_category_souvenir">紀念品</string>
+    <string name="collectible_category_bold">大膽之作</string>
+    <string name="collectible_category_key">關鍵道具</string>
+    <string name="collectible_category_nonsense">無厘頭</string>
+    <string name="collectible_category_nazo">謎團</string>
+    <string name="collectible_category_unknown">未知</string>
+    <string name="collectible_detail_title">收藏品詳情</string>
+    <string name="collectible_not_found">收藏品不存在</string>
+    <string name="collectible_detail_key_label">編號：%1$s</string>
+    <string name="collectible_detail_chapter_label">章節</string>
+    <string name="collectible_detail_chapter_format">%1$s · %2$s</string>
+    <string name="collectible_detail_date_label">日期</string>
+    <string name="collectible_detail_supervisor_label">負責人</string>
+    <string name="collectible_detail_part_header">第 %1$d 部分</string>
+    <string name="collectible_detail_category_label">類別</string>
+    <string name="collectible_detail_info_title">收藏品資訊</string>
+    <string name="collectible_detail_content_title">正文</string>
+    <string name="collectible_chapter_not_found">章節不存在</string>
+    <string name="collectible_chapter_key_label">章節：%1$s</string>
+</resources>

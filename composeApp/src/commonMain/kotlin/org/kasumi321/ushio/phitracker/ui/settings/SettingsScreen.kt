@@ -36,6 +36,7 @@ fun SettingsScreen(
 
     SettingsTab(
         themeMode = state.themeMode,
+        amoledBlack = state.amoledBlack,
         themeColorSource = state.themeColorSource,
         seedColorArgb = state.seedColorArgb,
         themeImageSeedColorArgb = state.themeImageSeedColorArgb,
@@ -48,6 +49,7 @@ fun SettingsScreen(
         appLanguage = state.appLanguage,
         onAppLanguageChange = { viewModel.setAppLanguage(it) },
         onThemeModeChange = { viewModel.setThemeMode(it) },
+        onAmoledBlackChange = { viewModel.setAmoledBlack(it) },
         onThemeColorSourceChange = { viewModel.setThemeColorSource(it) },
         onSeedColorArgbChange = { viewModel.setSeedColorArgb(it) },
         onThemeImageColorSelected = { uri, seedArgb -> viewModel.setThemeImageColor(uri, seedArgb) },
@@ -89,6 +91,7 @@ fun SettingsScreen(
         updateDataPhase = state.updateDataPhase,
         updateDataError = state.updateDataError,
         updateResultSongNames = state.updateResultSongNames,
+        collectibleDataVersion = state.collectibleDataVersion,
         onUpdateSongData = { viewModel.updateSongData() },
         onDismissUpdateError = { viewModel.dismissUpdateDataError() },
         includePreRelease = state.includePreRelease,

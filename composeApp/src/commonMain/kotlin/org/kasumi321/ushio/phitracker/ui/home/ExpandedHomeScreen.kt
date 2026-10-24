@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,11 +48,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
 import org.kasumi321.ushio.phitracker.ui.DetailPaneState
@@ -60,6 +63,7 @@ import org.kasumi321.ushio.phitracker.ui.DetailRouteRequest
 import org.kasumi321.ushio.phitracker.ui.Screen
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
 import org.kasumi321.ushio.phitracker.ui.navigateDetailRequest
+import org.kasumi321.ushio.phitracker.ui.navigation.CollectibleDetailRoute
 import org.kasumi321.ushio.phitracker.ui.navigation.SongDetailRoute
 import org.kasumi321.ushio.phitracker.ui.secondaryDestinations
 import org.kasumi321.ushio.phitracker.ui.toDetailRouteRequest
@@ -159,6 +163,8 @@ internal fun ExpandedHomeScreen(
     reducedMotionEnabled: Boolean,
     outerNavController: NavHostController,
     tabState: HomeTabState,
+    indexSubTabState: IndexSubTabState,
+    collectiblesChapterState: CollectiblesChapterState,
     onLogout: () -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
@@ -186,6 +192,13 @@ internal fun ExpandedHomeScreen(
         }
     }
 
+    fun navigateCollectibleDetail(folderKey: String, key: String) {
+        detailNavController.navigate(CollectibleDetailRoute(folderKey = folderKey, key = key)) {
+            popUpTo(DetailPlaceholderRoute) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
+
     // Restore the detail destination that survived an Activity recreation (a
     // foldable's display switch recreates the Activity). This must run before
     // the route mirror below, whose first placeholder report would otherwise
@@ -199,6 +212,14 @@ internal fun ExpandedHomeScreen(
     val detailEntry by detailNavController.currentBackStackEntryAsState()
     LaunchedEffect(detailEntry) {
         detailPaneState.setPendingRoute(detailEntry?.toDetailRouteRequest())
+    }
+
+    // The collectible item currently shown in the detail pane (if any), used
+    // to highlight its card in the left-pane chapter list.
+    val selectedCollectibleItem = remember(detailEntry) {
+        val entry = detailEntry ?: return@remember null
+        if (!entry.destination.hasRoute<CollectibleDetailRoute>()) return@remember null
+        entry.toRoute<CollectibleDetailRoute>().let { it.folderKey to it.key }
     }
 
     val density = LocalDensity.current
@@ -261,11 +282,18 @@ internal fun ExpandedHomeScreen(
                     onNavigateToSongDetailWithDifficulty = { songId, difficulty ->
                         navigateSongDetail(songId, difficulty)
                     },
+                    onNavigateToCollectibleDetail = { folderKey, key ->
+                        navigateCollectibleDetail(folderKey, key)
+                    },
                     onNavigateToAbout = { navigateDetail(DetailRouteRequest.Plain(Screen.About.route)) },
                     onNavigateToSettings = { navigateDetail(DetailRouteRequest.Plain(Screen.Settings.route)) },
                     onNavigateToSuggest = { navigateDetail(DetailRouteRequest.Plain(Screen.Suggest.route)) },
                     onNavigateToLogin = onNavigateToLogin,
                     tabState = tabState,
+                    indexSubTabState = indexSubTabState,
+                    isInExpandedPane = true,
+                    selectedCollectibleItem = selectedCollectibleItem,
+                    collectiblesChapterState = collectiblesChapterState,
                     viewModel = homeViewModel
                 )
             }
