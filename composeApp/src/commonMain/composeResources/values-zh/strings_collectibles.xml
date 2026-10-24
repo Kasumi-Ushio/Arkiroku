@@ -14,12 +14,6 @@
     <string name="collectibles_filter_chapter_label">章节</string>
     <string name="collectibles_chapters_selected_count">已选 %1$d 个</string>
     <string name="collectibles_select_chapters_title">选择章节</string>
-    <string name="collectibles_data_checking">正在检查收藏品数据更新…</string>
-    <string name="collectibles_data_check_failed">检查收藏品数据更新失败：%1$s</string>
-    <string name="collectibles_data_up_to_date">收藏品数据已是最新</string>
-    <string name="collectibles_data_downloading">正在下载: %1$s (%2$d/%3$d)</string>
-    <string name="collectibles_data_updated">收藏品数据已更新</string>
-    <string name="collectibles_data_update_failed">收藏品数据更新失败</string>
     <string name="collectible_category_main">主线</string>
     <string name="collectible_category_souvenir">纪念品</string>
     <string name="collectible_category_bold">大胆之作</string>
@@ -30,7 +24,6 @@
     <string name="collectible_detail_title">收藏品详情</string>
     <string name="collectible_not_found">收藏品不存在</string>
     <string name="collectible_detail_key_label">编号：%1$s</string>
-    <string name="collectible_detail_chapter_label">章节</string>
     <string name="collectible_detail_chapter_format">%1$s · %2$s</string>
     <string name="collectible_detail_date_label">日期</string>
     <string name="collectible_detail_supervisor_label">负责人</string>
@@ -38,6 +31,4 @@
     <string name="collectible_detail_category_label">类别</string>
     <string name="collectible_detail_info_title">收藏品信息</string>
     <string name="collectible_detail_content_title">正文</string>
-    <string name="collectible_chapter_not_found">章节不存在</string>
-    <string name="collectible_chapter_key_label">章节：%1$s</string>
 </resources>

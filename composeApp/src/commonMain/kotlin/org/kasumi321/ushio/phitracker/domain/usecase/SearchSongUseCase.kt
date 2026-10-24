@@ -18,7 +18,6 @@ class SearchSongUseCase {
         if (query.isBlank()) return allSongs.values.toList()
 
         val trimmed = query.trim()
-        if (trimmed.isEmpty()) return allSongs.values.toList()
 
         // Beta5 guard: queries containing consecutive 2+ '*' (e.g. "**", "***")
         // return all songs immediately to avoid pathological regex expansion

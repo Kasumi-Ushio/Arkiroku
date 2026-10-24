@@ -3,7 +3,6 @@ package org.kasumi321.ushio.phitracker.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +37,6 @@ import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
-import org.kasumi321.ushio.phitracker.domain.model.SongInfo
 import org.kasumi321.ushio.phitracker.domain.model.SongSyncHistoryEntry
 import org.kasumi321.ushio.phitracker.domain.model.SyncMode
 import org.kasumi321.ushio.phitracker.domain.model.SyncSnapshot
@@ -215,11 +213,6 @@ class HomeViewModel(
         viewModelScope.launch {
             settingsRepository.themeImageSeedColorArgb.collect { argb ->
                 updateB30 { it.copy(themeSettings = it.themeSettings.copy(imageSeedColorArgb = argb)) }
-            }
-        }
-        viewModelScope.launch {
-            settingsRepository.themeImageUri.collect { uri ->
-                updateB30 { it.copy(themeSettings = it.themeSettings.copy(imageUri = uri)) }
             }
         }
         viewModelScope.launch {

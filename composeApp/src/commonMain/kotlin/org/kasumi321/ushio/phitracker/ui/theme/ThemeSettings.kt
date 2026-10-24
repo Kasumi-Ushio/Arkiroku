@@ -14,7 +14,6 @@ data class PhiTrackerThemeSettings(
     val colorSource: String = THEME_COLOR_SOURCE_SYSTEM,
     val seedColorArgb: Int = DEFAULT_THEME_SEED_ARGB,
     val imageSeedColorArgb: Int? = null,
-    val imageUri: String? = null,
     val paletteStyleName: String = PaletteStyle.TonalSpot.name
 )
 

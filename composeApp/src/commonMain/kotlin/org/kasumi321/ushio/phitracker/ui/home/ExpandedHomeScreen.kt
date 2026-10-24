@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -170,8 +171,26 @@ internal fun ExpandedHomeScreen(
 ) {
     val detailNavController = rememberNavController()
 
-    DisposableEffect(detailNavController) {
-        detailPaneState.controller = detailNavController
+    // The detail NavHost installs its graph from an effect, so navigating in
+    // the first frames would throw "setGraph() before getGraph()". Gate every
+    // navigation on this flag; pre-ready requests are queued in
+    // DetailPaneState and delivered by the restore effect below.
+    var detailGraphReady by remember(detailNavController) { mutableStateOf(false) }
+
+    // Capture the pending route synchronously, before the route-mirror effect
+    // below can report the initial placeholder and erase it. DetailPaneState's
+    // pendingRoute is a plain var (not snapshot state), so consuming it during
+    // composition is safe.
+    val restoredRequest = remember(detailNavController) {
+        detailPaneState.consumePendingRoute()
+    }
+
+    // Only expose the controller once its graph exists; callers in
+    // PhiTrackerNavHost fall back to the outer host while this is null.
+    DisposableEffect(detailNavController, detailGraphReady) {
+        if (detailGraphReady) {
+            detailPaneState.controller = detailNavController
+        }
         onDispose { detailPaneState.controller = null }
     }
 
@@ -179,6 +198,10 @@ internal fun ExpandedHomeScreen(
     // keeping the back stack shallow; nested flows (e.g. About -> Licenses)
     // navigate plainly inside the detail graph and stack normally.
     fun navigateDetail(request: DetailRouteRequest) {
+        if (!detailGraphReady) {
+            detailPaneState.setPendingRoute(request)
+            return
+        }
         detailNavController.navigateDetailRequest(request) {
             popUpTo(DetailPlaceholderRoute) { inclusive = false }
             launchSingleTop = true
@@ -186,6 +209,10 @@ internal fun ExpandedHomeScreen(
     }
 
     fun navigateSongDetail(songId: String, difficulty: org.kasumi321.ushio.phitracker.domain.model.Difficulty?) {
+        if (!detailGraphReady) {
+            detailPaneState.setPendingRoute(DetailRouteRequest.SongDetail(songId, difficulty?.name))
+            return
+        }
         detailNavController.navigate(SongDetailRoute.from(songId = songId, difficulty = difficulty)) {
             popUpTo(DetailPlaceholderRoute) { inclusive = false }
             launchSingleTop = true
@@ -193,18 +220,26 @@ internal fun ExpandedHomeScreen(
     }
 
     fun navigateCollectibleDetail(folderKey: String, key: String) {
+        if (!detailGraphReady) {
+            detailPaneState.setPendingRoute(DetailRouteRequest.Collectible(folderKey, key))
+            return
+        }
         detailNavController.navigate(CollectibleDetailRoute(folderKey = folderKey, key = key)) {
             popUpTo(DetailPlaceholderRoute) { inclusive = false }
             launchSingleTop = true
         }
     }
 
-    // Restore the detail destination that survived an Activity recreation (a
-    // foldable's display switch recreates the Activity). This must run before
-    // the route mirror below, whose first placeholder report would otherwise
-    // erase the restored route.
-    LaunchedEffect(detailNavController) {
-        detailPaneState.consumePendingRoute()?.let { navigateDetail(it) }
+    // Restore once the graph is installed. The pending route was captured
+    // synchronously above so the mirror effect's initial placeholder report
+    // cannot erase it; a request queued during the not-ready window wins over
+    // that composition-time capture.
+    LaunchedEffect(detailNavController, detailGraphReady) {
+        if (!detailGraphReady) return@LaunchedEffect
+        val request = detailPaneState.consumePendingRouteOr(restoredRequest)
+        if (request != null) {
+            navigateDetail(request)
+        }
     }
 
     // Mirror the detail pane's current destination so the compact layout can
@@ -359,6 +394,13 @@ internal fun ExpandedHomeScreen(
                     detailPaneState = detailPaneState,
                     migrateOnExpanded = false
                 )
+            }
+
+            // LaunchedEffects run in composition order: NavHost's internal
+            // setGraph effect launches first, then this marks the graph usable
+            // for navigation (and unblocks the restore effect above).
+            LaunchedEffect(detailNavController) {
+                detailGraphReady = true
             }
         }
     }

@@ -193,7 +193,6 @@ fun SettingsTab(
         themeColorSource: String = THEME_COLOR_SOURCE_SYSTEM,
         seedColorArgb: Int = -10011977,
         themeImageSeedColorArgb: Int? = null,
-        themeImageUri: String? = null,
         paletteStyleName: String = PaletteStyle.TonalSpot.name,
         showB30Overflow: Boolean,
         overflowCount: Int,
@@ -204,7 +203,6 @@ fun SettingsTab(
         onThemeModeChange: (Int) -> Unit,
         onAmoledBlackChange: (Boolean) -> Unit = {},
         onThemeColorSourceChange: (String) -> Unit = {},
-        onSeedColorArgbChange: (Int) -> Unit = {},
         onThemeImageColorSelected: (String?, Int) -> Unit = { _, _ -> },
         onThemeImageColorClear: () -> Unit = {},
         onPaletteStyleNameChange: (String) -> Unit = {},
@@ -437,29 +435,41 @@ fun SettingsTab(
                     }
                 }
 
-                // The switch only has an effect in follow-system mode; the
-                // dedicated AMOLED mode (3) always uses pure black.
-                if (themeMode == 0) {
-                    Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                    stringResource(Res.string.settings_amoled_black),
-                                    style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                    text = stringResource(Res.string.settings_amoled_black_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                                checked = amoledBlack,
-                                onCheckedChange = { onAmoledBlackChange(it) }
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                stringResource(Res.string.settings_palette_style),
+                                style = MaterialTheme.typography.bodyLarge
                         )
+                        Text(
+                                text = stringResource(Res.string.settings_palette_style_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Box {
+                        TextButton(onClick = { expandedPaletteStyle = true }) {
+                            Text(paletteStyleName)
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(
+                                expanded = expandedPaletteStyle,
+                                onDismissRequest = { expandedPaletteStyle = false }
+                        ) {
+                            PaletteStyle.entries.forEach { style ->
+                                DropdownMenuItem(
+                                        text = { Text(style.name) },
+                                        onClick = {
+                                            onPaletteStyleNameChange(style.name)
+                                            expandedPaletteStyle = false
+                                        }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -584,41 +594,29 @@ fun SettingsTab(
                     }
                 }
 
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_palette_style),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_palette_style_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Box {
-                        TextButton(onClick = { expandedPaletteStyle = true }) {
-                            Text(paletteStyleName)
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                // The switch only has an effect in follow-system mode; the
+                // dedicated AMOLED mode (3) always uses pure black.
+                if (themeMode == 0) {
+                    Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                    stringResource(Res.string.settings_amoled_black),
+                                    style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                    text = stringResource(Res.string.settings_amoled_black_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        DropdownMenu(
-                                expanded = expandedPaletteStyle,
-                                onDismissRequest = { expandedPaletteStyle = false }
-                        ) {
-                            PaletteStyle.entries.forEach { style ->
-                                DropdownMenuItem(
-                                        text = { Text(style.name) },
-                                        onClick = {
-                                            onPaletteStyleNameChange(style.name)
-                                            expandedPaletteStyle = false
-                                        }
-                                )
-                            }
-                        }
+                        Switch(
+                                checked = amoledBlack,
+                                onCheckedChange = { onAmoledBlackChange(it) }
+                        )
                     }
                 }
 

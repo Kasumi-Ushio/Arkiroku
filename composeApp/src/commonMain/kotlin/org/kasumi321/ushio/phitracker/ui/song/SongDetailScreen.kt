@@ -104,7 +104,6 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
-import org.kasumi321.ushio.phitracker.domain.model.ChartTagCategoryDisplay
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagVoteCount
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.SongInfo

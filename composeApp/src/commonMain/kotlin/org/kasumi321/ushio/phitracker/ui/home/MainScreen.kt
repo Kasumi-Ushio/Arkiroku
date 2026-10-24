@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -48,7 +48,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -93,6 +92,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -168,9 +168,13 @@ class HomeTabState(initial: HomeTab = HomeTab.Profile) {
     }
 
     companion object {
-        val Saver = Saver<HomeTabState, Int>(
+        val Saver = Saver<HomeTabState, Any>(
             save = { it.selected.ordinal },
-            restore = { HomeTabState(HomeTab.entries[it]) }
+            restore = { saved ->
+                HomeTabState(
+                    (saved as? Int)?.let { HomeTab.entries.getOrNull(it) } ?: HomeTab.Profile
+                )
+            }
         )
     }
 }
@@ -195,9 +199,13 @@ class IndexSubTabState(initial: IndexSubTab = IndexSubTab.Songs) {
     }
 
     companion object {
-        val Saver = Saver<IndexSubTabState, Int>(
+        val Saver = Saver<IndexSubTabState, Any>(
             save = { it.selected.ordinal },
-            restore = { IndexSubTabState(IndexSubTab.entries[it]) }
+            restore = { saved ->
+                IndexSubTabState(
+                    (saved as? Int)?.let { IndexSubTab.entries.getOrNull(it) } ?: IndexSubTab.Songs
+                )
+            }
         )
     }
 }
@@ -214,8 +222,6 @@ class CollectiblesChapterState(initialFolderKey: String? = null) {
     var folderKey by mutableStateOf(initialFolderKey)
         private set
 
-    val isDrilledDown: Boolean get() = folderKey != null
-
     fun open(folderKey: String) {
         this.folderKey = folderKey
     }
@@ -225,9 +231,9 @@ class CollectiblesChapterState(initialFolderKey: String? = null) {
     }
 
     companion object {
-        val Saver = Saver<CollectiblesChapterState, String>(
+        val Saver = Saver<CollectiblesChapterState, Any>(
             save = { it.folderKey },
-            restore = { saved -> CollectiblesChapterState(saved) }
+            restore = { saved -> CollectiblesChapterState(saved as? String) }
         )
     }
 }
@@ -939,25 +945,13 @@ fun MainScreen(
                     ) { page ->
                         when (IndexSubTab.entries[page]) {
                             IndexSubTab.Songs -> {
-                                val pullRefreshState = rememberPullToRefreshState()
-                                PullToRefreshBox(
+                                IndexPullToRefreshBox(
                                     isRefreshing = state.songs.isSongDataRefreshing,
-                                    onRefresh = { viewModel.refreshSongData() },
-                                    state = pullRefreshState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    indicator = {
-                                        PullToRefreshDefaults.Indicator(
-                                            state = pullRefreshState,
-                                            isRefreshing = state.songs.isSongDataRefreshing,
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .padding(top = indexContentPadding.calculateTopPadding())
-                                        )
-                                    }
+                                    topPadding = indexContentPadding.calculateTopPadding(),
+                                    onRefresh = { viewModel.refreshSongData() }
                                 ) {
                                     SongsTab(
                                         state = state.songs,
-                                        onSearchChange = { viewModel.searchSongs(it) },
                                         onToggleChapter = { viewModel.toggleChapter(it) },
                                         onClearChapters = { viewModel.resetFilters() },
                                         onDifficultySelect = { viewModel.filterByDifficulty(it) },
@@ -972,41 +966,13 @@ fun MainScreen(
                                         useGrid = songsUseGrid,
                                         gridState = songsGridState
                                     )
-                                    // The progress card floats below the glass top bar instead of
-                                    // scrolling with the list, so the pull gesture collapsing the
-                                    // header can never slide it under the blurred area.
-                                    val songDataStatusText = state.songs.songDataStatusText
-                                    if (state.songs.isSongDataRefreshing && songDataStatusText != null) {
-                                        SongDataRefreshProgressCard(
-                                            statusText = songDataStatusText.asString(),
-                                            progressFraction = state.songs.songDataProgressFraction,
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .padding(
-                                                    start = 16.dp,
-                                                    end = 16.dp,
-                                                    top = indexContentPadding.calculateTopPadding() + 8.dp
-                                                )
-                                        )
-                                    }
                                 }
                             }
                             IndexSubTab.Collectibles -> {
-                                val pullRefreshState = rememberPullToRefreshState()
-                                PullToRefreshBox(
+                                IndexPullToRefreshBox(
                                     isRefreshing = state.songs.isSongDataRefreshing,
-                                    onRefresh = { viewModel.refreshSongData() },
-                                    state = pullRefreshState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    indicator = {
-                                        PullToRefreshDefaults.Indicator(
-                                            state = pullRefreshState,
-                                            isRefreshing = state.songs.isSongDataRefreshing,
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .padding(top = indexContentPadding.calculateTopPadding())
-                                        )
-                                    }
+                                    topPadding = indexContentPadding.calculateTopPadding(),
+                                    onRefresh = { viewModel.refreshSongData() }
                                 ) {
                                     CollectiblesTab(
                                         state = collectiblesState,
@@ -1068,26 +1034,27 @@ fun MainScreen(
                                             }
                                         }
                                     )
-                                    // The combined index (songs + collectibles)
-                                    // refresh reports through the songs state on
-                                    // both sub-tabs.
-                                    val songDataStatusText = state.songs.songDataStatusText
-                                    if (state.songs.isSongDataRefreshing && songDataStatusText != null) {
-                                        SongDataRefreshProgressCard(
-                                            statusText = songDataStatusText.asString(),
-                                            progressFraction = state.songs.songDataProgressFraction,
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .padding(
-                                                    start = 16.dp,
-                                                    end = 16.dp,
-                                                    top = indexContentPadding.calculateTopPadding() + 8.dp
-                                                )
-                                        )
-                                    }
                                 }
                             }
                         }
+                    }
+
+                    // The combined index refresh is sub-tab independent, so
+                    // this card is drawn once outside the pager instead of in
+                    // both pages.
+                    val songDataStatusText = state.songs.songDataStatusText
+                    if (state.songs.isSongDataRefreshing && songDataStatusText != null) {
+                        SongDataRefreshProgressCard(
+                            statusText = songDataStatusText.asString(),
+                            progressFraction = state.songs.songDataProgressFraction,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = indexContentPadding.calculateTopPadding() + 8.dp
+                                )
+                        )
                     }
 
                     AnimatedVisibility(
@@ -1187,6 +1154,32 @@ fun MainScreen(
             )
         }
     }
+}
+
+@Composable
+private fun IndexPullToRefreshBox(
+    isRefreshing: Boolean,
+    topPadding: Dp,
+    onRefresh: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val pullRefreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        state = pullRefreshState,
+        modifier = Modifier.fillMaxSize(),
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullRefreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = topPadding)
+            )
+        },
+        content = content
+    )
 }
 
 @Composable

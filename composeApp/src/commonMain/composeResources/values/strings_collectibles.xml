@@ -14,12 +14,6 @@
     <string name="collectibles_filter_chapter_label">Chapter</string>
     <string name="collectibles_chapters_selected_count">%1$d selected</string>
     <string name="collectibles_select_chapters_title">Select Chapters</string>
-    <string name="collectibles_data_checking">Checking for collectible data updates…</string>
-    <string name="collectibles_data_check_failed">Failed to check for collectible data updates: %1$s</string>
-    <string name="collectibles_data_up_to_date">Collectible data is already up to date</string>
-    <string name="collectibles_data_downloading">Downloading: %1$s (%2$d/%3$d)</string>
-    <string name="collectibles_data_updated">Collectible data updated</string>
-    <string name="collectibles_data_update_failed">Failed to update collectible data</string>
     <string name="collectible_category_main">Main</string>
     <string name="collectible_category_souvenir">Souvenir</string>
     <string name="collectible_category_bold">Bold</string>
@@ -30,7 +24,6 @@
     <string name="collectible_detail_title">Collectible Details</string>
     <string name="collectible_not_found">Collectible not found</string>
     <string name="collectible_detail_key_label">Key: %1$s</string>
-    <string name="collectible_detail_chapter_label">Chapter</string>
     <string name="collectible_detail_chapter_format">%1$s · %2$s</string>
     <string name="collectible_detail_date_label">Date</string>
     <string name="collectible_detail_supervisor_label">Supervisor</string>
@@ -38,6 +31,4 @@
     <string name="collectible_detail_category_label">Category</string>
     <string name="collectible_detail_info_title">Collectible Info</string>
     <string name="collectible_detail_content_title">Content</string>
-    <string name="collectible_chapter_not_found">Chapter not found</string>
-    <string name="collectible_chapter_key_label">Chapter: %1$s</string>
 </resources>

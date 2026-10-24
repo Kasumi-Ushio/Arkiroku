@@ -12,6 +12,10 @@ import org.kasumi321.ushio.phitracker.ui.b30.B30MissingPayloadRecovery
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationGateway
 import org.kasumi321.ushio.phitracker.ui.home.CollectiblesChapterState
+import org.kasumi321.ushio.phitracker.ui.home.HomeTab
+import org.kasumi321.ushio.phitracker.ui.home.HomeTabState
+import org.kasumi321.ushio.phitracker.ui.home.IndexSubTab
+import org.kasumi321.ushio.phitracker.ui.home.IndexSubTabState
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerThemeSettings
 
 class PhiTrackerNavHostTest {
@@ -194,6 +198,25 @@ class PhiTrackerNavHostTest {
     }
 
     @Test
+    fun pendingRouteQueuedBeforeGraphReadyWinsOverRestoredRoute() {
+        val state = DetailPaneState()
+        val restored = DetailRouteRequest.Plain(Screen.Settings.route)
+        val queued = DetailRouteRequest.Plain(Screen.About.route)
+        state.setPendingRoute(queued)
+
+        assertEquals(queued, state.consumePendingRouteOr(restored))
+        assertNull(state.consumePendingRoute())
+    }
+
+    @Test
+    fun restoredRouteIsUsedWhenNothingWasQueuedBeforeGraphReady() {
+        val state = DetailPaneState()
+        val restored = DetailRouteRequest.SongDetail("光.姜米條.0", "AT")
+
+        assertEquals(restored, state.consumePendingRouteOr(restored))
+    }
+
+    @Test
     fun detailPaneStateIgnoresNonMigratableDetailRoutes() {
         val state = DetailPaneState()
         state.setPendingRoute(migratableDetailRoute(DetailPlaceholderRoute)?.let(DetailRouteRequest::Plain))
@@ -275,6 +298,26 @@ class PhiTrackerNavHostTest {
             with(SaverScope { true }) { save(DetailPaneState()) }
         }
         assertNull(saved)
+    }
+
+    @Test
+    fun saversIgnoreValuesOfTheWrongType() {
+        assertNull(DetailPaneState.Saver.restore(123)?.consumePendingRoute())
+        assertNull(DetailPaneState.Saver.restore("not-json")?.consumePendingRoute())
+
+        assertNull(CollectiblesChapterState.Saver.restore(123)?.folderKey)
+        assertEquals(
+            "冰封世界",
+            CollectiblesChapterState.Saver.restore("冰封世界")?.folderKey
+        )
+
+        assertEquals(HomeTab.Profile, HomeTabState.Saver.restore("not-an-int")?.selected)
+        assertEquals(HomeTab.B30, HomeTabState.Saver.restore(1)?.selected)
+        assertEquals(HomeTab.Profile, HomeTabState.Saver.restore(99)?.selected)
+
+        assertEquals(IndexSubTab.Songs, IndexSubTabState.Saver.restore("not-an-int")?.selected)
+        assertEquals(IndexSubTab.Collectibles, IndexSubTabState.Saver.restore(1)?.selected)
+        assertEquals(IndexSubTab.Songs, IndexSubTabState.Saver.restore(99)?.selected)
     }
 
     private fun payload(songId: String) = B30ExportPayload(

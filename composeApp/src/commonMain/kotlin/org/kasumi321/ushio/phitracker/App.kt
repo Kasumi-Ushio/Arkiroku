@@ -37,7 +37,6 @@ fun App() {
     val themeColorSource by settingsRepository.themeColorSource.collectAsState(initial = "system")
     val seedColorArgb by settingsRepository.seedColorArgb.collectAsState(initial = -10011977)
     val imageSeedColorArgb by settingsRepository.themeImageSeedColorArgb.collectAsState(initial = null)
-    val imageUri by settingsRepository.themeImageUri.collectAsState(initial = null)
     val paletteStyleName by settingsRepository.paletteStyleName.collectAsState(initial = "TonalSpot")
     val hazeBlurEnabled by settingsRepository.hazeBlurEnabled.collectAsState(initial = true)
     val hazeBlurStrength by settingsRepository.hazeBlurStrength.collectAsState(initial = 0.75f)
@@ -53,7 +52,6 @@ fun App() {
         colorSource = themeColorSource,
         seedColorArgb = seedColorArgb,
         imageSeedColorArgb = imageSeedColorArgb,
-        imageUri = imageUri,
         paletteStyleName = paletteStyleName
     )
 
@@ -79,5 +77,3 @@ fun App() {
         }
     }
 }
-
-internal val appLogger: AppLogger get() = AppLogger

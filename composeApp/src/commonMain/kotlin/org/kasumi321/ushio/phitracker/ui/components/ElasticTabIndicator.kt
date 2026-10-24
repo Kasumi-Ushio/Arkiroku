@@ -34,16 +34,15 @@ import kotlin.math.sin
  * tab and then contracts back to its target width.
  *
  * Two drivers share the same edge logic:
- *  - [ElasticPagerPrimaryIndicator] / [ElasticPagerSecondaryIndicator] follow a
- *    [PagerState] live, so a drag stretches the bar with the finger and a
- *    programmatic pager animation drives it frame by frame.
+ *  - [ElasticPagerPrimaryIndicator] follows a [PagerState] live, so a drag
+ *    stretches the bar with the finger and a programmatic pager animation
+ *    drives it frame by frame.
  *  - [ElasticClickPrimaryIndicator] is used by tab rows without a pager; its
  *    two edges are animated independently with different springs.
  *
- * Indicator height, color and shape come from the Material 3 defaults
- * (`TabRowDefaults.PrimaryIndicator` / `SecondaryIndicator`); only the motion
- * is custom. Reduced motion collapses the elastic easing to a synchronous
- * (non-stretching) animation.
+ * Indicator height, color and shape come from the Material 3
+ * `TabRowDefaults.PrimaryIndicator`; only the motion is custom. Reduced motion
+ * collapses the elastic easing to a synchronous (non-stretching) animation.
  */
 
 internal data class ElasticIndicatorBounds(val left: Dp, val right: Dp)
@@ -66,38 +65,11 @@ fun TabIndicatorScope.ElasticPagerPrimaryIndicator(
                 bounds = elasticPagerBounds(
                     pagerState = pagerState,
                     tabPositions = tabPositions,
-                    matchContentSize = true,
                     reducedMotion = reducedMotion
                 )
             )
         },
         width = Dp.Unspecified
-    )
-}
-
-/**
- * Pager-driven secondary indicator (full tab width, square bar). Typical use:
- * `SecondaryTabRow(indicator = { ElasticPagerSecondaryIndicator(state) })`.
- */
-@Composable
-fun TabIndicatorScope.ElasticPagerSecondaryIndicator(
-    pagerState: PagerState,
-    modifier: Modifier = Modifier
-) {
-    val reducedMotion = rememberReducedMotionEnabled()
-    TabRowDefaults.SecondaryIndicator(
-        modifier = modifier.tabIndicatorLayout { measurable, constraints, tabPositions ->
-            layoutElasticIndicator(
-                measurable = measurable,
-                constraints = constraints,
-                bounds = elasticPagerBounds(
-                    pagerState = pagerState,
-                    tabPositions = tabPositions,
-                    matchContentSize = false,
-                    reducedMotion = reducedMotion
-                )
-            )
-        }
     )
 }
 
@@ -131,7 +103,7 @@ fun TabIndicatorScope.ElasticClickPrimaryIndicator(
         val positions = tabPositions
         val targetBounds = positions
             .getOrNull(selectedTabIndex.coerceIn(positions.indices))
-            ?.indicatorBounds(matchContentSize = true)
+            ?.indicatorBounds()
             ?: ElasticIndicatorBounds(0.dp, 0.dp)
 
         // Freeze the direction for one selection change; otherwise a
@@ -197,7 +169,6 @@ fun TabIndicatorScope.ElasticClickPrimaryIndicator(
 private fun elasticPagerBounds(
     pagerState: PagerState,
     tabPositions: List<TabPosition>,
-    matchContentSize: Boolean,
     reducedMotion: Boolean
 ): ElasticIndicatorBounds {
     if (tabPositions.isEmpty()) return ElasticIndicatorBounds(0.dp, 0.dp)
@@ -207,10 +178,10 @@ private fun elasticPagerBounds(
         .coerceIn(0f, lastIndex.toFloat())
     val startIndex = rawPosition.toInt().coerceIn(0, lastIndex)
     val endIndex = (startIndex + 1).coerceAtMost(lastIndex)
-    val startBounds = tabPositions[startIndex].indicatorBounds(matchContentSize)
+    val startBounds = tabPositions[startIndex].indicatorBounds()
     if (startIndex == endIndex) return startBounds
 
-    val endBounds = tabPositions[endIndex].indicatorBounds(matchContentSize)
+    val endBounds = tabPositions[endIndex].indicatorBounds()
     val progress = (rawPosition - startIndex).coerceIn(0f, 1f)
     val leading = if (reducedMotion) progress else easeOutSine(progress)
     val trailing = if (reducedMotion) progress else easeInSine(progress)
@@ -244,12 +215,8 @@ private fun easeInSine(fraction: Float): Float =
 private fun easeOutSine(fraction: Float): Float =
     sin(fraction * PI / 2.0).toFloat()
 
-private fun TabPosition.indicatorBounds(matchContentSize: Boolean): ElasticIndicatorBounds {
-    val inset = if (matchContentSize) {
-        ((width - contentWidth) * 0.5f).coerceAtLeast(0.dp)
-    } else {
-        0.dp
-    }
+private fun TabPosition.indicatorBounds(): ElasticIndicatorBounds {
+    val inset = ((width - contentWidth) * 0.5f).coerceAtLeast(0.dp)
     return ElasticIndicatorBounds(
         left = left + inset,
         right = left + width - inset

@@ -24,7 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,10 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import coil3.compose.LocalPlatformContext
-import coil3.request.CachePolicy
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.CollectibleChapter
 import org.kasumi321.ushio.phitracker.domain.model.CollectibleItem
@@ -102,17 +97,7 @@ internal fun CollectibleChapterHeader(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val platformContext = LocalPlatformContext.current
-    val imageRequest = remember(platformContext, posterUrl) {
-        posterUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            ImageRequest.Builder(platformContext)
-                .data(url)
-                .size(96)
-                .networkCachePolicy(CachePolicy.READ_ONLY)
-                .crossfade(200)
-                .build()
-        }
-    }
+    val imageRequest = rememberLocalCoverRequest(posterUrl)
     Row(
         modifier = modifier
             .fillMaxWidth()

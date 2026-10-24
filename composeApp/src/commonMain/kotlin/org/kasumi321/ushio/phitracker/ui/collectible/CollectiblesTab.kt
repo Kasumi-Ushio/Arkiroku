@@ -673,18 +673,7 @@ private fun CollectibleChapterHeader(
     getCoverUrl: (String) -> String?,
     modifier: Modifier = Modifier
 ) {
-    val platformContext = LocalPlatformContext.current
-    val coverUrl = getCoverUrl(group.chapter.coverSongId)
-    val imageRequest = remember(platformContext, coverUrl) {
-        coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            ImageRequest.Builder(platformContext)
-                .data(url)
-                .size(96)
-                .networkCachePolicy(CachePolicy.READ_ONLY)
-                .crossfade(200)
-                .build()
-        }
-    }
+    val imageRequest = rememberLocalCoverRequest(getCoverUrl(group.chapter.coverSongId))
     Row(
         modifier = modifier
             .fillMaxWidth()

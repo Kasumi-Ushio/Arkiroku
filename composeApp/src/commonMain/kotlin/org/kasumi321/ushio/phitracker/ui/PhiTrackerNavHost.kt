@@ -171,16 +171,26 @@ internal class DetailPaneState(restoredRoute: DetailRouteRequest? = null) {
         return route
     }
 
+    /**
+     * Delivery used when the detail graph becomes usable: a route queued while
+     * the graph was not ready is newer than [restored] (the route captured at
+     * composition time), so it wins; otherwise the restored route is used.
+     */
+    fun consumePendingRouteOr(restored: DetailRouteRequest?): DetailRouteRequest? =
+        consumePendingRoute() ?: restored
+
     companion object {
         private val saverJson = Json { ignoreUnknownKeys = true }
 
-        val Saver: Saver<DetailPaneState, String> = Saver(
+        val Saver: Saver<DetailPaneState, Any> = Saver(
             save = { state ->
                 state.pendingRoute?.let { saverJson.encodeToString(it) }
             },
             restore = { saved ->
                 DetailPaneState(
-                    runCatching { saverJson.decodeFromString<DetailRouteRequest>(saved) }.getOrNull()
+                    (saved as? String)?.let {
+                        runCatching { saverJson.decodeFromString<DetailRouteRequest>(it) }.getOrNull()
+                    }
                 )
             }
         )
@@ -349,13 +359,24 @@ fun PhiTrackerNavHost() {
         return
     }
 
-    val detailPaneState = rememberSaveable(saver = DetailPaneState.Saver) { DetailPaneState() }
+    // Explicit dotted keys: the default key is the position hash in base 36,
+    // which can collide with runtime-saveable slots after rapid Activity
+    // recreation (density changes) and composition-structure swaps. Dotted
+    // custom keys cannot collide with a base-36 position hash.
+    @Suppress("DEPRECATION")
+    val detailPaneState = rememberSaveable(
+        key = "phitracker.detail_pane_state",
+        saver = DetailPaneState.Saver
+    ) { DetailPaneState() }
     // Collectibles chapter drill-down state: used inline by the compact Index
     // content and the expanded home's left pane. Hoisted at the NavHost level
     // so both layouts share one instance; it survives configuration changes
     // and process death via the Saver.
-    val collectiblesChapterState =
-        rememberSaveable(saver = CollectiblesChapterState.Saver) { CollectiblesChapterState() }
+    @Suppress("DEPRECATION")
+    val collectiblesChapterState = rememberSaveable(
+        key = "phitracker.collectibles_chapter_state",
+        saver = CollectiblesChapterState.Saver
+    ) { CollectiblesChapterState() }
     val b30Navigation = remember(navController, detailPaneState) {
         B30NavigationCoordinator(
             object : B30NavigationGateway {

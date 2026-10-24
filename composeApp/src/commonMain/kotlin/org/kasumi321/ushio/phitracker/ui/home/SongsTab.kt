@@ -39,7 +39,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -97,7 +96,6 @@ private fun Float.formatLevel(): String {
 @Composable
 fun SongsTab(
     state: SongsUiState,
-    onSearchChange: (String) -> Unit,
     onToggleChapter: (String) -> Unit,
     onClearChapters: () -> Unit,
     onDifficultySelect: (Difficulty?) -> Unit,

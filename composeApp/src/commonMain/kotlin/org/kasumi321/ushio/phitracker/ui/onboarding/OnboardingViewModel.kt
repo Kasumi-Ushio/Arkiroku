@@ -45,7 +45,6 @@ enum class OnboardingPreloadChoice {
     Skip
 }
 
-/** State machine of the inline illustration download in the preload step. */
 /** State machine of the inline song database check/update in its own step. */
 enum class OnboardingSongDataStatus {
     Idle,
@@ -57,6 +56,7 @@ enum class OnboardingSongDataStatus {
     Failed
 }
 
+/** State machine of the inline illustration download in the preload step. */
 enum class OnboardingPreloadStatus {
     Idle,
     Running,

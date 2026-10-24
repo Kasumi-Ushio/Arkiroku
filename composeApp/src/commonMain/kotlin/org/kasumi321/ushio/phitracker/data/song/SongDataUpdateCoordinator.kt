@@ -39,8 +39,7 @@ class SongDataUpdateCoordinator(
     )
 
     data class UpdateOutcome(
-        val addedSongNames: List<String>,
-        val removedCount: Int
+        val addedSongNames: List<String>
     )
 
     /**
@@ -92,8 +91,7 @@ class SongDataUpdateCoordinator(
                 val newSongIds = songDataProvider.getSongs().keys.toSet()
                 val songNames = songDataProvider.getSongNameMap()
                 UpdateOutcome(
-                    addedSongNames = (newSongIds - oldSongIds).sorted().map { songNames[it] ?: it },
-                    removedCount = (oldSongIds - newSongIds).size
+                    addedSongNames = (newSongIds - oldSongIds).sorted().map { songNames[it] ?: it }
                 )
             }
         }
@@ -175,8 +173,7 @@ class SongDataUpdateCoordinator(
         AppLogger.event("cache", "song_data_illustration_reconcile", mapOf("added" to added.size.toString(), "addedSuccess" to (added.size - failures).toString(), "addedFailure" to failures.toString(), "removed" to removed.size.toString()))
         if (failures > 0) throw IllegalStateException("图鉴信息已更新，但部分曲绘未能下载，可稍后在设置中重试")
         return UpdateOutcome(
-            addedSongNames = added.map { songNames[it] ?: it },
-            removedCount = removed.size
+            addedSongNames = added.map { songNames[it] ?: it }
         )
     }
 }

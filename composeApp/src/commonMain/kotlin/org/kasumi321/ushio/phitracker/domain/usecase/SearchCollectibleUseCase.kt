@@ -18,7 +18,6 @@ class SearchCollectibleUseCase {
         if (query.isBlank()) return items
 
         val trimmed = query.trim()
-        if (trimmed.isEmpty()) return items
 
         if (WildcardQueryMatcher.isFullResultQuery(trimmed)) {
             return items.sortedBy { it.displayName }
