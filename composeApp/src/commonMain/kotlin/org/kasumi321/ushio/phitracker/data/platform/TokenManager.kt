@@ -5,12 +5,14 @@ import org.kasumi321.ushio.phitracker.domain.model.Server
 
 /**
  * SessionToken secure storage manager.
- * Preserves v0.1.0-beta.1 semantics exactly:
- * - Keys: "session_token", "server"
+ * - Keys: "session_token", "server", "session_player_id"
  * - save trims token whitespace
  * - get returns null if no session_token stored
  * - server defaults to CN if missing or invalid
- * - clear removes both keys
+ * - session_player_id records the TapTap objectId the token was issued for;
+ *   it lets offline startup recovery prove the cached data belongs to this
+ *   token's account (objectIds survive sessionToken resets, tokens do not)
+ * - clear removes all three keys
  */
 class TokenManager(
     private val storage: SecureKeyValueStorage
@@ -32,13 +34,21 @@ class TokenManager(
         return token to server
     }
 
+    fun savePlayerBinding(playerId: String) {
+        storage.putString(KEY_SESSION_PLAYER_ID, playerId)
+    }
+
+    fun getPlayerBinding(): String? = storage.getString(KEY_SESSION_PLAYER_ID)
+
     fun clearToken() {
         storage.remove(KEY_SESSION_TOKEN)
         storage.remove(KEY_SERVER)
+        storage.remove(KEY_SESSION_PLAYER_ID)
     }
 
     companion object {
         private const val KEY_SESSION_TOKEN = "session_token"
         private const val KEY_SERVER = "server"
+        private const val KEY_SESSION_PLAYER_ID = "session_player_id"
     }
 }

@@ -9,22 +9,23 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.domain.model.QrLoginPollResult
 import org.kasumi321.ushio.phitracker.domain.model.Server
-import org.kasumi321.ushio.phitracker.domain.model.SyncMode
-import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
 import org.kasumi321.ushio.phitracker.domain.repository.QrLoginRepository
-import org.kasumi321.ushio.phitracker.domain.usecase.SyncSaveUseCase
+import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
+import org.kasumi321.ushio.phitracker.domain.session.SessionCredentialsPersistenceException
+import org.kasumi321.ushio.phitracker.domain.session.SessionResumeOutcome
+import org.kasumi321.ushio.phitracker.domain.session.SessionTokenRejectedException
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.login_error_credential_expired
 import phitracker.composeapp.generated.resources.login_error_empty_token
 import phitracker.composeapp.generated.resources.login_error_expired_no_save
+import phitracker.composeapp.generated.resources.login_error_persist_failed
 import phitracker.composeapp.generated.resources.login_error_sync_failed
 import phitracker.composeapp.generated.resources.login_qr_auth_failed
 import phitracker.composeapp.generated.resources.login_qr_fetch_failed
@@ -57,8 +58,7 @@ data class LoginUiState(
 )
 
 class LoginViewModel(
-    private val repository: PhigrosRepository,
-    private val syncSaveUseCase: SyncSaveUseCase,
+    private val sessionCoordinator: SessionCoordinator,
     private val qrLoginRepository: QrLoginRepository,
     private val clockMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() }
 ) : ViewModel() {
@@ -74,68 +74,41 @@ class LoginViewModel(
 
     private fun checkExistingToken() {
         viewModelScope.launch {
-            val saved = repository.getSessionToken()
-            if (saved == null) {
-                _uiState.update { it.copy(isCheckingToken = false) }
-                AppLogger.event("login", "state_checked", mapOf("tokenPresent" to "false", "loggedIn" to "false"))
-                return@launch
-            }
-
-            val (token, server) = saved
-
-            // A cached save means this device has synced before, so the silent
-            // startup sync must diff against the stored records (Refresh) instead
-            // of overwriting them (Bootstrap) — Bootstrap writes no snapshot or
-            // history and would swallow score changes made since the last launch.
-            val cachedSave = repository.getCachedSave().first()
-
-            // Try to refresh the session and save from the network.
-            val validateResult = repository.validateToken(token, server)
-            val syncResult = if (validateResult.isSuccess) {
-                val mode = if (cachedSave != null) SyncMode.Refresh else SyncMode.Bootstrap
-                syncSaveUseCase(token, server, mode)
-            } else {
-                null
-            }
-            val onlineRefreshOk = validateResult.isSuccess && syncResult?.isSuccess == true
-
-            if (onlineRefreshOk) {
-                _uiState.update {
-                    it.copy(token = token, server = server, isCheckingToken = false, isLoggedIn = true)
+            when (val outcome = sessionCoordinator.resumeSession()) {
+                is SessionResumeOutcome.Resumed -> {
+                    _uiState.update {
+                        it.copy(
+                            isCheckingToken = false,
+                            isLoggedIn = true,
+                            server = _uiState.value.server
+                        )
+                    }
+                    AppLogger.event(
+                        "login",
+                        "state_checked",
+                        mapOf("tokenPresent" to "true", "loggedIn" to "true", "source" to outcome.source.name.lowercase())
+                    )
                 }
-                AppLogger.event(
-                    "login",
-                    "state_checked",
-                    mapOf("tokenPresent" to "true", "loggedIn" to "true", "source" to "online")
-                )
-                return@launch
-            }
 
-            // The network refresh failed (offline, or the server rejected the call). Instead of
-            // forcing a logout, stay signed in with the local session + cached save when one is
-            // available — only the total absence of local data sends the user back to login.
-            if (cachedSave != null) {
-                _uiState.update {
-                    it.copy(token = token, server = server, isCheckingToken = false, isLoggedIn = true)
+                is SessionResumeOutcome.RequiresLogin -> {
+                    _uiState.update {
+                        it.copy(
+                            isCheckingToken = false,
+                            isLoggedIn = false,
+                            error = if (outcome.hadToken) {
+                                UiText.Res(Res.string.login_error_expired_no_save)
+                            } else {
+                                null
+                            }
+                        )
+                    }
+                    AppLogger.event(
+                        "login",
+                        "state_checked",
+                        mapOf("tokenPresent" to outcome.hadToken.toString(), "loggedIn" to "false")
+                    )
                 }
-                AppLogger.event(
-                    "login",
-                    "state_checked",
-                    mapOf("tokenPresent" to "true", "loggedIn" to "true", "source" to "local")
-                )
-                return@launch
             }
-
-            _uiState.update {
-                it.copy(
-                    token = token,
-                    server = server,
-                    isCheckingToken = false,
-                    isLoggedIn = false,
-                    error = UiText.Res(Res.string.login_error_expired_no_save)
-                )
-            }
-            AppLogger.event("login", "state_checked", mapOf("tokenPresent" to "true", "loggedIn" to "false"))
         }
     }
 
@@ -157,32 +130,26 @@ class LoginViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            val validateResult = repository.validateToken(state.token, state.server)
-            if (validateResult.isFailure) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = UiText.Res(Res.string.login_error_credential_expired)
-                    )
+            val result = sessionCoordinator.login(state.token, state.server)
+            result.fold(
+                onSuccess = {
+                    _uiState.update { state0 ->
+                        state0.copy(isLoading = false, isLoggedIn = true)
+                    }
+                },
+                onFailure = { throwable ->
+                    _uiState.update {
+                        it.copy(isLoading = false, error = mapLoginError(throwable))
+                    }
                 }
-                return@launch
-            }
-
-            repository.saveSessionToken(state.token, state.server)
-
-            val syncResult = syncSaveUseCase(state.token, state.server, SyncMode.Bootstrap)
-            if (syncResult.isFailure) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = UiText.Res(Res.string.login_error_sync_failed)
-                    )
-                }
-                return@launch
-            }
-
-            _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
+            )
         }
+    }
+
+    private fun mapLoginError(throwable: Throwable): UiText = when (throwable) {
+        is SessionTokenRejectedException -> UiText.Res(Res.string.login_error_credential_expired)
+        is SessionCredentialsPersistenceException -> UiText.Res(Res.string.login_error_persist_failed)
+        else -> UiText.Res(Res.string.login_error_sync_failed)
     }
 
     fun startQrLogin() {
@@ -217,13 +184,16 @@ class LoginViewModel(
                             failureMessage = UiText.Res(Res.string.login_qr_auth_failed)
                             val sessionToken = qrLoginRepository.exchangeForSessionToken(result.authorizationId)
 
-                            repository.saveSessionToken(sessionToken, server)
-                            val syncResult = syncSaveUseCase(sessionToken, server, SyncMode.Bootstrap)
-                            if (syncResult.isFailure) {
+                            val loginResult = sessionCoordinator.login(sessionToken, server)
+                            if (loginResult.isFailure) {
                                 _uiState.update {
                                     it.copy(
                                         qrStatus = QrStatus.Error,
-                                        qrError = UiText.Res(Res.string.login_qr_sync_failed)
+                                        qrError = if (loginResult.exceptionOrNull() is SessionTokenRejectedException) {
+                                            UiText.Res(Res.string.login_qr_auth_failed)
+                                        } else {
+                                            UiText.Res(Res.string.login_qr_sync_failed)
+                                        }
                                     )
                                 }
                                 return@launch

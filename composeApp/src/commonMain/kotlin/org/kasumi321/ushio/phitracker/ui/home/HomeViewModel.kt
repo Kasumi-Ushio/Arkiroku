@@ -2,6 +2,7 @@ package org.kasumi321.ushio.phitracker.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,15 +39,16 @@ import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
 import org.kasumi321.ushio.phitracker.domain.model.SongSyncHistoryEntry
-import org.kasumi321.ushio.phitracker.domain.model.SyncMode
 import org.kasumi321.ushio.phitracker.domain.model.SyncSnapshot
 import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
+import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
+import org.kasumi321.ushio.phitracker.domain.session.SessionNotLoggedInException
+import org.kasumi321.ushio.phitracker.domain.session.SessionTokenRejectedException
 import org.kasumi321.ushio.phitracker.domain.usecase.GetB30UseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetSongLevelBoundsUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.RksCalculator
 import org.kasumi321.ushio.phitracker.domain.usecase.SearchSongUseCase
-import org.kasumi321.ushio.phitracker.domain.usecase.SyncSaveUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.AnalyzeB30TagsUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.BuildB30RksHistogramUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.CheckForUpdateUseCase
@@ -67,6 +69,7 @@ import phitracker.composeapp.generated.resources.songs_songdata_up_to_date
 import phitracker.composeapp.generated.resources.songs_songdata_update_failed
 import phitracker.composeapp.generated.resources.songs_songdata_updated
 import phitracker.composeapp.generated.resources.songs_songdata_updated_count
+import phitracker.composeapp.generated.resources.sync_error_session_expired
 import phitracker.composeapp.generated.resources.sync_login_required
 import phitracker.composeapp.generated.resources.tools_api_invalid_rank
 import phitracker.composeapp.generated.resources.tools_api_invalid_rks
@@ -105,7 +108,7 @@ private val GameUpdateJson = Json { ignoreUnknownKeys = true }
 class HomeViewModel(
     private val repository: PhigrosRepository,
     private val getB30UseCase: GetB30UseCase,
-    private val syncSaveUseCase: SyncSaveUseCase,
+    private val sessionCoordinator: SessionCoordinator,
     private val searchSongUseCase: SearchSongUseCase,
     private val getSongLevelBoundsUseCase: GetSongLevelBoundsUseCase = GetSongLevelBoundsUseCase(),
     private val songDataProvider: SongDataProvider,
@@ -687,13 +690,7 @@ class HomeViewModel(
             updateSync { it.copy(isSyncing = true, error = null) }
             AppLogger.event("sync", "refresh_started")
             try {
-                val tokenPair = repository.getSessionToken()
-                if (tokenPair == null) {
-                    updateSync { it.copy(isSyncing = false, error = UiText.Res(Res.string.sync_login_required)) }
-                    return@launch
-                }
-
-                val result = syncSaveUseCase(tokenPair.first, tokenPair.second, SyncMode.Refresh)
+                val result = sessionCoordinator.refresh()
                 if (result.isSuccess) {
                     val syncResult = result.getOrThrow()
                     val save = syncResult.save
@@ -746,11 +743,15 @@ class HomeViewModel(
                     updateSync {
                         it.copy(
                             isSyncing = false,
-                            error = result.exceptionOrNull()?.message?.let(UiText::Raw)
+                            error = mapRefreshError(result.exceptionOrNull())
                         )
                     }
                     AppLogger.event("sync", "refresh_failed", mapOf("error" to (result.exceptionOrNull()?.message ?: "unknown")), throwable = result.exceptionOrNull())
                 }
+            } catch (e: CancellationException) {
+                // Logout cancels an in-flight refresh; the session UI is about
+                // to be torn down, so this must not surface as an error.
+                throw e
             } catch (e: Exception) {
                 updateSync {
                     it.copy(isSyncing = false, error = e.message?.let(UiText::Raw))
@@ -758,6 +759,13 @@ class HomeViewModel(
                 AppLogger.event("sync", "refresh_failed", mapOf("error" to (e.message ?: "unknown")), throwable = e)
             }
         }
+    }
+
+    private fun mapRefreshError(throwable: Throwable?): UiText? = when (throwable) {
+        is SessionNotLoggedInException -> UiText.Res(Res.string.sync_login_required)
+        is SessionTokenRejectedException -> UiText.Res(Res.string.sync_error_session_expired)
+        null -> null
+        else -> throwable.message?.let(UiText::Raw)
     }
 
     private suspend fun loadSyncRecordsForSnapshot(snapshotId: Long) {
@@ -928,13 +936,6 @@ class HomeViewModel(
 
     fun getRandomTip(): String {
         return tipsProvider.getRandomTip()
-    }
-
-    fun logout() {
-        viewModelScope.launch {
-            repository.clearData()
-            updateSync { it.copy(isLoggedOut = true) }
-        }
     }
 
     fun clearError() {

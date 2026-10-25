@@ -4,6 +4,7 @@
     <string name="login_error_empty_token">請輸入 sessionToken</string>
     <string name="login_error_credential_expired">登入憑證已失效，請重新登入</string>
     <string name="login_error_sync_failed">同步失敗，請檢查網路後重試</string>
+    <string name="login_error_persist_failed">登入成功但憑證儲存失敗，請重試登入</string>
     <string name="login_qr_fetch_failed">取得 QR 碼失敗，請重試</string>
     <string name="login_qr_status_failed">QR 碼狀態查詢失敗，請重試</string>
     <string name="login_qr_auth_failed">QR 碼授權失敗，請重試</string>

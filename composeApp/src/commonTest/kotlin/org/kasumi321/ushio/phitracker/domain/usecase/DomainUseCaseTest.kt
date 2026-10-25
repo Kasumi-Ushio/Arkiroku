@@ -627,12 +627,7 @@ class DomainUseCaseTest {
         val save = emptySave()
         val repository = FakePhigrosRepository(save)
 
-        assertEquals(
-            save,
-            SyncSaveUseCase(repository)("token", Server.CN, SyncMode.Refresh).getOrThrow().save
-        )
         assertEquals(Pair(emptyList(), emptyList()), GetB30UseCase(repository)(emptyMap(), emptyMap()).first())
-        assertEquals(Triple("token", Server.CN, SyncMode.Refresh), repository.lastSyncRequest)
     }
 
     private fun emptySave(): Save = Save(

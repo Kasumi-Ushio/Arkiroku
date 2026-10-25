@@ -57,5 +57,6 @@ enum class UpdateDataPhase {
 
 sealed interface SettingsEvent {
     data object LoggedOut : SettingsEvent
+    data object LogoutFailed : SettingsEvent
     data object RestartRequested : SettingsEvent
 }

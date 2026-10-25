@@ -38,11 +38,6 @@ internal class B30NavigationCoordinator(
         clearPayload()
     }
 
-    fun homeLogout() {
-        clearPayload()
-        gateway.navigateLoginReplacingHome()
-    }
-
     fun settingsLogout() {
         clearPayload()
         gateway.navigateLoginReplacingHome()

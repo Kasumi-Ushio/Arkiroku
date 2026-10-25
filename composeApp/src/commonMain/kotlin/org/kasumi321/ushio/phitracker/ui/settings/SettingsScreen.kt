@@ -6,8 +6,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.data.platform.getAppMetadata
+import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
 import org.kasumi321.ushio.phitracker.data.platform.triggerAppRestart
 import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.settings_logout_failed
 import phitracker.composeapp.generated.resources.settings_restart_required_message
 import phitracker.composeapp.generated.resources.settings_restart_required_title
 
@@ -23,11 +25,13 @@ fun SettingsScreen(
     val isDebugBuild = metadata.buildType == "Debug"
     val restartRequiredTitle = stringResource(Res.string.settings_restart_required_title)
     val restartRequiredMessage = stringResource(Res.string.settings_restart_required_message)
+    val logoutFailedMessage = stringResource(Res.string.settings_logout_failed)
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 SettingsEvent.LoggedOut -> onLogout()
+                SettingsEvent.LogoutFailed -> showPlatformMessage(logoutFailedMessage)
                 SettingsEvent.RestartRequested ->
                     triggerAppRestart(restartRequiredTitle, restartRequiredMessage)
             }

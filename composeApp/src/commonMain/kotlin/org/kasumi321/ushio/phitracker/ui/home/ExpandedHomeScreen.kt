@@ -166,7 +166,6 @@ internal fun ExpandedHomeScreen(
     tabState: HomeTabState,
     indexSubTabState: IndexSubTabState,
     collectiblesChapterState: CollectiblesChapterState,
-    onLogout: () -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
     val detailNavController = rememberNavController()
@@ -311,7 +310,6 @@ internal fun ExpandedHomeScreen(
                     .clipToBounds()
             ) {
                 MainScreen(
-                    onLogout = onLogout,
                     onNavigateToB30Image = b30Navigation::openB30,
                     onNavigateToSongDetail = { songId -> navigateSongDetail(songId, null) },
                     onNavigateToSongDetailWithDifficulty = { songId, difficulty ->

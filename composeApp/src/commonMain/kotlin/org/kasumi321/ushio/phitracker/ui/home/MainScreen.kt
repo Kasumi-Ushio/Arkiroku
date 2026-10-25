@@ -442,7 +442,6 @@ private fun MainNavigationRail(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun MainScreen(
-    onLogout: () -> Unit,
     onNavigateToB30Image: (B30ExportPayload) -> Unit,
     onNavigateToSongDetail: (String) -> Unit,
     onNavigateToSongDetailWithDifficulty: (String, org.kasumi321.ushio.phitracker.domain.model.Difficulty?) -> Unit,
@@ -477,10 +476,6 @@ fun MainScreen(
     )
 
     val launchAvatarPicker = rememberAvatarPicker { uri -> uri?.let(viewModel::setAvatarUri) }
-
-    LaunchedEffect(state.sync.isLoggedOut) {
-        if (state.sync.isLoggedOut) onLogout()
-    }
 
     LaunchedEffect(selectedTab) {
         val tabName = when (selectedTab) {

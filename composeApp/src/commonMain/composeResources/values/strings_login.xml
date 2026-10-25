@@ -4,6 +4,7 @@
     <string name="login_error_empty_token">Please enter your sessionToken</string>
     <string name="login_error_credential_expired">Your credentials have expired. Please log in again.</string>
     <string name="login_error_sync_failed">Sync failed. Check your network and try again.</string>
+    <string name="login_error_persist_failed">Login succeeded but the credentials could not be stored. Please try logging in again.</string>
     <string name="login_qr_fetch_failed">Failed to get the QR code. Please try again.</string>
     <string name="login_qr_status_failed">Failed to check the QR code status. Please try again.</string>
     <string name="login_qr_auth_failed">QR code authorization failed. Please try again.</string>

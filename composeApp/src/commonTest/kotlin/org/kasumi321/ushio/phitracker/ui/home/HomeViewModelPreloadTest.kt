@@ -63,7 +63,7 @@ import org.kasumi321.ushio.phitracker.domain.usecase.GetB30UseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetSuggestUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.RksCalculator
 import org.kasumi321.ushio.phitracker.domain.usecase.SearchSongUseCase
-import org.kasumi321.ushio.phitracker.domain.usecase.SyncSaveUseCase
+import org.kasumi321.ushio.phitracker.data.session.SessionCoordinatorImpl
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.ViewModelTestLifecycle
 import okio.FileSystem
@@ -509,7 +509,7 @@ class HomeViewModelPreloadTest {
         val settings = FakeSettingsRepository(preloadDone = true)
         val preloader = RecordingPreloader()
         val existingRecords = listOf(
-            RecordEntity(songId = "song-a", difficulty = "IN", score = 950_000, accuracy = 95f, isFullCombo = false, updatedAt = 1_000L)
+            RecordEntity(ownerPlayerId = "test-owner", songId = "song-a", difficulty = "IN", score = 950_000, accuracy = 95f, isFullCombo = false, updatedAt = 1_000L)
         )
         val recordDao = StatefulRecordDao(initialRecords = existingRecords, postSyncRecords = existingRecords)
         val repository = FakePhigrosRepositoryForSync(
@@ -521,7 +521,7 @@ class HomeViewModelPreloadTest {
         val viewModel = HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            syncSaveUseCase = SyncSaveUseCase(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = testSongDataProvider,
             illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
@@ -552,7 +552,7 @@ class HomeViewModelPreloadTest {
         val settings = FakeSettingsRepository(preloadDone = true)
         val preloader = RecordingPreloader()
         val existingRecords = listOf(
-            RecordEntity(songId = "song-a", difficulty = "IN", score = 950_000, accuracy = 95f, isFullCombo = false, updatedAt = 1_000L)
+            RecordEntity(ownerPlayerId = "test-owner", songId = "song-a", difficulty = "IN", score = 950_000, accuracy = 95f, isFullCombo = false, updatedAt = 1_000L)
         )
         val recordDao = StatefulRecordDao(initialRecords = existingRecords, postSyncRecords = existingRecords)
         val repository = FakePhigrosRepositoryForSync(
@@ -571,7 +571,7 @@ class HomeViewModelPreloadTest {
         val viewModel = HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            syncSaveUseCase = SyncSaveUseCase(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = testSongDataProvider,
             illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
@@ -617,10 +617,10 @@ class HomeViewModelPreloadTest {
             timestamp = 2_000L
         )
         val initialRecords = listOf(
-            RecordEntity(songId = "song-a", difficulty = "IN", score = 900_000, accuracy = 90f, isFullCombo = false, updatedAt = 1_000L)
+            RecordEntity(ownerPlayerId = "test-owner", songId = "song-a", difficulty = "IN", score = 900_000, accuracy = 90f, isFullCombo = false, updatedAt = 1_000L)
         )
         val postSyncRecords = listOf(
-            RecordEntity(songId = "song-a", difficulty = "IN", score = 950_000, accuracy = 95f, isFullCombo = true, updatedAt = 2_000L)
+            RecordEntity(ownerPlayerId = "test-owner", songId = "song-a", difficulty = "IN", score = 950_000, accuracy = 95f, isFullCombo = true, updatedAt = 2_000L)
         )
         val recordDao = StatefulRecordDao(initialRecords = initialRecords, postSyncRecords = postSyncRecords)
         val cachedSave = saveWithRecord(
@@ -645,7 +645,7 @@ class HomeViewModelPreloadTest {
         val viewModel = HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            syncSaveUseCase = SyncSaveUseCase(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = testSongDataProvider,
             illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
@@ -768,7 +768,7 @@ class HomeViewModelPreloadTest {
         return HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            syncSaveUseCase = SyncSaveUseCase(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = songDataProvider,
             illustrationProvider = illustrationProvider,
@@ -1125,6 +1125,8 @@ class HomeViewModelPreloadTest {
         override suspend fun getSessionToken(): Pair<String, Server>? = Pair("fake-token", Server.CN)
         override suspend fun clearData() = Unit
         override suspend fun clearTokenSync() = Unit
+        override suspend fun getCurrentAccountOwner(): String? = "test-owner"
+        override suspend fun hasLocalRecords(ownerPlayerId: String): Boolean = cachedSave != null
 
         override suspend fun apiTest(): Result<JsonObject> =
             networkResult(Result.failure(IllegalStateException("Not implemented in Phase B")))
@@ -1193,15 +1195,15 @@ class HomeViewModelPreloadTest {
 
     private class FakeRecordDao : RecordDao {
         override suspend fun insertAll(records: List<RecordEntity>) = Unit
-        override fun getAllRecords(): Flow<List<RecordEntity>> = flowOf(emptyList())
-        override suspend fun getAllRecordsOnce(): List<RecordEntity> = emptyList()
-        override suspend fun getRecordsBySong(songId: String): List<RecordEntity> = emptyList()
-        override suspend fun deleteAll() = Unit
-        override suspend fun getRecordCount(): Int = 0
-        override suspend fun getDistinctSongCount(): Int = 0
-        override suspend fun getClearCountByDifficulty(difficulty: String): Int = 0
-        override suspend fun getTotalFcCount(): Int = 0
-        override suspend fun getTotalPhiCount(): Int = 0
+        override fun getAllRecords(owner: String): Flow<List<RecordEntity>> = flowOf(emptyList())
+        override suspend fun getAllRecordsOnce(owner: String): List<RecordEntity> = emptyList()
+        override suspend fun getRecordsBySong(owner: String, songId: String): List<RecordEntity> = emptyList()
+        override suspend fun deleteByOwner(owner: String) = Unit
+        override suspend fun getRecordCount(owner: String): Int = 0
+        override suspend fun getDistinctSongCount(owner: String): Int = 0
+        override suspend fun getClearCountByDifficulty(owner: String, difficulty: String): Int = 0
+        override suspend fun getTotalFcCount(owner: String): Int = 0
+        override suspend fun getTotalPhiCount(owner: String): Int = 0
     }
 
     private class FakeSongDataUpdater(
@@ -1247,20 +1249,20 @@ class HomeViewModelPreloadTest {
             currentRecords.addAll(records)
         }
 
-        override fun getAllRecords(): Flow<List<RecordEntity>> = flowOf(currentRecords.toList())
-        override suspend fun getAllRecordsOnce(): List<RecordEntity> {
+        override fun getAllRecords(owner: String): Flow<List<RecordEntity>> = flowOf(currentRecords.toList())
+        override suspend fun getAllRecordsOnce(owner: String): List<RecordEntity> {
             val records = if (getAllRecordsOnceCallCount == 0) currentRecords.toList() else postSyncRecords.toList()
             getAllRecordsOnceCallCount++
             return records
         }
 
-        override suspend fun getRecordsBySong(songId: String): List<RecordEntity> = currentRecords.filter { it.songId == songId }
-        override suspend fun deleteAll() { currentRecords.clear() }
-        override suspend fun getRecordCount(): Int = currentRecords.size
-        override suspend fun getDistinctSongCount(): Int = currentRecords.map { it.songId }.distinct().size
-        override suspend fun getClearCountByDifficulty(difficulty: String): Int = 0
-        override suspend fun getTotalFcCount(): Int = currentRecords.count { it.isFullCombo }
-        override suspend fun getTotalPhiCount(): Int = currentRecords.count { it.accuracy >= 100f }
+        override suspend fun getRecordsBySong(owner: String, songId: String): List<RecordEntity> = currentRecords.filter { it.songId == songId }
+        override suspend fun deleteByOwner(owner: String) { currentRecords.clear() }
+        override suspend fun getRecordCount(owner: String): Int = currentRecords.size
+        override suspend fun getDistinctSongCount(owner: String): Int = currentRecords.map { it.songId }.distinct().size
+        override suspend fun getClearCountByDifficulty(owner: String, difficulty: String): Int = 0
+        override suspend fun getTotalFcCount(owner: String): Int = currentRecords.count { it.isFullCombo }
+        override suspend fun getTotalPhiCount(owner: String): Int = currentRecords.count { it.accuracy >= 100f }
     }
 
     private class FakePhigrosRepositoryForSync(
@@ -1618,7 +1620,7 @@ class HomeViewModelPreloadTest {
         return HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            syncSaveUseCase = SyncSaveUseCase(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = songDataProvider,
             illustrationProvider = illustrationProvider,

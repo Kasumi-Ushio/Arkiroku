@@ -16,13 +16,14 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 object EntityMapper {
-    fun Save.toRecordEntities(updatedAt: Long): List<RecordEntity> {
+    fun Save.toRecordEntities(ownerPlayerId: String, updatedAt: Long): List<RecordEntity> {
         val entities = mutableListOf<RecordEntity>()
         for ((songId, songRecord) in gameRecord) {
             for ((difficulty, levelRecord) in songRecord.levels) {
                 if (levelRecord != null) {
                     entities.add(
                         RecordEntity(
+                            ownerPlayerId = ownerPlayerId,
                             songId = songId,
                             difficulty = difficulty.name,
                             score = levelRecord.score,

@@ -29,6 +29,7 @@ import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdater
 import org.kasumi321.ushio.phitracker.domain.model.ReleaseInfo
+import org.kasumi321.ushio.phitracker.data.session.SessionCoordinatorImpl
 import org.kasumi321.ushio.phitracker.domain.usecase.CheckForUpdateUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetB30UseCase
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
@@ -229,6 +230,7 @@ class SettingsViewModelTest {
         prepareLogStore(store)
         return SettingsViewModel(
             repository = repository,
+            sessionCoordinator = SessionCoordinatorImpl(repository),
             settingsRepository = settings,
             checkForUpdateUseCase = CheckForUpdateUseCase(repository),
             getB30UseCase = GetB30UseCase(repository),

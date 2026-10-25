@@ -4,6 +4,7 @@
     <string name="login_error_empty_token">请输入 sessionToken</string>
     <string name="login_error_credential_expired">登录凭据已失效，请重新登录</string>
     <string name="login_error_sync_failed">同步失败，请检查网络后重试</string>
+    <string name="login_error_persist_failed">登录成功但凭据保存失败，请重试登录</string>
     <string name="login_qr_fetch_failed">获取二维码失败，请重试</string>
     <string name="login_qr_status_failed">二维码状态查询失败，请重试</string>
     <string name="login_qr_auth_failed">二维码授权失败，请重试</string>

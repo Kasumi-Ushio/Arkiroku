@@ -105,7 +105,6 @@ data class SyncUiState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
     val error: UiText? = null,
-    val isLoggedOut: Boolean = false,
     val gameUpdateInfo: GameUpdateInfo? = null,
     val updateCheckState: UpdateCheckState = UpdateCheckState.Idle
 )

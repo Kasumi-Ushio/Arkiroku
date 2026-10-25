@@ -88,7 +88,7 @@ class SyncSnapshotProjectorTest {
             songNames = names
         )
         val changedEntries = data.changedEntriesComparedTo(
-            listOf(RecordEntity("song-a.0", "IN", 900_000, 90f, false, 1L))
+            listOf(RecordEntity("player", "song-a.0", "IN", 900_000, 90f, false, 1L))
         )
 
         assertEquals(committedAt, data.committedAt)
@@ -108,9 +108,9 @@ class SyncSnapshotProjectorTest {
             songNames = names
         )
         val oldRecords = listOf(
-            RecordEntity("song-a.0", "IN", 1_000_000, 100f, false, 1L),
-            RecordEntity("song-b.0", "HD", 950_000, 95f, false, 1L),
-            RecordEntity("deleted.0", "EZ", 800_000, 80f, false, 1L)
+            RecordEntity("player", "song-a.0", "IN", 1_000_000, 100f, false, 1L),
+            RecordEntity("player", "song-b.0", "HD", 950_000, 95f, false, 1L),
+            RecordEntity("player", "deleted.0", "EZ", 800_000, 80f, false, 1L)
         )
 
         assertTrue(data.changedEntriesComparedTo(oldRecords).isEmpty())
@@ -126,15 +126,15 @@ class SyncSnapshotProjectorTest {
             songNames = names
         )
         val oldRecords = listOf(
-            RecordEntity("song-a.0", "IN", 900_000, 100f, true, 1L),
-            RecordEntity("song-b.0", "HD", 950_000, 90f, false, 1L)
+            RecordEntity("player", "song-a.0", "IN", 900_000, 100f, true, 1L),
+            RecordEntity("player", "song-b.0", "HD", 950_000, 90f, false, 1L)
         )
 
         val changed = data.changedEntriesComparedTo(oldRecords)
 
         assertEquals(setOf("song-a.0" to "IN", "song-b.0" to "HD"), changed.map { it.songId to it.difficulty }.toSet())
         val absentData = data.copy(
-            records = data.records + RecordEntity("song-c.0", "EZ", 700_000, 75f, false, committedAt)
+            records = data.records + RecordEntity("player", "song-c.0", "EZ", 700_000, 75f, false, committedAt)
         )
         assertTrue(absentData.changedEntriesComparedTo(oldRecords).any { it.songId == "song-c.0" })
     }

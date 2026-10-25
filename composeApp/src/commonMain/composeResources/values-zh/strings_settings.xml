@@ -93,6 +93,7 @@
     <string name="settings_logout">退出登录</string>
     <string name="settings_logout_confirm">退出</string>
     <string name="settings_logout_dialog_text">确定要退出当前账号吗？所有同步进度将会重置。</string>
+    <string name="settings_logout_failed">退出登录失败，账号数据已保留，请重试</string>
     <string name="settings_no_crash_log">Arkiroku 还未发生过崩溃，请在发生一次崩溃后重试。</string>
     <string name="settings_no_crash_log_title">暂无可导出的崩溃日志</string>
     <string name="settings_no_runtime_log">Arkiroku 目前尚未形成运行日志，请使用一段时间后重试。</string>

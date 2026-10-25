@@ -28,6 +28,7 @@ import org.kasumi321.ushio.phitracker.data.platform.createSecureKeyValueStorage
 import org.kasumi321.ushio.phitracker.data.repository.PhigrosRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.repository.QrLoginRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.repository.SettingsRepositoryImpl
+import org.kasumi321.ushio.phitracker.data.session.SessionCoordinatorImpl
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
@@ -38,6 +39,7 @@ import org.kasumi321.ushio.phitracker.data.song.SongDataUpdater
 import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
 import org.kasumi321.ushio.phitracker.domain.repository.QrLoginRepository
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
+import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
 import org.koin.dsl.module
 
 val dataModule = module {
@@ -78,6 +80,8 @@ val dataModule = module {
     single { get<AppDatabase>().userDao() }
     single { get<AppDatabase>().syncSnapshotDao() }
     single { get<AppDatabase>().songSyncHistoryDao() }
+    single { get<AppDatabase>().currentAccountDao() }
+    single<SessionCoordinator> { SessionCoordinatorImpl(get()) }
     single { TokenManager(createSecureKeyValueStorage("phi_tracker_secure_prefs")) }
     single<SettingsRepository> {
         SettingsRepositoryImpl(
@@ -100,6 +104,7 @@ val dataModule = module {
             userDao = get(),
             syncSnapshotDao = get(),
             songSyncHistoryDao = get(),
+            currentAccountDao = get(),
             tokenManager = get(),
             json = get(),
             songDataProvider = get()

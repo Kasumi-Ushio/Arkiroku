@@ -28,6 +28,7 @@ internal data class SyncCommitData(
                 null
             } else {
                 SongSyncHistoryEntity(
+                    ownerPlayerId = user.playerId,
                     snapshotId = 0,
                     songId = record.songId,
                     difficulty = record.difficulty,
@@ -52,7 +53,7 @@ internal class SyncSnapshotProjector(
         songNames: Map<String, String>
     ): SyncCommitData {
         val committedAt = clock()
-        val records = save.toRecordEntities(committedAt)
+        val records = save.toRecordEntities(profile.playerId, committedAt)
         val b30 = RksCalculator.getB30AndAllRecords(save.gameRecord, difficulties, songNames).first
         val topRecord = b30.firstOrNull()
         val rks = profile.rks.takeIf { it > 0f } ?: RksCalculator.calculateDisplayRks(b30)
@@ -62,6 +63,7 @@ internal class SyncSnapshotProjector(
             user = profile.toEntity(server, committedAt),
             records = records,
             snapshot = SyncSnapshotEntity(
+                ownerPlayerId = profile.playerId,
                 timestamp = committedAt,
                 rks = rks,
                 nickname = profile.nickname,

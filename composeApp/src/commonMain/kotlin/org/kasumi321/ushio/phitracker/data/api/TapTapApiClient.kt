@@ -5,9 +5,11 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.statement.HttpResponse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.kasumi321.ushio.phitracker.domain.model.Server
+import org.kasumi321.ushio.phitracker.domain.session.SessionTokenRejectedException
 
 class TapTapApiClient(
     private val httpClient: HttpClient
@@ -18,11 +20,24 @@ class TapTapApiClient(
         "X-LC-Session" to sessionToken
     )
 
+    /**
+     * TapTap's built-in account service answers an invalid sessionToken
+     * (reset or revoked server-side) with 401/403. Surface that as a distinct
+     * domain exception instead of a body-decode failure, so callers can route
+     * the user to re-login while keeping the account's local data intact.
+     */
+    private fun HttpResponse.rejectIfSessionTokenInvalid(): HttpResponse {
+        when (status.value) {
+            401, 403 -> throw SessionTokenRejectedException("TapTap rejected the session token (${status.value})")
+        }
+        return this
+    }
+
     suspend fun getUserInfo(sessionToken: String, server: Server): UserInfoResponse {
         val baseUrl = TapTapConstants.baseUrl(server)
         return httpClient.get(baseUrl + TapTapConstants.Endpoints.USERS_ME) {
             buildHeaders(sessionToken, server).forEach { (key, value) -> header(key, value) }
-        }.body()
+        }.rejectIfSessionTokenInvalid().body()
     }
 
     suspend fun getGameSaves(sessionToken: String, server: Server, userObjectId: String): GameSaveListResponse {
@@ -32,7 +47,7 @@ class TapTapApiClient(
             parameter("where", userPointerWhere(userObjectId))
             parameter("order", "-updatedAt")
             parameter("limit", 1)
-        }.body()
+        }.rejectIfSessionTokenInvalid().body()
     }
 
     suspend fun downloadSave(url: String): ByteArray = httpClient.get(url).body()

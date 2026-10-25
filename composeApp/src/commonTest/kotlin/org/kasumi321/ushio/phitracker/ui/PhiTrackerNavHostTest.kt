@@ -55,22 +55,6 @@ class PhiTrackerNavHostTest {
     }
 
     @Test
-    fun homeLogoutClearsPayloadBeforeReplacingGraphWithLogin() {
-        val gateway = RecordingGateway("home")
-        val coordinator = B30NavigationCoordinator(gateway)
-        coordinator.openB30(payload("previous-session"))
-        gateway.systemBack()
-        gateway.observePayload = { coordinator.payload }
-
-        coordinator.homeLogout()
-
-        assertEquals(1, gateway.navigationObservationCount)
-        assertNull(gateway.payloadObservedDuringNavigation)
-        assertNull(coordinator.payload)
-        assertEquals(listOf("login"), gateway.routes)
-    }
-
-    @Test
     fun settingsLogoutClearsPayloadBeforeReplacingGraphWithLogin() {
         val gateway = RecordingGateway("home")
         val coordinator = B30NavigationCoordinator(gateway)

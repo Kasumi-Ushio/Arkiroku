@@ -3,10 +3,12 @@ package org.kasumi321.ushio.phitracker.data.repository
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
@@ -21,6 +23,8 @@ import org.kasumi321.ushio.phitracker.data.api.toDomain
 import org.kasumi321.ushio.phitracker.data.api.PhiPluginApi
 import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
+import org.kasumi321.ushio.phitracker.data.database.AccountDataClearer
+import org.kasumi321.ushio.phitracker.data.database.CurrentAccountDao
 import org.kasumi321.ushio.phitracker.data.database.RecordDao
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
 import org.kasumi321.ushio.phitracker.data.database.SongSyncHistoryDao
@@ -69,11 +73,13 @@ class PhigrosRepositoryImpl(
     private val userDao: UserDao,
     private val syncSnapshotDao: SyncSnapshotDao,
     private val songSyncHistoryDao: SongSyncHistoryDao,
+    private val currentAccountDao: CurrentAccountDao,
     private val tokenManager: TokenManager,
     private val json: Json,
     private val songDataProvider: SongDataProvider,
 ) : PhigrosRepository {
-    private val syncWriter = SyncWriter(database, recordDao, userDao, syncSnapshotDao, songSyncHistoryDao)
+    private val syncWriter = SyncWriter(database, recordDao, userDao, syncSnapshotDao, songSyncHistoryDao, currentAccountDao)
+    private val accountDataClearer = AccountDataClearer(database, recordDao, userDao, syncSnapshotDao, songSyncHistoryDao, currentAccountDao)
     private val syncSnapshotProjector = SyncSnapshotProjector()
     private val apiDetailMutex = Mutex()
     private val apiDetailCache = mutableMapOf<ApiDetailCacheKey, SongApiDetail>()
@@ -99,8 +105,15 @@ class PhigrosRepositoryImpl(
         sessionToken: String,
         server: Server,
         mode: SyncMode
+    ): Result<SyncSaveResult> = syncSave(sessionToken, server, mode, currentAccountDao.get()?.playerId)
+
+    override suspend fun syncSave(
+        sessionToken: String,
+        server: Server,
+        mode: SyncMode,
+        expectedCurrentOwner: String?
     ): Result<SyncSaveResult> = runCatching {
-        val previousPlayerId = userDao.getUser().first()?.playerId
+        val previousOwner = currentAccountDao.get()?.playerId
         val userInfo = apiClient.getUserInfo(sessionToken, server)
         val saveList = apiClient.getGameSaves(sessionToken, server, userInfo.objectId)
         val latestSave = saveList.results.firstOrNull { it.user?.objectId == userInfo.objectId }
@@ -126,47 +139,63 @@ class PhigrosRepositoryImpl(
             difficulties = songDataProvider.getDifficultyMap(),
             songNames = songDataProvider.getSongNameMap()
         )
-        syncWriter.commit(commitData, mode).also {
-            if (previousPlayerId != userProfile.playerId) {
+        syncWriter.commit(commitData, mode, expectedCurrentOwner).also {
+            if (previousOwner != userProfile.playerId) {
                 invalidateApiDetailCache()
             }
         }
     }.logFailure("syncSave")
 
-    override fun getCachedSave(): Flow<Save?> = combine(recordDao.getAllRecords(), userDao.getUser()) { records, user ->
-        if (records.isEmpty()) return@combine null
-        Save(
-            gameRecord = records.toSongRecordMap(),
-            gameProgress = GameProgress(
-                isFirstRun = false,
-                legacyChapterFinished = false,
-                alreadyShowCollectionTip = false,
-                alreadyShowAutoUnlockINTip = false,
-                completed = "",
-                songUpdateInfo = 0,
-                challengeModeRank = user?.challengeModeRank ?: 0,
-                money = emptyList(),
-                unlockFlagOfSpasmodic = 0,
-                unlockFlagOfIgallta = 0,
-                unlockFlagOfRrharil = 0,
-                flagOfSongRecordKey = 0,
-                randomVersionUnlocked = null,
-                chapter8UnlockBegin = null,
-                chapter8UnlockSecondPhase = null,
-                chapter8Passed = null,
-                chapter8SongUnlocked = null
-            ),
-            user = UserSettings(
-                showPlayerId = true,
-                selfIntro = user?.selfIntro ?: "",
-                avatar = user?.avatar ?: "",
-                background = user?.background ?: ""
-            ),
-            summary = null
-        )
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun getCachedSave(): Flow<Save?> = currentAccountDao.observe().flatMapLatest { accounts ->
+        val owner = accounts.firstOrNull()?.playerId
+        if (owner == null) {
+            flowOf(null)
+        } else {
+            combine(recordDao.getAllRecords(owner), userDao.getUser(owner)) { records, user ->
+                if (records.isEmpty()) return@combine null
+                Save(
+                    gameRecord = records.toSongRecordMap(),
+                    gameProgress = GameProgress(
+                        isFirstRun = false,
+                        legacyChapterFinished = false,
+                        alreadyShowCollectionTip = false,
+                        alreadyShowAutoUnlockINTip = false,
+                        completed = "",
+                        songUpdateInfo = 0,
+                        challengeModeRank = user?.challengeModeRank ?: 0,
+                        money = emptyList(),
+                        unlockFlagOfSpasmodic = 0,
+                        unlockFlagOfIgallta = 0,
+                        unlockFlagOfRrharil = 0,
+                        flagOfSongRecordKey = 0,
+                        randomVersionUnlocked = null,
+                        chapter8UnlockBegin = null,
+                        chapter8UnlockSecondPhase = null,
+                        chapter8Passed = null,
+                        chapter8SongUnlocked = null
+                    ),
+                    user = UserSettings(
+                        showPlayerId = true,
+                        selfIntro = user?.selfIntro ?: "",
+                        avatar = user?.avatar ?: "",
+                        background = user?.background ?: ""
+                    ),
+                    summary = null
+                )
+            }
+        }
     }
 
-    override fun getUserProfile(): Flow<UserProfile?> = userDao.getUser().map { it?.toUserProfile() }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun getUserProfile(): Flow<UserProfile?> = currentAccountDao.observe().flatMapLatest { accounts ->
+        val owner = accounts.firstOrNull()?.playerId
+        if (owner == null) {
+            flowOf(null)
+        } else {
+            userDao.getUser(owner).map { it?.toUserProfile() }
+        }
+    }
 
     override suspend fun saveSessionToken(token: String, server: Server) {
         invalidateApiDetailCache()
@@ -176,37 +205,81 @@ class PhigrosRepositoryImpl(
     override suspend fun getSessionToken(): Pair<String, Server>? = tokenManager.getToken()
 
     override suspend fun clearData() {
-        invalidateApiDetailCache()
-        tokenManager.clearToken()
-        recordDao.deleteAll()
-        userDao.deleteAll()
+        clearCurrentAccountData().getOrThrow()
     }
+
+    override suspend fun clearCurrentAccountData(): Result<Unit> = runCatching {
+        val clearedOwner = accountDataClearer.clearCurrentAccount()
+        AppLogger.event("session", "account_data_cleared", mapOf("hadAccount" to (clearedOwner != null).toString()))
+    }.also { result ->
+        if (result.isSuccess) {
+            invalidateApiDetailCache()
+            // Best-effort: the account rows are already gone; a token-store
+            // failure here degrades to "stale token, no data" (startup will
+            // re-validate online or fall back to login), never a half state.
+            runCatching { tokenManager.clearToken() }
+                .onFailure { AppLogger.w("PhigrosRepo", it) { "clearToken degraded after account clear" } }
+        }
+    }.logFailure("clearCurrentAccountData")
 
     override suspend fun clearTokenSync() {
         invalidateApiDetailCache()
         tokenManager.clearToken()
     }
 
-    override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> =
-        Difficulty.entries.associateWith { difficulty ->
-            recordDao.getClearCountByDifficulty(difficulty.name)
+    override suspend fun getCurrentAccountOwner(): String? = currentAccountDao.get()?.playerId
+
+    override suspend fun hasLocalRecords(ownerPlayerId: String): Boolean =
+        recordDao.getRecordCount(ownerPlayerId) > 0
+
+    override suspend fun getBoundPlayerId(): String? = tokenManager.getPlayerBinding()
+
+    override suspend fun saveBoundPlayerId(playerId: String) = tokenManager.savePlayerBinding(playerId)
+
+    override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> {
+        val owner = currentAccountDao.get()?.playerId ?: return emptyMap()
+        return Difficulty.entries.associateWith { difficulty ->
+            recordDao.getClearCountByDifficulty(owner, difficulty.name)
+        }
+    }
+
+    override suspend fun getTotalFullComboCount(): Int =
+        currentAccountDao.get()?.playerId?.let { recordDao.getTotalFcCount(it) } ?: 0
+
+    override suspend fun getTotalPhiCount(): Int =
+        currentAccountDao.get()?.playerId?.let { recordDao.getTotalPhiCount(it) } ?: 0
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeSyncSnapshots(): Flow<List<SyncSnapshot>> =
+        currentAccountDao.observe().flatMapLatest { accounts ->
+            val owner = accounts.firstOrNull()?.playerId
+            if (owner == null) {
+                flowOf(emptyList())
+            } else {
+                syncSnapshotDao.getAll(owner).map { snapshots -> snapshots.map { it.toDomain() } }
+            }
         }
 
-    override suspend fun getTotalFullComboCount(): Int = recordDao.getTotalFcCount()
+    override suspend fun getSyncSnapshotsOnce(): List<SyncSnapshot> {
+        val owner = currentAccountDao.get()?.playerId ?: return emptyList()
+        return syncSnapshotDao.getAllOnce(owner).map { it.toDomain() }
+    }
 
-    override suspend fun getTotalPhiCount(): Int = recordDao.getTotalPhiCount()
-
-    override fun observeSyncSnapshots(): Flow<List<SyncSnapshot>> =
-        syncSnapshotDao.getAll().map { snapshots -> snapshots.map { it.toDomain() } }
-
-    override suspend fun getSyncSnapshotsOnce(): List<SyncSnapshot> =
-        syncSnapshotDao.getAllOnce().map { it.toDomain() }
-
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeSongSyncHistory(songId: String): Flow<List<SongSyncHistoryEntry>> =
-        songSyncHistoryDao.getBySongId(songId).map { entries -> entries.map { it.toDomain() } }
+        currentAccountDao.observe().flatMapLatest { accounts ->
+            val owner = accounts.firstOrNull()?.playerId
+            if (owner == null) {
+                flowOf(emptyList())
+            } else {
+                songSyncHistoryDao.getBySongId(owner, songId).map { entries -> entries.map { it.toDomain() } }
+            }
+        }
 
-    override suspend fun getSyncHistoryForSnapshot(snapshotId: Long): List<SongSyncHistoryEntry> =
-        songSyncHistoryDao.getBySnapshotId(snapshotId).map { it.toDomain() }
+    override suspend fun getSyncHistoryForSnapshot(snapshotId: Long): List<SongSyncHistoryEntry> {
+        val owner = currentAccountDao.get()?.playerId ?: return emptyList()
+        return songSyncHistoryDao.getBySnapshotId(owner, snapshotId).map { it.toDomain() }
+    }
 
     override suspend fun apiTest(): Result<JsonObject> =
         runCatching { phiPluginApi.test() }.logFailure("apiTest")

@@ -10,7 +10,6 @@ import org.kasumi321.ushio.phitracker.domain.usecase.GetSongLevelBoundsUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetSuggestUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.ProposeSongAliasUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.SearchSongUseCase
-import org.kasumi321.ushio.phitracker.domain.usecase.SyncSaveUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.AnalyzeB30TagsUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.CheckForUpdateUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.FetchGameUpdateInfoUseCase
@@ -28,7 +27,6 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
-    single { SyncSaveUseCase(get()) }
     single { GetB30UseCase(get()) }
     single { GetSuggestUseCase() }
     single { GetSongLevelBoundsUseCase() }
@@ -50,7 +48,7 @@ val appModule = module {
             ?: error("LoggingState not initialised. Call createLoggingState() before initKoin().")
         CrashReportExporter(store)
     }
-    viewModel { LoginViewModel(get(), get(), get()) }
+    viewModel { LoginViewModel(get(), get()) }
     viewModel {
         OnboardingViewModel(
             settingsRepository = get(),
@@ -77,6 +75,7 @@ val appModule = module {
     viewModel {
         SettingsViewModel(
             repository = get(),
+            sessionCoordinator = get(),
             settingsRepository = get(),
             checkForUpdateUseCase = get(),
             getB30UseCase = get(),
@@ -102,7 +101,7 @@ val appModule = module {
         HomeViewModel(
             repository = get(),
             getB30UseCase = get(),
-            syncSaveUseCase = get(),
+            sessionCoordinator = get(),
             searchSongUseCase = get(),
             getSongLevelBoundsUseCase = get(),
             songDataProvider = get(),

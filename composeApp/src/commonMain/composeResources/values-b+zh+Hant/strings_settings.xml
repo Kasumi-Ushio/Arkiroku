@@ -93,6 +93,7 @@
     <string name="settings_logout">登出</string>
     <string name="settings_logout_confirm">登出</string>
     <string name="settings_logout_dialog_text">確定要登出目前帳號嗎？所有同步進度將會重置。</string>
+    <string name="settings_logout_failed">登出失敗，帳號資料已保留，請重試</string>
     <string name="settings_no_crash_log">Arkiroku 尚未發生過崩潰，請在發生一次崩潰後重試。</string>
     <string name="settings_no_crash_log_title">暫無可匯出的崩潰日誌</string>
     <string name="settings_no_runtime_log">Arkiroku 目前尚未形成執行日誌，請使用一段時間後重試。</string>

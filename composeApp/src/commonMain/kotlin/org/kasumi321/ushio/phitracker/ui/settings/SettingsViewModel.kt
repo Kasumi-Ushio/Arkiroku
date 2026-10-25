@@ -31,6 +31,7 @@ import org.kasumi321.ushio.phitracker.data.song.SongDataUpdater
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
+import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
 import org.kasumi321.ushio.phitracker.domain.usecase.CheckForUpdateUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetB30UseCase
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
@@ -53,6 +54,7 @@ internal class B30ArtworkCachePartialFailure(val failures: Int) :
 
 class SettingsViewModel(
     internal val repository: PhigrosRepository,
+    internal val sessionCoordinator: SessionCoordinator,
     internal val settingsRepository: SettingsRepository,
     private val checkForUpdateUseCase: CheckForUpdateUseCase,
     getB30UseCase: GetB30UseCase,

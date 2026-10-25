@@ -418,6 +418,7 @@ class PhigrosRepositoryImplApiDetailTest {
             userDao = database.userDao(),
             syncSnapshotDao = database.syncSnapshotDao(),
             songSyncHistoryDao = database.songSyncHistoryDao(),
+            currentAccountDao = database.currentAccountDao(),
             tokenManager = TokenManager(FakeStorage()),
             json = json,
             songDataProvider = SongDataProvider(assetReader = EmptySongAssets)

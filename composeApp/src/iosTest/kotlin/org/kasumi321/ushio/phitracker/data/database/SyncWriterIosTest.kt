@@ -31,34 +31,37 @@ class SyncWriterIosTest {
             val userDao = database.userDao()
             val snapshotDao = database.syncSnapshotDao()
             val historyDao = database.songSyncHistoryDao()
+            val currentAccountDao = database.currentAccountDao()
             val originalUser = UserEntity("new-player", "Old", "", "", "", 10f, 1, 1, "CN", 100L)
-            val originalRecord = RecordEntity("old-song.0", "EZ", 800_000, 80f, false, 100L)
+            val originalRecord = RecordEntity("new-player", "old-song.0", "EZ", 800_000, 80f, false, 100L)
             userDao.insertOrUpdate(originalUser)
             recordDao.insertAll(listOf(originalRecord))
-            val originalSnapshotId = snapshotDao.insertAndGetId(snapshot(100L, "Old"))
+            currentAccountDao.setCurrent(CurrentAccountEntity("new-player"))
+            val originalSnapshotId = snapshotDao.insertAndGetId(snapshot("new-player", 100L, "Old"))
             historyDao.insertAll(
-                listOf(history(originalSnapshotId, "old-song.0", "EZ", 800_000, 80f, false, 100L))
+                listOf(history("new-player", originalSnapshotId, "old-song.0", "EZ", 800_000, 80f, false, 100L))
             )
-            val beforeUser = userDao.getUserOnce()
-            val beforeRecords = recordDao.getAllRecordsOnce()
-            val beforeSnapshots = snapshotDao.getAllOnce()
-            val beforeHistory = historyDao.getRecent(100)
+            val beforeUser = userDao.getUserOnce("new-player")
+            val beforeRecords = recordDao.getAllRecordsOnce("new-player")
+            val beforeSnapshots = snapshotDao.getAllOnce("new-player")
+            val beforeHistory = historyDao.getRecent("new-player", 100)
             val throwingHistoryDao = object : SongSyncHistoryDao by historyDao {
                 override suspend fun insertAll(entries: List<SongSyncHistoryEntity>) {
                     historyDao.insertAll(entries)
                     error("injected after real history insert")
                 }
             }
-            val writer = SyncWriter(database, recordDao, userDao, snapshotDao, throwingHistoryDao)
+            val writer = SyncWriter(database, recordDao, userDao, snapshotDao, throwingHistoryDao, currentAccountDao)
 
             assertFailsWith<IllegalStateException> {
-                writer.commit(commitData(), SyncMode.Refresh)
+                writer.commit(commitData(), SyncMode.Refresh, expectedCurrentOwner = "new-player")
             }
 
-            assertEquals(beforeUser, userDao.getUserOnce())
-            assertEquals(beforeRecords, recordDao.getAllRecordsOnce())
-            assertEquals(beforeSnapshots, snapshotDao.getAllOnce())
-            assertEquals(beforeHistory, historyDao.getRecent(100))
+            assertEquals(beforeUser, userDao.getUserOnce("new-player"))
+            assertEquals(beforeRecords, recordDao.getAllRecordsOnce("new-player"))
+            assertEquals(beforeSnapshots, snapshotDao.getAllOnce("new-player"))
+            assertEquals(beforeHistory, historyDao.getRecent("new-player", 100))
+            assertEquals("new-player", currentAccountDao.get()?.playerId)
         } finally {
             database.close()
             NSFileManager.defaultManager.removeItemAtPath(path, error = null)
@@ -79,11 +82,12 @@ class SyncWriterIosTest {
         ),
         committedAt = 200L,
         user = UserEntity("new-player", "New", "", "", "", 12f, 2, 2, "CN", 200L),
-        records = listOf(RecordEntity("new-song.0", "IN", 950_000, 95f, true, 200L)),
-        snapshot = snapshot(200L, "New")
+        records = listOf(RecordEntity("new-player", "new-song.0", "IN", 950_000, 95f, true, 200L)),
+        snapshot = snapshot("new-player", 200L, "New")
     )
 
-    private fun snapshot(timestamp: Long, nickname: String) = SyncSnapshotEntity(
+    private fun snapshot(ownerPlayerId: String, timestamp: Long, nickname: String) = SyncSnapshotEntity(
+        ownerPlayerId = ownerPlayerId,
         timestamp = timestamp,
         rks = 15f,
         nickname = nickname,
@@ -95,6 +99,7 @@ class SyncWriterIosTest {
     )
 
     private fun history(
+        ownerPlayerId: String,
         snapshotId: Long,
         songId: String,
         difficulty: String,
@@ -103,6 +108,7 @@ class SyncWriterIosTest {
         isFullCombo: Boolean,
         timestamp: Long
     ) = SongSyncHistoryEntity(
+        ownerPlayerId = ownerPlayerId,
         snapshotId = snapshotId,
         songId = songId,
         difficulty = difficulty,

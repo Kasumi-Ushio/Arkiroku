@@ -93,6 +93,7 @@
     <string name="settings_logout">Log out</string>
     <string name="settings_logout_confirm">Log out</string>
     <string name="settings_logout_dialog_text">Log out of the current account? All sync progress will be reset.</string>
+    <string name="settings_logout_failed">Log out failed. Your account data was kept — please try again.</string>
     <string name="settings_no_crash_log">Arkiroku has not crashed yet. Try again after a crash occurs.</string>
     <string name="settings_no_crash_log_title">No crash logs to export</string>
     <string name="settings_no_runtime_log">Arkiroku has no runtime logs yet. Use the app for a while and try again.</string>

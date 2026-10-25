@@ -26,6 +26,7 @@ import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdater
+import org.kasumi321.ushio.phitracker.data.session.SessionCoordinatorImpl
 import org.kasumi321.ushio.phitracker.domain.usecase.CheckForUpdateUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetB30UseCase
 import org.kasumi321.ushio.phitracker.ui.ViewModelTestLifecycle
@@ -201,7 +202,7 @@ class SettingsMaintenanceViewModelTest {
         val root = "/tmp/settings-maintenance-${kotlin.random.Random.nextInt()}"
         val store = LogFileStore(FileSystem.SYSTEM, "$root/runtime".toPath(), "$root/crash".toPath()).also(prepareLogStore)
         return SettingsViewModel(
-            repository, FakeSettingsRepository(), CheckForUpdateUseCase(repository), GetB30UseCase(repository), provider,
+            repository, SessionCoordinatorImpl(repository), FakeSettingsRepository(), CheckForUpdateUseCase(repository), GetB30UseCase(repository), provider,
             SongDataUpdateCoordinator(
                 songDataUpdater = updater,
                 songDataProvider = provider,

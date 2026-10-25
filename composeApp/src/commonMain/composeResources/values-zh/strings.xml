@@ -22,6 +22,7 @@
     <string name="common_unknown_error">未知错误</string>
     <string name="common_confirm">确定</string>
     <string name="sync_login_required">请先登录后再操作</string>
+    <string name="sync_error_session_expired">会话凭据已被拒绝（可能已被重置），请重新登录</string>
     <string name="api_error_missing_fields">请先填写平台名称、平台 ID 与 API 用户 ID</string>
     <string name="action_go_login">去登录</string>
     <string name="detail_pane_placeholder">从左侧选择页面，在此显示</string>

@@ -517,7 +517,6 @@ fun PhiTrackerNavHost() {
                     tabState = tabState,
                     indexSubTabState = indexSubTabState,
                     collectiblesChapterState = collectiblesChapterState,
-                    onLogout = b30Navigation::homeLogout,
                     onNavigateToLogin = { navController.navigate(Screen.Login.route) }
                 )
             } else {
@@ -531,7 +530,6 @@ fun PhiTrackerNavHost() {
                     }
                 }
                 MainScreen(
-                    onLogout = b30Navigation::homeLogout,
                     onNavigateToB30Image = b30Navigation::openB30,
                     onNavigateToSongDetail = { songId ->
                         navController.navigate(SongDetailRoute.from(songId = songId, difficulty = null))

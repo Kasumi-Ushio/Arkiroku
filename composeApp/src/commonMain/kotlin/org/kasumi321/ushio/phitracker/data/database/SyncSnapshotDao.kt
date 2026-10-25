@@ -15,12 +15,15 @@ interface SyncSnapshotDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAndGetId(snapshot: SyncSnapshotEntity): Long
 
-    @Query("SELECT * FROM sync_snapshots ORDER BY timestamp DESC")
-    fun getAll(): Flow<List<SyncSnapshotEntity>>
+    @Query("SELECT * FROM sync_snapshots WHERE ownerPlayerId = :owner ORDER BY timestamp DESC")
+    fun getAll(owner: String): Flow<List<SyncSnapshotEntity>>
 
-    @Query("SELECT * FROM sync_snapshots ORDER BY timestamp DESC")
-    suspend fun getAllOnce(): List<SyncSnapshotEntity>
+    @Query("SELECT * FROM sync_snapshots WHERE ownerPlayerId = :owner ORDER BY timestamp DESC")
+    suspend fun getAllOnce(owner: String): List<SyncSnapshotEntity>
 
-    @Query("SELECT * FROM sync_snapshots ORDER BY timestamp DESC LIMIT 1")
-    suspend fun getLatest(): SyncSnapshotEntity?
+    @Query("SELECT * FROM sync_snapshots WHERE ownerPlayerId = :owner ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatest(owner: String): SyncSnapshotEntity?
+
+    @Query("DELETE FROM sync_snapshots WHERE ownerPlayerId = :owner")
+    suspend fun deleteByOwner(owner: String)
 }

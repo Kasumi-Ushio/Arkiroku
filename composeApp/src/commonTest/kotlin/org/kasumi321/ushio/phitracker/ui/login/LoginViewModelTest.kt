@@ -11,36 +11,24 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.serialization.json.JsonObject
 import org.kasumi321.ushio.phitracker.data.api.TapTapQrLoginApi
 import org.kasumi321.ushio.phitracker.data.platform.ApiCrypto
 import org.kasumi321.ushio.phitracker.data.repository.QrLoginRepositoryImpl
-import org.kasumi321.ushio.phitracker.domain.model.GameProgress
-import org.kasumi321.ushio.phitracker.domain.model.Difficulty
-import org.kasumi321.ushio.phitracker.domain.model.B30ChartTagBatch
-import org.kasumi321.ushio.phitracker.domain.model.BestRecord
-import org.kasumi321.ushio.phitracker.domain.model.ChartTagSongData
-import org.kasumi321.ushio.phitracker.domain.model.ChartTagTreeNode
 import org.kasumi321.ushio.phitracker.domain.model.Save
 import org.kasumi321.ushio.phitracker.domain.model.Server
-import org.kasumi321.ushio.phitracker.domain.model.SongSyncHistoryEntry
-import org.kasumi321.ushio.phitracker.domain.model.SyncMode
 import org.kasumi321.ushio.phitracker.domain.model.SyncSaveResult
-import org.kasumi321.ushio.phitracker.domain.model.SyncSnapshot
 import org.kasumi321.ushio.phitracker.domain.model.UserProfile
-import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
-import org.kasumi321.ushio.phitracker.domain.model.ReleaseInfo
-import org.kasumi321.ushio.phitracker.domain.model.UserSettings
-import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
-import org.kasumi321.ushio.phitracker.domain.usecase.SyncSaveUseCase
+import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
+import org.kasumi321.ushio.phitracker.domain.session.SessionEstablished
+import org.kasumi321.ushio.phitracker.domain.session.SessionNotLoggedInException
+import org.kasumi321.ushio.phitracker.domain.session.SessionResumeOutcome
+import org.kasumi321.ushio.phitracker.domain.session.SessionTokenRejectedException
 import org.kasumi321.ushio.phitracker.ui.ViewModelTestLifecycle
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -48,8 +36,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * LoginViewModel maps SessionCoordinator outcomes onto UI state; the session
+ * semantics themselves (mode selection, persistence order, inheritance) are
+ * covered by SessionCoordinatorTest.
+ */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LoginViewModelTest {
 
@@ -63,86 +57,60 @@ class LoginViewModelTest {
     fun tearDown() = viewModelLifecycle.tearDown(dispatcher)
 
     private fun viewModel(
-        repo: PhigrosRepository,
+        session: FakeSessionCoordinator = FakeSessionCoordinator(),
         qrLoginApi: TapTapQrLoginApi = TapTapQrLoginApi(HttpClient(MockEngine { respond("") }))
     ): LoginViewModel = viewModelLifecycle.track(
-        LoginViewModel(repo, SyncSaveUseCase(repo), QrLoginRepositoryImpl(qrLoginApi))
+        LoginViewModel(session, QrLoginRepositoryImpl(qrLoginApi))
     )
 
     @Test
-    fun noSavedTokenGoesToLogin() = runTest(dispatcher) {
-        val vm = viewModel(FakeRepo(savedToken = null))
+    fun resumeRequiringLoginWithoutTokenShowsNoError() = runTest(dispatcher) {
+        val vm = viewModel(FakeSessionCoordinator(resumeOutcome = SessionResumeOutcome.RequiresLogin(hadToken = false)))
         advanceUntilIdle()
         assertFalse(vm.uiState.value.isCheckingToken)
         assertFalse(vm.uiState.value.isLoggedIn)
+        assertNull(vm.uiState.value.error)
     }
 
     @Test
-    fun onlineValidateAndSyncSuccessLogsIn() = runTest(dispatcher) {
-        val repo = FakeRepo(savedToken = "t" to Server.CN, validateOk = true, syncOk = true)
-        val vm = viewModel(repo)
+    fun resumeWithUnusableTokenExplainsTheFallback() = runTest(dispatcher) {
+        val vm = viewModel(FakeSessionCoordinator(resumeOutcome = SessionResumeOutcome.RequiresLogin(hadToken = true)))
         advanceUntilIdle()
         assertFalse(vm.uiState.value.isCheckingToken)
-        assertTrue(vm.uiState.value.isLoggedIn)
-        assertEquals(listOf(SyncMode.Bootstrap), repo.syncModes)
-        assertEquals("t", vm.uiState.value.token)
-        assertEquals(Server.CN, vm.uiState.value.server)
-    }
-
-    @Test
-    fun onlineValidateWithCachedSaveSyncsWithRefresh() = runTest(dispatcher) {
-        // A returning launch already has local records, so the silent startup
-        // sync must diff via Refresh — Bootstrap would overwrite them without
-        // writing any snapshot/history (issue #12).
-        val repo = FakeRepo(savedToken = "t" to Server.CN, validateOk = true, syncOk = true, cachedSave = minimalSave())
-        val vm = viewModel(repo)
-        advanceUntilIdle()
-        assertFalse(vm.uiState.value.isCheckingToken)
-        assertTrue(vm.uiState.value.isLoggedIn)
-        assertEquals(listOf(SyncMode.Refresh), repo.syncModes)
-    }
-
-    @Test
-    fun onlineValidateWithoutCachedSaveSyncsWithBootstrap() = runTest(dispatcher) {
-        // Token survives but local data is gone (e.g. cleared storage): the
-        // startup sync must re-seed everything, which is Bootstrap territory.
-        val repo = FakeRepo(savedToken = "t" to Server.CN, validateOk = true, syncOk = true, cachedSave = null)
-        val vm = viewModel(repo)
-        advanceUntilIdle()
-        assertTrue(vm.uiState.value.isLoggedIn)
-        assertEquals(listOf(SyncMode.Bootstrap), repo.syncModes)
-    }
-
-    @Test
-    fun offlineButCachedSavePresentStaysLoggedIn() = runTest(dispatcher) {
-        // validate fails (offline) but a local save exists → must NOT log out.
-        val vm = viewModel(FakeRepo(savedToken = "t" to Server.CN, validateOk = false, cachedSave = minimalSave()))
-        advanceUntilIdle()
-        assertFalse(vm.uiState.value.isCheckingToken)
-        assertTrue(vm.uiState.value.isLoggedIn, "offline with a cached save must stay logged in")
-    }
-
-    @Test
-    fun syncFailsButCachedSavePresentStaysLoggedIn() = runTest(dispatcher) {
-        // token still validates but the save sync fails; the cached save should keep us in.
-        val vm = viewModel(FakeRepo(savedToken = "t" to Server.CN, validateOk = true, syncOk = false, cachedSave = minimalSave()))
-        advanceUntilIdle()
-        assertTrue(vm.uiState.value.isLoggedIn)
-    }
-
-    @Test
-    fun offlineWithoutCachedSaveFallsBackToLogin() = runTest(dispatcher) {
-        val vm = viewModel(FakeRepo(savedToken = "t" to Server.CN, validateOk = false, cachedSave = null))
-        advanceUntilIdle()
-        assertFalse(vm.uiState.value.isCheckingToken)
-        assertFalse(vm.uiState.value.isLoggedIn, "no local save and no network → login")
+        assertFalse(vm.uiState.value.isLoggedIn)
         assertNotNull(vm.uiState.value.error)
     }
 
     @Test
-    fun manualTokenLoginPersistsThenShowsHomeAfterSync() = runTest(dispatcher) {
-        val repo = FakeRepo(savedToken = null, validateOk = true, syncOk = true)
-        val vm = viewModel(repo)
+    fun resumedSessionLogsInFromBothSources() {
+        listOf(SessionResumeOutcome.Resumed.Source.ONLINE, SessionResumeOutcome.Resumed.Source.LOCAL).forEach { source ->
+            val vm = viewModel(
+                FakeSessionCoordinator(resumeOutcome = SessionResumeOutcome.Resumed(profile = null, source = source, syncResult = null))
+            )
+            advanceUntilIdleFor(vm)
+            assertTrue(vm.uiState.value.isLoggedIn)
+            assertFalse(vm.uiState.value.isCheckingToken)
+        }
+    }
+
+    @Test
+    fun emptyTokenShowsInlineErrorWithoutCallingCoordinator() = runTest(dispatcher) {
+        val session = FakeSessionCoordinator()
+        val vm = viewModel(session)
+        advanceUntilIdle()
+
+        vm.login()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoggedIn)
+        assertNotNull(vm.uiState.value.error)
+        assertTrue(session.loginCalls.isEmpty())
+    }
+
+    @Test
+    fun manualTokenLoginSuccessLogsIn() = runTest(dispatcher) {
+        val session = FakeSessionCoordinator(loginResult = Result.success(established()))
+        val vm = viewModel(session)
         advanceUntilIdle()
 
         vm.updateToken("  manual-token  ")
@@ -152,25 +120,36 @@ class LoginViewModelTest {
 
         assertTrue(vm.uiState.value.isLoggedIn)
         assertFalse(vm.uiState.value.isLoading)
-        assertEquals("manual-token", vm.uiState.value.token)
-        assertEquals(listOf("manual-token" to Server.GLOBAL), repo.persistedTokens)
-        assertEquals(listOf(SyncMode.Bootstrap), repo.syncModes)
+        assertEquals(listOf("manual-token" to Server.GLOBAL), session.loginCalls)
     }
 
     @Test
-    fun manualTokenLoginFailureKeepsUserAtLoginAndDoesNotPersist() = runTest(dispatcher) {
-        val repo = FakeRepo(savedToken = null, validateOk = false, syncOk = true)
-        val vm = viewModel(repo)
+    fun manualTokenLoginFailureKeepsUserAtLoginWithError() = runTest(dispatcher) {
+        val session = FakeSessionCoordinator(loginResult = Result.failure(RuntimeException("sync unavailable")))
+        val vm = viewModel(session)
         advanceUntilIdle()
 
-        vm.updateToken("invalid-token")
+        vm.updateToken("token")
         vm.login()
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.isLoggedIn)
         assertFalse(vm.uiState.value.isLoading)
         assertNotNull(vm.uiState.value.error)
-        assertTrue(repo.persistedTokens.isEmpty())
+    }
+
+    @Test
+    fun rejectedTokenMapsToCredentialExpiredMessage() = runTest(dispatcher) {
+        val session = FakeSessionCoordinator(loginResult = Result.failure(SessionTokenRejectedException()))
+        val vm = viewModel(session)
+        advanceUntilIdle()
+
+        vm.updateToken("reset-token")
+        vm.login()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isLoggedIn)
+        assertNotNull(vm.uiState.value.error)
     }
 
     @Test
@@ -178,7 +157,7 @@ class LoginViewModelTest {
         val firstPoll = CompletableDeferred<Unit>()
         val profileRequest = CompletableDeferred<Unit>()
         var pollAttempts = 0
-        val repo = FakeRepo(savedToken = null, syncOk = true)
+        val session = FakeSessionCoordinator(loginResult = Result.success(established()))
         val api = TapTapQrLoginApi(
             HttpClient(MockEngine(MockEngineConfig().apply {
                 dispatcher = this@LoginViewModelTest.dispatcher
@@ -215,7 +194,7 @@ class LoginViewModelTest {
             })) { install(ContentNegotiation) { json() } },
             apiCrypto = FakeApiCrypto
         )
-        val vm = viewModel(repo, api)
+        val vm = viewModel(session, api)
         advanceUntilIdle()
 
         vm.startQrLogin()
@@ -242,9 +221,7 @@ class LoginViewModelTest {
         advanceUntilIdle()
         assertEquals(QrStatus.Success, vm.uiState.value.qrStatus, vm.uiState.value.qrError?.toString())
         assertTrue(vm.uiState.value.isLoggedIn)
-        assertEquals("qr-session", vm.uiState.value.token)
-        assertEquals(listOf("qr-session" to Server.CN), repo.persistedTokens)
-        assertEquals(listOf(SyncMode.Bootstrap), repo.syncModes)
+        assertEquals(listOf("qr-session" to Server.CN), session.loginCalls)
     }
 
     @Test
@@ -262,7 +239,7 @@ class LoginViewModelTest {
             })) { install(ContentNegotiation) { json() } },
             apiCrypto = FakeApiCrypto
         )
-        val expiredVm = viewModel(FakeRepo(savedToken = null), expiredApi)
+        val expiredVm = viewModel(FakeSessionCoordinator(), expiredApi)
         advanceUntilIdle()
         expiredVm.startQrLogin()
         advanceUntilIdle()
@@ -272,7 +249,7 @@ class LoginViewModelTest {
         assertEquals(QrStatus.Idle, expiredVm.uiState.value.qrStatus)
 
         val failingVm = viewModel(
-            FakeRepo(savedToken = null),
+            FakeSessionCoordinator(),
             TapTapQrLoginApi(
                 HttpClient(MockEngine(MockEngineConfig().apply {
                     dispatcher = this@LoginViewModelTest.dispatcher
@@ -289,9 +266,9 @@ class LoginViewModelTest {
     }
 
     @Test
-    fun cancellingQrLoginWhilePollingLeavesIdleWithoutPersisting() = runTest(dispatcher) {
+    fun cancellingQrLoginWhilePollingLeavesIdleWithoutLogin() = runTest(dispatcher) {
         val pollStarted = CompletableDeferred<Unit>()
-        val repo = FakeRepo(savedToken = null, syncOk = true)
+        val session = FakeSessionCoordinator(loginResult = Result.success(established()))
         val api = TapTapQrLoginApi(
             HttpClient(MockEngine(MockEngineConfig().apply {
                 dispatcher = this@LoginViewModelTest.dispatcher
@@ -310,7 +287,7 @@ class LoginViewModelTest {
             })) { install(ContentNegotiation) { json() } },
             apiCrypto = FakeApiCrypto
         )
-        val vm = viewModel(repo, api)
+        val vm = viewModel(session, api)
         advanceUntilIdle()
 
         vm.startQrLogin()
@@ -323,14 +300,13 @@ class LoginViewModelTest {
         runCurrent()
         assertEquals(QrStatus.Idle, vm.uiState.value.qrStatus, "cancelled QR login must not overwrite Idle with Error")
         assertEquals(null, vm.uiState.value.qrError)
-        assertTrue(repo.persistedTokens.isEmpty())
+        assertTrue(session.loginCalls.isEmpty())
     }
 
     @Test
-    fun qrLoginExchangeFailureAndSyncFailureShowError() = runTest(dispatcher) {
-        val exchangeRepo = FakeRepo(savedToken = null, syncOk = true)
+    fun qrLoginExchangeFailureAndSessionFailureShowError() = runTest(dispatcher) {
         val exchangeVm = viewModel(
-            exchangeRepo,
+            FakeSessionCoordinator(),
             TapTapQrLoginApi(
                 HttpClient(MockEngine(MockEngineConfig().apply {
                     dispatcher = this@LoginViewModelTest.dispatcher
@@ -359,11 +335,10 @@ class LoginViewModelTest {
         exchangeVm.startQrLogin()
         advanceUntilIdle()
         assertEquals(QrStatus.Error, exchangeVm.uiState.value.qrStatus)
-        assertTrue(exchangeRepo.persistedTokens.isEmpty())
 
-        val syncRepo = FakeRepo(savedToken = null, syncOk = false)
+        val syncSession = FakeSessionCoordinator(loginResult = Result.failure(RuntimeException("sync unavailable")))
         val syncVm = viewModel(
-            syncRepo,
+            syncSession,
             TapTapQrLoginApi(
                 HttpClient(MockEngine(MockEngineConfig().apply {
                     dispatcher = this@LoginViewModelTest.dispatcher
@@ -395,118 +370,75 @@ class LoginViewModelTest {
         syncVm.startQrLogin()
         advanceUntilIdle()
         assertEquals(QrStatus.Error, syncVm.uiState.value.qrStatus)
-        assertEquals(listOf("qr-session" to Server.CN), syncRepo.persistedTokens)
+        assertNotNull(syncVm.uiState.value.qrError)
+        assertFalse(syncVm.uiState.value.isLoggedIn)
+        assertEquals(listOf("qr-session" to Server.CN), syncSession.loginCalls)
     }
 
     // ── fakes ──────────────────────────────────────────────────────────
 
-    private fun minimalSave(): Save = Save(
-        gameRecord = emptyMap(),
-        gameProgress = GameProgress(
-            isFirstRun = false, legacyChapterFinished = false,
-            alreadyShowCollectionTip = false, alreadyShowAutoUnlockINTip = false,
-            completed = "", songUpdateInfo = 0, challengeModeRank = 0, money = emptyList(),
-            unlockFlagOfSpasmodic = 0, unlockFlagOfIgallta = 0, unlockFlagOfRrharil = 0,
-            flagOfSongRecordKey = 0, randomVersionUnlocked = null,
-            chapter8UnlockBegin = null, chapter8UnlockSecondPhase = null,
-            chapter8Passed = null, chapter8SongUnlocked = null
-        ),
-        user = UserSettings(showPlayerId = false, selfIntro = "", avatar = "", background = ""),
-        summary = null
+    private fun established(): SessionEstablished = SessionEstablished(
+        profile = UserProfile("id", "nick", "", "", "", 0f, 0, 0, ""),
+        syncResult = SyncSaveResult(save = emptySave(), committedAt = 1L, changedEntryCount = 0, snapshotCreated = false)
     )
 
-    private inner class FakeRepo(
-        private val savedToken: Pair<String, Server>?,
-        private val validateOk: Boolean = false,
-        private val syncOk: Boolean = false,
-        private val cachedSave: Save? = null
-    ) : PhigrosRepository {
-        val persistedTokens = mutableListOf<Pair<String, Server>>()
-        val syncModes = mutableListOf<SyncMode>()
-        private fun offline() = Result.failure<Nothing>(RuntimeException("network unavailable"))
+    private fun emptySave(): Save = Save(gameRecord = emptyMap(), gameProgress = fakeProgress, user = fakeUser, summary = null)
 
-        override suspend fun validateToken(sessionToken: String, server: Server): Result<UserProfile> =
-            if (validateOk) {
-                Result.success(UserProfile("id", "nick", "", "", "", 0f, 0, 0, ""))
-            } else {
-                Result.failure(RuntimeException("network unavailable"))
-            }
+    // advanceUntilIdle is a TestScope extension; VM-only constructions used by
+    // resumedSessionLogsInFromBothSources run inside runTest, so mirror it via
+    // a small helper driven by the shared dispatcher.
+    private fun advanceUntilIdleFor(vm: LoginViewModel) {
+        dispatcher.scheduler.advanceUntilIdle()
+    }
 
-        override suspend fun syncSave(
-            sessionToken: String,
-            server: Server,
-            mode: SyncMode
-        ): Result<SyncSaveResult> {
-            syncModes += mode
-            return if (syncOk) {
-                Result.success(SyncSaveResult(minimalSave(), 1L, 0, false))
-            } else {
-                Result.failure(RuntimeException("network unavailable"))
-            }
+    private inner class FakeSessionCoordinator(
+        var resumeOutcome: SessionResumeOutcome = SessionResumeOutcome.RequiresLogin(hadToken = false),
+        var loginResult: Result<SessionEstablished> = Result.success(established()),
+        var refreshResult: Result<SyncSaveResult> = Result.failure(SessionNotLoggedInException()),
+        var logoutResult: Result<Unit> = Result.success(Unit)
+    ) : SessionCoordinator {
+        val loginCalls = mutableListOf<Pair<String, Server>>()
+        var resumeCalls = 0
+        var refreshCalls = 0
+        var logoutCalls = 0
+
+        override suspend fun login(sessionToken: String, server: Server): Result<SessionEstablished> {
+            loginCalls += sessionToken to server
+            return loginResult
         }
 
-        override fun getCachedSave(): Flow<Save?> = flowOf(cachedSave)
-        override fun getUserProfile(): Flow<UserProfile?> = flowOf(null)
-        override suspend fun saveSessionToken(token: String, server: Server) {
-            persistedTokens += token to server
+        override suspend fun resumeSession(): SessionResumeOutcome {
+            resumeCalls++
+            return resumeOutcome
         }
-        override suspend fun getSessionToken(): Pair<String, Server>? = savedToken
-        override suspend fun clearData() = Unit
-        override suspend fun clearTokenSync() = Unit
-        override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> = emptyMap()
-        override suspend fun getTotalFullComboCount(): Int = 0
-        override suspend fun getTotalPhiCount(): Int = 0
-        override fun observeSyncSnapshots(): Flow<List<SyncSnapshot>> = flowOf(emptyList())
-        override suspend fun getSyncSnapshotsOnce(): List<SyncSnapshot> = emptyList()
-        override fun observeSongSyncHistory(songId: String): Flow<List<SongSyncHistoryEntry>> = flowOf(emptyList())
-        override suspend fun getSyncHistoryForSnapshot(snapshotId: Long): List<SongSyncHistoryEntry> = emptyList()
 
-        override suspend fun apiTest(): Result<JsonObject> = offline()
-        override suspend fun apiGetBindInfo(platform: String, platformId: String): Result<JsonObject> = offline()
-        override suspend fun getSongApiDetail(key: org.kasumi321.ushio.phitracker.domain.model.ApiDetailCacheKey): Result<org.kasumi321.ushio.phitracker.domain.model.SongApiDetail> = offline()
-        override suspend fun apiGetRksAbove(rks: Float): Result<JsonObject> = offline()
-        override suspend fun apiGetSaveHistory(platform: String, platformId: String, apiUserId: String, request: List<String>): Result<JsonObject> = offline()
-        override suspend fun apiGetRankByUser(platform: String, platformId: String, apiUserId: String): Result<JsonObject> = offline()
-        override suspend fun apiGetRankByPosition(position: Int): Result<JsonObject> = offline()
-        override suspend fun getChartTagTree(): Result<List<ChartTagTreeNode>> =
-            Result.failure(UnsupportedOperationException())
+        override suspend fun refresh(): Result<SyncSaveResult> {
+            refreshCalls++
+            return refreshResult
+        }
 
-        override suspend fun getChartTags(songId: String, difficulty: Difficulty): Result<ChartTagSongData> =
-            Result.failure(UnsupportedOperationException())
-
-        override suspend fun getMyChartTagVotes(
-            songId: String,
-            difficulty: Difficulty,
-            platform: String,
-            platformId: String,
-            apiUserId: String,
-            apiToken: String?
-        ): Result<Set<String>> = Result.failure(UnsupportedOperationException())
-
-        override suspend fun getB30ChartTags(records: List<BestRecord>): Result<B30ChartTagBatch> =
-            Result.failure(UnsupportedOperationException())
-
-        override suspend fun voteChartTags(
-            songId: String,
-            difficulty: Difficulty,
-            primaryTags: List<String>,
-            secondaryTags: List<String>,
-            platform: String,
-            platformId: String,
-            apiUserId: String,
-            apiToken: String
-        ): Result<Unit> = Result.failure(UnsupportedOperationException())
-
-        override suspend fun proposeSongAlias(songId: String, alias: String, note: String?): Result<Unit> =
-            Result.failure(UnsupportedOperationException())
-
-        override suspend fun fetchLatestRelease(includePreRelease: Boolean): Result<ReleaseInfo> = offline()
-
-        override suspend fun fetchGameUpdateInfo(): Result<GameUpdateInfo> = offline()
+        override suspend fun logout(): Result<Unit> {
+            logoutCalls++
+            return logoutResult
+        }
     }
 
     private object FakeApiCrypto : ApiCrypto {
         override fun md5Hex(data: String): String = "fixed-md5"
         override fun hmacSha1(data: String, key: String): ByteArray = byteArrayOf(1, 2, 3)
+    }
+
+    private companion object {
+        val fakeProgress = org.kasumi321.ushio.phitracker.domain.model.GameProgress(
+            isFirstRun = false, legacyChapterFinished = false, alreadyShowCollectionTip = false,
+            alreadyShowAutoUnlockINTip = false, completed = "", songUpdateInfo = 0,
+            challengeModeRank = 0, money = emptyList(), unlockFlagOfSpasmodic = 0,
+            unlockFlagOfIgallta = 0, unlockFlagOfRrharil = 0, flagOfSongRecordKey = 0,
+            randomVersionUnlocked = null, chapter8UnlockBegin = null,
+            chapter8UnlockSecondPhase = null, chapter8Passed = null, chapter8SongUnlocked = null
+        )
+        val fakeUser = org.kasumi321.ushio.phitracker.domain.model.UserSettings(
+            showPlayerId = false, selfIntro = "", avatar = "", background = ""
+        )
     }
 }

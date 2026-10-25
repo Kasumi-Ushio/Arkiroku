@@ -11,12 +11,12 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(user: UserEntity)
 
-    @Query("SELECT * FROM users LIMIT 1")
-    fun getUser(): Flow<UserEntity?>
+    @Query("SELECT * FROM users WHERE playerId = :playerId")
+    fun getUser(playerId: String): Flow<UserEntity?>
 
-    @Query("SELECT * FROM users LIMIT 1")
-    suspend fun getUserOnce(): UserEntity?
+    @Query("SELECT * FROM users WHERE playerId = :playerId")
+    suspend fun getUserOnce(playerId: String): UserEntity?
 
-    @Query("DELETE FROM users")
-    suspend fun deleteAll()
+    @Query("DELETE FROM users WHERE playerId = :playerId")
+    suspend fun deleteByPlayer(playerId: String)
 }
