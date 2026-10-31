@@ -4,7 +4,7 @@
     <string name="login_error_empty_token">Please enter your sessionToken</string>
     <string name="login_error_credential_expired">Your credentials have expired. Please log in again.</string>
     <string name="login_error_sync_failed">Sync failed. Check your network and try again.</string>
-    <string name="login_error_persist_failed">Login succeeded but the credentials could not be stored. Please try logging in again.</string>
+    <string name="login_error_persist_failed">Login succeeded, but the sessionToken could not be saved. Please log in again.</string>
     <string name="login_qr_fetch_failed">Failed to get the QR code. Please try again.</string>
     <string name="login_qr_status_failed">Failed to check the QR code status. Please try again.</string>
     <string name="login_qr_auth_failed">QR code authorization failed. Please try again.</string>
@@ -35,12 +35,12 @@
     <string name="login_token_tutorial_link">View the tutorial</string>
     <string name="login_skip_to_home">Continue without logging in</string>
     <string name="login_reset_local_session">Repair or reset local session</string>
-    <string name="login_reset_local_session_dialog_text">Use this when secure credential storage or an earlier session recovery is unavailable. This removes the saved login credential and hides the current account. Scores, catalog and settings are kept. The Phi-Plugin API token is restored when a readable copy remains; otherwise you will need to enter it again.</string>
-    <string name="login_error_reset_failed">Local session reset is incomplete. Your scores and catalog were kept, but an old credential may still remain. Retry the reset; if secure storage remains unavailable, restart the app and retry. If your API token could not be restored, enter it again in Settings.</string>
-    <string name="login_error_reset_pending">The previous local session reset has not finished. Your scores and catalog are safe. Retry the reset below before logging in.</string>
-    <string name="login_error_storage_rebuild_required">Secure credential storage is unavailable in this process, so retrying login cannot save your credentials. Use “Repair or reset local session” below, or restart the app and try again. Scores are kept; the API token is restored only when a readable copy remains.</string>
-    <string name="login_error_recovery_unresolved">An earlier session recovery could not be verified. Retry login to probe it again; if it remains blocked, use “Repair or reset local session” below. This protects a previous account's data from being cleared by mistake.</string>
-    <string name="login_error_previous_data_cleanup">The previous account's local data could not be cleared, so a new login is blocked. Retry, or use local session reset to hide that account without deleting its scores.</string>
-    <string name="login_error_previous_credential_cleanup">The previous account is hidden, but its old credential could not be fully removed. Retry, or use local session reset to rebuild credential storage. Scores are kept; the API token is restored only when a readable copy remains.</string>
-    <string name="login_error_login_finalization">Your new credential was saved, but the previous recovery marker could not be cleared. Retry login to finish recovery; do not reset storage unless the problem persists.</string>
+    <string name="login_reset_local_session_dialog_text">Clear the current sessionToken and archive the current account data. Use this only when secure credential storage is unavailable or an earlier session recovery is incomplete.</string>
+    <string name="login_error_reset_failed">The local session reset is incomplete. Save data was kept, but the old sessionToken may remain. Retry repair or reset; if secure storage remains unavailable, restart Arkiroku and try again. If the API Token could not be restored, enter it again in Settings.</string>
+    <string name="login_error_reset_pending">The previous local session reset is incomplete. Try resetting again before logging in.</string>
+    <string name="login_error_storage_rebuild_required">Secure credential storage remains unavailable after repeated attempts. Use “Repair or reset local session” below, or restart Arkiroku and try again.</string>
+    <string name="login_error_recovery_unresolved">The earlier session recovery state could not be confirmed. Try logging in again; if the problem persists, use “Repair or reset local session” to repair it.</string>
+    <string name="login_error_previous_data_cleanup">The previous account's local data could not be cleared, so a new session cannot be established. Retry, or use “Repair or reset local session” to archive the account.</string>
+    <string name="login_error_previous_credential_cleanup">The previous account's data was archived, but its sessionToken could not be fully removed. Retry, or use “Repair or reset local session” to refresh it.</string>
+    <string name="login_error_login_finalization">Your new sessionToken was saved, but the previous recovery marker could not be cleared. Log in again to finish recovery; if the problem persists, try repairing or resetting the session.</string>
 </resources>

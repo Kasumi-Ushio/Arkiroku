@@ -4,7 +4,7 @@
     <string name="login_error_empty_token">請輸入 sessionToken</string>
     <string name="login_error_credential_expired">登入憑證已失效，請重新登入</string>
     <string name="login_error_sync_failed">同步失敗，請檢查網路後重試</string>
-    <string name="login_error_persist_failed">登入成功但憑證儲存失敗，請重試登入</string>
+    <string name="login_error_persist_failed">登入成功但 sessionToken 儲存失敗，請重試登入</string>
     <string name="login_qr_fetch_failed">取得 QR 碼失敗，請重試</string>
     <string name="login_qr_status_failed">QR 碼狀態查詢失敗，請重試</string>
     <string name="login_qr_auth_failed">QR 碼授權失敗，請重試</string>
@@ -35,12 +35,12 @@
     <string name="login_token_tutorial_link">查看取得教學</string>
     <string name="login_skip_to_home">暫不登入，直接進入</string>
     <string name="login_reset_local_session">修復或重設本機工作階段</string>
-    <string name="login_reset_local_session_dialog_text">當安全憑證儲存不可用或先前的工作階段復原未完成時使用。此操作會刪除已儲存的登入憑證並隱藏目前帳號，但保留成績、圖鑑和設定。若仍存在可讀取的 Phi-Plugin API Token 副本，將一併恢復；否則需要重新填寫。</string>
-    <string name="login_error_reset_failed">本機工作階段重設未完成。成績和圖鑑已保留，但舊憑證可能仍有殘留。請重試重設；若安全儲存持續不可用，請重新啟動應用程式後再試。若 API Token 未能恢復，請在設定中重新填寫。</string>
-    <string name="login_error_reset_pending">上一次本機工作階段重設尚未完成，成績和圖鑑仍然安全。請先使用下方入口重試重設，再登入。</string>
-    <string name="login_error_storage_rebuild_required">目前處理程序無法使用安全憑證儲存，重試登入也無法儲存憑證。請使用下方「修復或重設本機工作階段」，或重新啟動應用程式後重試。成績會保留；API Token 僅在仍有可讀取副本時恢復。</string>
-    <string name="login_error_recovery_unresolved">先前的工作階段復原狀態暫時無法核驗。可重試登入以重新探測；若仍被阻止，請使用下方「修復或重設本機工作階段」。此保護可避免舊帳號資料被誤刪。</string>
-    <string name="login_error_previous_data_cleanup">上一帳號的本機資料未能清除，因此暫時不能建立新工作階段。請重試，或使用本機工作階段重設來隱藏該帳號而不刪除其成績。</string>
-    <string name="login_error_previous_credential_cleanup">上一帳號已隱藏，但舊憑證未能完全刪除。請重試，或使用本機工作階段重設來重建憑證儲存。成績會保留；API Token 僅在仍有可讀取副本時恢復。</string>
-    <string name="login_error_login_finalization">新憑證已儲存，但先前的復原標記未能清除。請重試登入以完成復原；若問題持續，再考慮重設儲存。</string>
+    <string name="login_reset_local_session_dialog_text">清除目前 sessionToken 並封存目前資料，僅應在安全憑證儲存不可用或先前的工作階段復原未完成時使用</string>
+    <string name="login_error_reset_failed">本機工作階段重設未完成，存檔資訊已保留，但舊的 sessionToken 可能仍有殘留。請重試修復或重設；若安全儲存持續不可用，請重新啟動 Arkiroku 後重試。若 API Token 未能恢復，請在設定中重新填寫。</string>
+    <string name="login_error_reset_pending">上一次本機工作階段重設尚未完成，請嘗試再次重設後登入。</string>
+    <string name="login_error_storage_rebuild_required">目前處理程序經反覆重試後仍無法使用安全憑證儲存，請使用下方「修復或重設本機工作階段」，或重新啟動 Arkiroku 後重試。</string>
+    <string name="login_error_recovery_unresolved">先前的工作階段復原狀態無法確認，請嘗試重新登入，若問題仍然存在，請嘗試透過「修復或重設本機工作階段」以嘗試修復。</string>
+    <string name="login_error_previous_data_cleanup">上一帳號的本機資料未能清除，因此暫時不能建立新工作階段。請重試，或透過「修復或重設本機工作階段」來封存帳號。</string>
+    <string name="login_error_previous_credential_cleanup">上一帳號的資料已封存，但 sessionToken 未能完全刪除，請重試，或透過「修復或重設本機工作階段」以嘗試刷新。</string>
+    <string name="login_error_login_finalization">您的新 sessionToken 已儲存，但先前的復原標記未能清除。請重新登入以完成復原；若問題持續，請嘗試修復或重設工作階段。</string>
 </resources>
