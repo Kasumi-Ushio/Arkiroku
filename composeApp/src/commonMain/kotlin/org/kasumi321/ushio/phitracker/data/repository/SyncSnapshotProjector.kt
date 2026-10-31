@@ -11,6 +11,7 @@ import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.Save
 import org.kasumi321.ushio.phitracker.domain.model.Server
 import org.kasumi321.ushio.phitracker.domain.model.UserProfile
+import org.kasumi321.ushio.phitracker.domain.model.formatMoneyString
 import org.kasumi321.ushio.phitracker.domain.usecase.RksCalculator
 
 internal data class SyncCommitData(
@@ -60,7 +61,9 @@ internal class SyncSnapshotProjector(
         return SyncCommitData(
             save = save,
             committedAt = committedAt,
-            user = profile.toEntity(server, committedAt),
+            user = profile.toEntity(server, committedAt).copy(
+                moneyString = formatMoneyString(save.gameProgress.money)
+            ),
             records = records,
             snapshot = SyncSnapshotEntity(
                 ownerPlayerId = profile.playerId,

@@ -3,14 +3,18 @@ package org.kasumi321.ushio.phitracker.data.repository
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -112,7 +116,7 @@ class PhigrosRepositoryImpl(
         server: Server,
         mode: SyncMode,
         expectedCurrentOwner: String?
-    ): Result<SyncSaveResult> = runCatching {
+    ): Result<SyncSaveResult> = try {
         val previousOwner = currentAccountDao.get()?.playerId
         val userInfo = apiClient.getUserInfo(sessionToken, server)
         val saveList = apiClient.getGameSaves(sessionToken, server, userInfo.objectId)
@@ -139,16 +143,32 @@ class PhigrosRepositoryImpl(
             difficulties = songDataProvider.getDifficultyMap(),
             songNames = songDataProvider.getSongNameMap()
         )
-        syncWriter.commit(commitData, mode, expectedCurrentOwner).also {
-            if (previousOwner != userProfile.playerId) {
-                invalidateApiDetailCache()
-            }
+        val result = syncWriter.commit(commitData, mode, expectedCurrentOwner)
+        if (previousOwner != userProfile.playerId) {
+            withContext(NonCancellable) { invalidateApiDetailCache() }
         }
-    }.logFailure("syncSave")
+        Result.success(result)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure<SyncSaveResult>(e).logFailure("syncSave")
+    }
+
+    private fun displayOwnerFlow(): Flow<String?> =
+        combine(currentAccountDao.observe(), tokenManager.credentials) { accounts, credentials ->
+            val owner = accounts.firstOrNull()?.playerId
+            owner?.takeIf { credentials.token != null && credentials.boundPlayerId == owner }
+        }
+
+    private suspend fun currentDisplayOwner(): String? {
+        val owner = currentAccountDao.get()?.playerId
+        return owner?.takeIf {
+            tokenManager.getToken() != null && tokenManager.getPlayerBinding() == owner
+        }
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override fun getCachedSave(): Flow<Save?> = currentAccountDao.observe().flatMapLatest { accounts ->
-        val owner = accounts.firstOrNull()?.playerId
+    override fun getCachedSave(): Flow<Save?> = displayOwnerFlow().flatMapLatest { owner ->
         if (owner == null) {
             flowOf(null)
         } else {
@@ -188,8 +208,7 @@ class PhigrosRepositoryImpl(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override fun getUserProfile(): Flow<UserProfile?> = currentAccountDao.observe().flatMapLatest { accounts ->
-        val owner = accounts.firstOrNull()?.playerId
+    override fun getUserProfile(): Flow<UserProfile?> = displayOwnerFlow().flatMapLatest { owner ->
         if (owner == null) {
             flowOf(null)
         } else {
@@ -197,35 +216,47 @@ class PhigrosRepositoryImpl(
         }
     }
 
+    override suspend fun setAvatarUri(uri: String?): Result<Unit> = runCatching {
+        val owner = currentDisplayOwner() ?: error("没有可设置头像的当前账号")
+        check(userDao.updateAvatarUri(owner, uri) == 1) { "当前账号资料不存在" }
+    }
+
     override suspend fun saveSessionToken(token: String, server: Server) {
         invalidateApiDetailCache()
-        tokenManager.saveToken(token, server)
+        tokenManager.saveToken(token, server).getOrThrow()
     }
 
     override suspend fun getSessionToken(): Pair<String, Server>? = tokenManager.getToken()
+
+    override fun observeSessionToken(): Flow<Pair<String, Server>?> =
+        tokenManager.credentials.map { it.token }.distinctUntilChanged()
 
     override suspend fun clearData() {
         clearCurrentAccountData().getOrThrow()
     }
 
     override suspend fun clearCurrentAccountData(): Result<Unit> = runCatching {
-        val clearedOwner = accountDataClearer.clearCurrentAccount()
-        AppLogger.event("session", "account_data_cleared", mapOf("hadAccount" to (clearedOwner != null).toString()))
-    }.also { result ->
-        if (result.isSuccess) {
-            invalidateApiDetailCache()
-            // Best-effort: the account rows are already gone; a token-store
-            // failure here degrades to "stale token, no data" (startup will
-            // re-validate online or fall back to login), never a half state.
-            runCatching { tokenManager.clearToken() }
-                .onFailure { AppLogger.w("PhigrosRepo", it) { "clearToken degraded after account clear" } }
-        }
+        clearCurrentAccountRows().getOrThrow()
+        tokenManager.clearToken().getOrThrow()
     }.logFailure("clearCurrentAccountData")
+
+    override suspend fun clearCurrentAccountRows(): Result<Unit> = runCatching {
+        val clearedOwner = accountDataClearer.clearCurrentAccount()
+        invalidateApiDetailCache()
+        AppLogger.event("session", "account_data_cleared", mapOf("hadAccount" to (clearedOwner != null).toString()))
+    }.logFailure("clearCurrentAccountRows")
+
+    override suspend fun deactivateCurrentAccount() {
+        currentAccountDao.clear()
+        invalidateApiDetailCache()
+    }
 
     override suspend fun clearTokenSync() {
         invalidateApiDetailCache()
-        tokenManager.clearToken()
+        tokenManager.clearToken().getOrThrow()
     }
+
+    override suspend fun resetCredentialStorage(): Result<Unit> = tokenManager.resetStorage()
 
     override suspend fun getCurrentAccountOwner(): String? = currentAccountDao.get()?.playerId
 
@@ -234,25 +265,38 @@ class PhigrosRepositoryImpl(
 
     override suspend fun getBoundPlayerId(): String? = tokenManager.getPlayerBinding()
 
-    override suspend fun saveBoundPlayerId(playerId: String) = tokenManager.savePlayerBinding(playerId)
+    override suspend fun saveBoundPlayerId(playerId: String) {
+        tokenManager.savePlayerBinding(playerId).getOrThrow()
+    }
+
+    override suspend fun resetSessionToken(
+        sessionToken: String,
+        server: Server,
+        userObjectId: String
+    ): Result<String> = runCatching {
+        val response = apiClient.resetSessionToken(sessionToken, server, userObjectId)
+        check(response.objectId.isEmpty() || response.objectId == userObjectId) {
+            "reset returned a different account"
+        }
+        response.sessionToken
+    }.logFailure("resetSessionToken")
 
     override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> {
-        val owner = currentAccountDao.get()?.playerId ?: return emptyMap()
+        val owner = currentDisplayOwner() ?: return emptyMap()
         return Difficulty.entries.associateWith { difficulty ->
             recordDao.getClearCountByDifficulty(owner, difficulty.name)
         }
     }
 
     override suspend fun getTotalFullComboCount(): Int =
-        currentAccountDao.get()?.playerId?.let { recordDao.getTotalFcCount(it) } ?: 0
+        currentDisplayOwner()?.let { recordDao.getTotalFcCount(it) } ?: 0
 
     override suspend fun getTotalPhiCount(): Int =
-        currentAccountDao.get()?.playerId?.let { recordDao.getTotalPhiCount(it) } ?: 0
+        currentDisplayOwner()?.let { recordDao.getTotalPhiCount(it) } ?: 0
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeSyncSnapshots(): Flow<List<SyncSnapshot>> =
-        currentAccountDao.observe().flatMapLatest { accounts ->
-            val owner = accounts.firstOrNull()?.playerId
+        displayOwnerFlow().flatMapLatest { owner ->
             if (owner == null) {
                 flowOf(emptyList())
             } else {
@@ -261,14 +305,13 @@ class PhigrosRepositoryImpl(
         }
 
     override suspend fun getSyncSnapshotsOnce(): List<SyncSnapshot> {
-        val owner = currentAccountDao.get()?.playerId ?: return emptyList()
+        val owner = currentDisplayOwner() ?: return emptyList()
         return syncSnapshotDao.getAllOnce(owner).map { it.toDomain() }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeSongSyncHistory(songId: String): Flow<List<SongSyncHistoryEntry>> =
-        currentAccountDao.observe().flatMapLatest { accounts ->
-            val owner = accounts.firstOrNull()?.playerId
+        displayOwnerFlow().flatMapLatest { owner ->
             if (owner == null) {
                 flowOf(emptyList())
             } else {
@@ -277,7 +320,7 @@ class PhigrosRepositoryImpl(
         }
 
     override suspend fun getSyncHistoryForSnapshot(snapshotId: Long): List<SongSyncHistoryEntry> {
-        val owner = currentAccountDao.get()?.playerId ?: return emptyList()
+        val owner = currentDisplayOwner() ?: return emptyList()
         return songSyncHistoryDao.getBySnapshotId(owner, snapshotId).map { it.toDomain() }
     }
 
@@ -474,6 +517,7 @@ class PhigrosRepositoryImpl(
 
     override suspend fun proposeSongAlias(songId: String, alias: String, note: String?): Result<Unit> =
         runCatching<Unit> {
+            currentDisplayOwner() ?: error("需要先登录 TapTap 账号")
             val (sessionToken, _) = tokenManager.getToken()
                 ?: error("需要先登录 TapTap 账号")
             phiPluginApi.proposeAlias(sessionToken, songId.trim(), alias.trim(), note?.trim())

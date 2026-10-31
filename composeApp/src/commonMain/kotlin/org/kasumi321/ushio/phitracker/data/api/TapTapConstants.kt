@@ -46,6 +46,7 @@ object TapTapConstants {
     object Endpoints {
         const val USERS_ME = "/users/me"
         const val GAME_SAVE = "/classes/_GameSave"
+        fun refreshSessionToken(userObjectId: String) = "/users/$userObjectId/refreshSessionToken"
     }
 }
 

@@ -2,6 +2,7 @@ package org.kasumi321.ushio.phitracker.data.session
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -23,10 +24,17 @@ import org.kasumi321.ushio.phitracker.domain.model.SongSyncHistoryEntry
 import org.kasumi321.ushio.phitracker.domain.model.SyncMode
 import org.kasumi321.ushio.phitracker.domain.model.SyncSaveResult
 import org.kasumi321.ushio.phitracker.domain.model.SyncSnapshot
+import org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage
+import org.kasumi321.ushio.phitracker.data.platform.LegacySessionMigration
+import org.kasumi321.ushio.phitracker.data.platform.LegacySessionMigrationSource
 import org.kasumi321.ushio.phitracker.domain.model.UserProfile
 import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
+import org.kasumi321.ushio.phitracker.domain.session.SessionCleanupRequiredException
 import org.kasumi321.ushio.phitracker.domain.session.SessionCredentialsPersistenceException
+import org.kasumi321.ushio.phitracker.domain.session.SessionLogoutOutcome
 import org.kasumi321.ushio.phitracker.domain.session.SessionNotLoggedInException
+import org.kasumi321.ushio.phitracker.domain.session.SessionRecoveryUnresolvedException
+import org.kasumi321.ushio.phitracker.domain.session.SessionResetOutcome
 import org.kasumi321.ushio.phitracker.domain.session.SessionResumeOutcome
 import org.kasumi321.ushio.phitracker.domain.session.SessionTokenRejectedException
 import kotlin.test.Test
@@ -39,7 +47,11 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionCoordinatorTest {
 
-    private fun coordinator(repo: FakeSessionRepository) = SessionCoordinatorImpl(repo)
+    private fun coordinator(
+        repo: FakeSessionRepository,
+        storage: org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage =
+            org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+    ) = SessionCoordinatorImpl(repo, SessionStateStore(storage))
 
     // ── login: persistence order and inheritance ─────────────────────
 
@@ -109,7 +121,7 @@ class SessionCoordinatorTest {
     }
 
     @Test
-    fun loginRollsBackCommittedRowsWhenCredentialStoreDropsTheWrite() = runTest {
+    fun loginDeactivatesCommittedPointerWhenCredentialStoreDropsTheWrite() = runTest {
         val repo = fake(
             validate = { Result.success(profile("P1")) },
             sync = { Result.success(syncResult()) },
@@ -119,7 +131,9 @@ class SessionCoordinatorTest {
 
         assertTrue(result.isFailure)
         assertIs<SessionCredentialsPersistenceException>(result.exceptionOrNull())
-        assertEquals(1, repo.clearCalls)
+        assertEquals(1, repo.deactivateCalls)
+        assertEquals(0, repo.clearCalls)
+        assertNull(repo.pointer)
     }
 
     // ── resume ────────────────────────────────────────────────────────
@@ -170,7 +184,7 @@ class SessionCoordinatorTest {
     }
 
     @Test
-    fun resumeLegacyInstallWithoutBindingTrustsLocalDataOnce() = runTest {
+    fun resumeLegacyInstallWithoutBindingRequiresOnlineValidation() = runTest {
         val repo = fake(
             savedToken = "token-1" to Server.CN,
             pointer = "P1",
@@ -179,6 +193,30 @@ class SessionCoordinatorTest {
             validate = { Result.failure(RuntimeException("offline")) }
         )
         val outcome = coordinator(repo).resumeSession()
+        assertIs<SessionResumeOutcome.RequiresLogin>(outcome)
+    }
+
+    @Test
+    fun legacyInstallCanUseOfflineResumeAfterBindingIsPersistedOnline() = runTest {
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = null,
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        assertIs<SessionResumeOutcome.Resumed>(coordinator(repo).resumeSession())
+        assertEquals("P1", repo.getBoundPlayerId())
+
+        val offline = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.failure(RuntimeException("offline")) }
+        )
+        val outcome = coordinator(offline).resumeSession()
         assertEquals(SessionResumeOutcome.Resumed.Source.LOCAL, assertIs<SessionResumeOutcome.Resumed>(outcome).source)
     }
 
@@ -241,6 +279,7 @@ class SessionCoordinatorTest {
         val repo = fake(
             savedToken = "token-1" to Server.CN,
             pointer = "P1",
+            boundPlayerId = "P1",
             sync = { Result.success(syncResult()) }
         )
         val result = coordinator(repo).refresh()
@@ -258,6 +297,7 @@ class SessionCoordinatorTest {
         val repo = fake(
             savedToken = "token-1" to Server.CN,
             pointer = "P1",
+            boundPlayerId = "P1",
             sync = {
                 syncStarted.complete(Unit)
                 releaseSync.await()
@@ -297,6 +337,659 @@ class SessionCoordinatorTest {
         assertEquals("P1", repo.pointer, "a failed clear must keep the current account's data")
     }
 
+    @Test
+    fun logoutCredentialFailureKeepsLogoutIntentAndBlocksOnlineResume() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            clearTokenFails = true,
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+
+        val logout = coordinator(repo, storage).logout()
+
+        assertEquals(SessionLogoutOutcome.CredentialsCleanupPending, logout.getOrThrow())
+        assertNull(repo.pointer)
+        assertTrue(storage.map["logout_pending"]?.toBooleanStrictOrNull() == true)
+        val resumed = coordinator(repo, storage).resumeSession()
+        val requires = assertIs<SessionResumeOutcome.RequiresLogin>(resumed)
+        assertTrue(requires.credentialCleanupPending)
+        assertFalse(Op.Validate in repo.ops)
+    }
+
+    @Test
+    fun processDeathAfterRowsClearedCannotResurrectStaleToken() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["logout_pending"] = "true"
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = null,
+            boundPlayerId = "P1",
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+
+        val outcome = coordinator(repo, storage).resumeSession()
+
+        val requires = assertIs<SessionResumeOutcome.RequiresLogin>(outcome)
+        assertFalse(requires.credentialCleanupPending)
+        assertNull(repo.getSessionToken())
+        assertNull(storage.map["logout_pending"])
+        assertFalse(Op.Validate in repo.ops)
+    }
+
+    @Test
+    fun cancellationAfterSyncBeforeCredentialsDeactivatesCommittedPointer() = runTest {
+        val repo = fake(
+            validate = { Result.success(profile("P1")) },
+            sync = {
+                kotlin.coroutines.coroutineContext.job.cancel()
+                Result.success(syncResult())
+            }
+        )
+
+        val loginJob = launch { coordinator(repo).login("token-1", Server.CN) }
+        loginJob.join()
+
+        assertTrue(loginJob.isCancelled)
+        assertEquals(1, repo.deactivateCalls)
+        assertNull(repo.pointer)
+        assertTrue(repo.storedTokens.isEmpty())
+    }
+
+    @Test
+    fun processDeathAfterSyncBeforeCredentialsRecoversWithoutGuestExposure() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["pending_login_owner"] = "P1"
+        }
+        val repo = fake(pointer = "P1", ownersWithRecords = setOf("P1"))
+
+        val outcome = coordinator(repo, storage).resumeSession()
+
+        assertIs<SessionResumeOutcome.RequiresLogin>(outcome)
+        assertEquals(1, repo.deactivateCalls)
+        assertNull(repo.pointer)
+        assertNull(storage.map["pending_login_owner"])
+    }
+
+    @Test
+    fun rejectedTokenCannotBeUsedAfterSkippingLogin() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val repo = fake(
+            savedToken = "rejected-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.failure(SessionTokenRejectedException()) }
+        )
+
+        val rejected = coordinator(repo, storage).resumeSession()
+
+        assertIs<SessionResumeOutcome.RequiresLogin>(rejected)
+        assertNull(repo.pointer)
+        assertNull(repo.getSessionToken())
+        assertTrue(storage.map["login_required"]?.toBooleanStrictOrNull() == true)
+
+        val afterSkip = coordinator(repo, storage).resumeSession()
+        assertIs<SessionResumeOutcome.RequiresLogin>(afterSkip)
+        assertEquals(1, repo.ops.count { it == Op.Validate })
+    }
+
+    @Test
+    fun logoutCancellationAfterDatabaseCommitStillCompletesCredentialCleanup() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            cancelAfterClear = true
+        )
+
+        val logoutJob = launch { coordinator(repo, storage).logout() }
+        logoutJob.join()
+
+        assertNull(repo.getSessionToken())
+        assertNull(storage.map["logout_pending"])
+    }
+
+    @Test
+    fun cancellingOuterLogoutWhileRowsClearIsSuspendedStillFinishesCleanup() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val clearStarted = CompletableDeferred<Unit>()
+        val releaseClear = CompletableDeferred<Unit>()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            clearBlock = {
+                clearStarted.complete(Unit)
+                releaseClear.await()
+            }
+        )
+        val logoutJob = launch { coordinator(repo, storage).logout() }
+        clearStarted.await()
+
+        logoutJob.cancel()
+        releaseClear.complete(Unit)
+        logoutJob.join()
+
+        assertTrue(logoutJob.isCancelled)
+        assertNull(repo.pointer)
+        assertNull(repo.getSessionToken())
+        assertNull(storage.map["logout_pending"])
+    }
+
+    @Test
+    fun divergentIntentRemovalBlocksLoginUntilExplicitLocalReset() = runTest {
+        val storage = DivergentSessionStateStorage().apply {
+            map["login_required"] = "true"
+            map["logout_pending"] = "true"
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        val blocked = session.login("new-token", Server.CN)
+
+        assertIs<SessionCleanupRequiredException>(blocked.exceptionOrNull())
+        assertTrue(repo.ops.isEmpty())
+        assertNull(storage.map["logout_pending"], "the fake mirrors Android's in-memory removal")
+
+        session.resetLocalSession().getOrThrow()
+        val login = session.login("new-token", Server.CN)
+
+        assertTrue(login.isSuccess)
+        assertEquals(1, repo.clearCalls, "only the interrupted session may be cleared")
+        assertNull(storage.map["login_required"])
+    }
+
+    @Test
+    fun successfulRefreshEstablishesMissingBinding() = runTest {
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = null,
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+
+        val result = coordinator(repo).refresh()
+
+        assertTrue(result.isSuccess)
+        assertEquals("P1", repo.getBoundPlayerId())
+        assertEquals("P1", repo.savedBinding)
+        assertEquals(listOf(Op.Validate, Op.Sync), repo.ops)
+    }
+
+    // ── sessionToken reset ────────────────────────────────────────────
+
+    @Test
+    fun resetStoresTheNewTokenAndKeepsDataAndBinding() = runTest {
+        val repo = fake(
+            savedToken = "old-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            reset = { Result.success("new-token") }
+        )
+        val outcome = coordinator(repo).resetSessionToken()
+
+        assertEquals("P1", assertIs<SessionResetOutcome.Success>(outcome).playerId)
+        assertEquals("new-token", repo.storedTokens.lastOrNull()?.first)
+        // Inheritance: nothing about the account's local footprint changes.
+        assertEquals(0, repo.clearCalls)
+        assertEquals("P1", repo.getBoundPlayerId())
+        assertNull(repo.savedBinding, "reset must not rewrite an already valid binding")
+    }
+
+    @Test
+    fun resetNetworkFailureReportsUnknownAndKeepsTheLocalToken() = runTest {
+        val repo = fake(
+            savedToken = "old-token" to Server.CN,
+            pointer = "P1",
+            reset = { Result.failure(RuntimeException("network unavailable")) }
+        )
+        val outcome = coordinator(repo).resetSessionToken()
+
+        assertIs<SessionResetOutcome.OutcomeUnknown>(outcome)
+        assertTrue(repo.storedTokens.isEmpty(), "an unknown outcome must not replace the stored token")
+    }
+
+    @Test
+    fun resetRejectedTokenReportsRejectedWithoutTouchingData() = runTest {
+        val repo = fake(
+            savedToken = "old-token" to Server.CN,
+            pointer = "P1",
+            reset = { Result.failure(SessionTokenRejectedException()) }
+        )
+        val outcome = coordinator(repo).resetSessionToken()
+
+        assertIs<SessionResetOutcome.Rejected>(outcome)
+        assertEquals(0, repo.clearCalls)
+        assertTrue(repo.storedTokens.isEmpty())
+    }
+
+    @Test
+    fun resetWithoutSessionReportsNotLoggedIn() = runTest {
+        val outcome = coordinator(fake()).resetSessionToken()
+        assertIs<SessionResetOutcome.NotLoggedIn>(outcome)
+    }
+
+    @Test
+    fun loginRequiredDoesNotBypassPendingLogoutCleanup() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["login_required"] = "true"
+            map["logout_pending"] = "true"
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "OLD",
+            boundPlayerId = "OLD",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        val login = session.login("new-token", Server.CN)
+
+        assertTrue(login.isSuccess)
+        assertEquals(1, repo.clearCalls)
+        assertEquals("P1", repo.pointer)
+        assertEquals("new-token", repo.getSessionToken()?.first)
+        assertEquals("P1", repo.getBoundPlayerId())
+        assertNull(storage.map["login_required"])
+        assertNull(storage.map["logout_pending"])
+        assertNull(storage.map["pending_login_owner"])
+
+        val resumed = session.resumeSession()
+        assertIs<SessionResumeOutcome.Resumed>(resumed)
+        assertEquals(1, repo.clearCalls, "restart must not apply the old logout to the new account")
+        assertEquals("P1", repo.pointer)
+        assertEquals("new-token", repo.getSessionToken()?.first)
+    }
+
+    @Test
+    fun resumeSyncRejectedInvalidatesInsteadOfFallingBackToLocal() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.failure(SessionTokenRejectedException()) }
+        )
+
+        val outcome = coordinator(repo, storage).resumeSession()
+
+        assertIs<SessionResumeOutcome.RequiresLogin>(outcome)
+        assertNull(repo.pointer)
+        assertNull(repo.getSessionToken())
+        assertTrue(storage.map["login_required"]?.toBooleanStrictOrNull() == true)
+        assertEquals(0, repo.clearCalls, "rejected credentials must not delete inheritable local rows")
+    }
+
+    @Test
+    fun refreshRejectedInvalidatesRuntimeSessionAndLaterSkipCannotResume() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            sync = { Result.failure(SessionTokenRejectedException()) }
+        )
+        val session = coordinator(repo, storage)
+
+        val result = session.refresh()
+
+        assertIs<SessionTokenRejectedException>(result.exceptionOrNull())
+        assertNull(repo.pointer)
+        assertNull(repo.getSessionToken())
+        assertTrue(storage.map["login_required"]?.toBooleanStrictOrNull() == true)
+        assertIs<SessionResumeOutcome.RequiresLogin>(session.resumeSession())
+        assertFalse(Op.Validate in repo.ops)
+    }
+
+    @Test
+    fun refreshRejectsMismatchedBindingBeforeSync() = runTest {
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "OTHER",
+            ownersWithRecords = setOf("P1"),
+            sync = { Result.success(syncResult()) }
+        )
+
+        val result = coordinator(repo).refresh()
+
+        assertIs<SessionNotLoggedInException>(result.exceptionOrNull())
+        assertTrue(repo.syncOps.isEmpty())
+        assertNull(repo.pointer)
+    }
+
+    @Test
+    fun localResetCreatesInertTerminalStateEvenWhenCredentialRemovalFails() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["logout_pending"] = "true"
+            map["pending_login_owner"] = "P1"
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            clearTokenFails = true
+        )
+
+        coordinator(repo, storage).resetLocalSession().getOrThrow()
+
+        assertNull(repo.pointer)
+        assertEquals(1, repo.resetStorageCalls)
+        assertNull(storage.map["logout_pending"])
+        assertNull(storage.map["pending_login_owner"])
+        assertTrue(storage.map["login_required"]?.toBooleanStrictOrNull() == true)
+        assertIs<SessionResumeOutcome.RequiresLogin>(coordinator(repo, storage).resumeSession())
+    }
+
+    @Test
+    fun failedCredentialRebuildKeepsResetPendingWithoutDeletingScoresUntilLogin() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            clearTokenFails = true,
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        ).apply {
+            resetStorageResult = Result.failure(IllegalStateException("keychain unavailable"))
+        }
+        val session = coordinator(repo, storage)
+
+        assertTrue(session.resetLocalSession().isFailure)
+        assertTrue(storage.map["reset_pending"]?.toBooleanStrictOrNull() == true)
+        assertNull(repo.pointer)
+
+        val resumed = assertIs<SessionResumeOutcome.RequiresLogin>(session.resumeSession())
+        assertTrue(resumed.localResetPending)
+        assertEquals(0, repo.clearCalls, "reset recovery must not delete account rows")
+        assertTrue(storage.map["reset_pending"]?.toBooleanStrictOrNull() == true)
+
+        repo.resetStorageResult = Result.success(Unit)
+        val login = session.login("new-token", Server.CN)
+
+        assertTrue(login.isSuccess)
+        assertNull(storage.map["reset_pending"])
+        assertNull(storage.map["login_required"])
+        assertEquals("new-token", repo.getSessionToken()?.first)
+        assertEquals(0, repo.clearCalls)
+    }
+
+    @Test
+    fun resetPendingSupersedesOldLogoutAndPreservesAllAccountDataForRelogin() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["logout_pending"] = "true"
+            map["reset_pending"] = "true"
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        val resumed = assertIs<SessionResumeOutcome.RequiresLogin>(session.resumeSession())
+
+        assertFalse(resumed.localResetPending)
+        assertEquals(0, repo.clearCalls, "reset must not clear records, user, snapshots or per-song history")
+        assertTrue(repo.hasLocalRecords("P1"))
+        assertNull(storage.map["logout_pending"])
+        assertNull(storage.map["reset_pending"])
+
+        val login = session.login("new-token", Server.CN)
+
+        assertTrue(login.isSuccess)
+        assertEquals(SyncMode.Refresh, repo.syncOps.single().mode)
+        assertEquals(0, repo.clearCalls)
+        assertTrue(repo.hasLocalRecords("P1"))
+    }
+
+    @Test
+    fun failureAfterResetIntentBeforeDeactivateStillCannotReplayOldLogout() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["logout_pending"] = "true"
+            removeResultsByKey["logout_pending"] =
+                org.kasumi321.ushio.phitracker.data.platform.StorageWriteResult.Failed
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        assertTrue(session.resetLocalSession().isFailure)
+        assertEquals("P1", repo.pointer)
+        assertTrue(storage.map["reset_pending"]?.toBooleanStrictOrNull() == true)
+        assertTrue(storage.map["logout_pending"]?.toBooleanStrictOrNull() == true)
+        assertEquals(0, repo.clearCalls)
+
+        assertIs<SessionNotLoggedInException>(session.refresh().exceptionOrNull())
+        assertEquals(SessionResetOutcome.NotLoggedIn, session.resetSessionToken())
+        assertTrue(repo.ops.isEmpty(), "reset_pending must fail closed before validation or sync")
+        assertEquals(0, repo.resetCalls, "reset_pending must block upstream token rotation")
+        assertEquals("P1", repo.pointer)
+
+        storage.removeResultsByKey["logout_pending"] =
+            org.kasumi321.ushio.phitracker.data.platform.StorageWriteResult.Persisted
+        val login = session.login("new-token", Server.CN)
+
+        assertTrue(login.isSuccess)
+        assertEquals(0, repo.clearCalls)
+        assertTrue(repo.hasLocalRecords("P1"))
+        assertEquals(SyncMode.Refresh, repo.syncOps.single().mode)
+    }
+
+    @Test
+    fun explicitLogoutSupersedesResetAndStillClearsAccountData() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["reset_pending"] = "true"
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1")
+        )
+
+        val result = coordinator(repo, storage).logout()
+
+        assertEquals(SessionLogoutOutcome.Completed, result.getOrThrow())
+        assertEquals(1, repo.clearCalls)
+        assertNull(storage.map["reset_pending"])
+        assertNull(storage.map["logout_pending"])
+    }
+
+    @Test
+    fun cancellationDuringResetRecoveryDoesNotRebuildCredentialStorage() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
+            map["reset_pending"] = "true"
+        }
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            cancelOnClearToken = true
+        )
+
+        val resume = launch { coordinator(repo, storage).resumeSession() }
+        resume.join()
+
+        assertTrue(resume.isCancelled)
+        assertEquals(0, repo.resetStorageCalls)
+        assertEquals(0, repo.clearCalls)
+        assertTrue(storage.map["reset_pending"]?.toBooleanStrictOrNull() == true)
+    }
+
+    // ── legacy recovery blocking ─────────────────────────────────────
+
+    @Test
+    fun unresolvedLegacyRecoveryBlocksLoginBeforeAnyMutation() = runTest {
+        val storage = UnresolvedLegacyStorage()
+        val repo = fake(
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+
+        val result = coordinator(repo, storage).login("token-1", Server.CN)
+
+        assertIs<SessionRecoveryUnresolvedException>(result.exceptionOrNull())
+        assertTrue(repo.ops.isEmpty())
+        assertTrue(repo.storedTokens.isEmpty())
+        assertNull(repo.savedBinding)
+        assertTrue(storage.map.isEmpty())
+    }
+
+    @Test
+    fun unresolvedLegacyRecoveryBlocksResumeAndRefreshWithoutTouchingTheStoredSession() = runTest {
+        val storage = UnresolvedLegacyStorage()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        val resumed = session.resumeSession()
+        assertTrue(assertIs<SessionResumeOutcome.RequiresLogin>(resumed).hadToken)
+        assertTrue(repo.ops.isEmpty())
+        assertEquals("P1", repo.pointer)
+        assertEquals("token-1", repo.getSessionToken()?.first)
+
+        assertIs<SessionNotLoggedInException>(session.refresh().exceptionOrNull())
+        assertTrue(repo.syncOps.isEmpty())
+    }
+
+    @Test
+    fun localResetDiscardsUnresolvedLegacyRecoveryAndRestoresLogin() = runTest {
+        val storage = UnresolvedLegacyStorage()
+        val repo = fake(
+            savedToken = "old-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            validate = { Result.success(profile("P2")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        assertIs<SessionRecoveryUnresolvedException>(
+            session.login("new-token", Server.CN).exceptionOrNull()
+        )
+
+        session.resetLocalSession().getOrThrow()
+
+        assertTrue(storage.discarded)
+        assertFalse(SessionStateStore(storage).hasUnresolvedLegacyRecovery)
+        assertTrue(session.login("new-token", Server.CN).isSuccess)
+    }
+
+    @Test
+    fun failedLegacyDiscardKeepsResetAndLoginClosed() = runTest {
+        val storage = UnresolvedLegacyStorage(discardResult = false)
+        val repo = fake(
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        assertTrue(session.resetLocalSession().isFailure)
+        assertTrue(SessionStateStore(storage).hasUnresolvedLegacyRecovery)
+        assertIs<SessionRecoveryUnresolvedException>(
+            session.login("token-1", Server.CN).exceptionOrNull()
+        )
+    }
+
+    @Test
+    fun resetFailureDuringLegacyDiscardBlocksSessionOperationsUntilCompensation() = runTest {
+        val storage = UnresolvedLegacyStorage(discardResult = false)
+        val repo = fake(
+            savedToken = "stale-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) },
+            reset = { Result.success("rotated-token") }
+        )
+        val session = coordinator(repo, storage)
+
+        assertTrue(session.resetLocalSession().isFailure)
+        assertTrue(storage.map["reset_pending"]?.toBooleanStrictOrNull() == true)
+        assertEquals("P1", repo.pointer)
+        assertIs<SessionNotLoggedInException>(session.refresh().exceptionOrNull())
+        assertEquals(SessionResetOutcome.NotLoggedIn, session.resetSessionToken())
+        assertTrue(repo.ops.isEmpty())
+        assertEquals(0, repo.resetCalls)
+
+        storage.discardResult = true
+        session.resetLocalSession().getOrThrow()
+        val login = session.login("new-token", Server.CN)
+
+        assertTrue(login.isSuccess)
+        assertEquals(SyncMode.Refresh, repo.syncOps.single().mode)
+        assertEquals(0, repo.clearCalls)
+        assertTrue(repo.hasLocalRecords("P1"))
+        assertNull(storage.map["reset_pending"])
+    }
+
+    @Test
+    fun logoutDiscardsUnresolvedLegacyRecoveryBeforeCompleting() = runTest {
+        val storage = UnresolvedLegacyStorage()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1"
+        )
+
+        val outcome = coordinator(repo, storage).logout().getOrThrow()
+
+        assertEquals(SessionLogoutOutcome.Completed, outcome)
+        assertTrue(storage.discarded)
+        assertFalse(SessionStateStore(storage).hasUnresolvedLegacyRecovery)
+        assertNull(storage.map["logout_pending"])
+        assertNull(repo.getSessionToken())
+    }
+
+    @Test
+    fun sessionTokenResetIsRefusedWhileLegacyRecoveryIsUnresolved() = runTest {
+        val storage = UnresolvedLegacyStorage()
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            reset = { Result.success("rotated-token") }
+        )
+
+        assertEquals(SessionResetOutcome.NotLoggedIn, coordinator(repo, storage).resetSessionToken())
+        assertTrue(repo.ops.isEmpty())
+    }
+
     // ── helpers ───────────────────────────────────────────────────────
 
     private fun profile(playerId: String) = UserProfile(
@@ -308,6 +1001,19 @@ class SessionCoordinatorTest {
 
     private fun minimalSave(): Save = Save(gameRecord = emptyMap(), gameProgress = fakeProgress, user = fakeUser, summary = null)
 
+    private class DivergentSessionStateStorage : org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage() {
+        private var failNextLogoutClear = true
+
+        override fun remove(key: String): org.kasumi321.ushio.phitracker.data.platform.StorageWriteResult {
+            if (key == "logout_pending" && failNextLogoutClear) {
+                failNextLogoutClear = false
+                map.remove(key)
+                return org.kasumi321.ushio.phitracker.data.platform.StorageWriteResult.Failed
+            }
+            return super.remove(key)
+        }
+    }
+
     private fun fake(
         savedToken: Pair<String, Server>? = null,
         pointer: String? = null,
@@ -315,8 +1021,15 @@ class SessionCoordinatorTest {
         ownersWithRecords: Set<String> = emptySet(),
         tokenReadback: Pair<String, Server>? = UNSET_READBACK,
         clearFails: Boolean = false,
+        clearTokenFails: Boolean = false,
+        cancelOnClearToken: Boolean = false,
+        cancelAfterClear: Boolean = false,
+        clearBlock: suspend () -> Unit = {},
+        tokenSaveFails: Boolean = false,
+        bindingSaveFails: Boolean = false,
         validate: suspend () -> Result<UserProfile> = { Result.failure(RuntimeException("offline")) },
-        sync: suspend () -> Result<SyncSaveResult> = { Result.failure(RuntimeException("offline")) }
+        sync: suspend () -> Result<SyncSaveResult> = { Result.failure(RuntimeException("offline")) },
+        reset: suspend () -> Result<String> = { Result.failure(RuntimeException("offline")) }
     ): FakeSessionRepository = FakeSessionRepository(
         savedToken = savedToken,
         initialPointer = pointer,
@@ -324,8 +1037,15 @@ class SessionCoordinatorTest {
         ownersWithRecords = ownersWithRecords,
         tokenReadback = tokenReadback,
         clearFails = clearFails,
+        clearTokenFails = clearTokenFails,
+        cancelOnClearToken = cancelOnClearToken,
+        cancelAfterClear = cancelAfterClear,
+        clearBlock = clearBlock,
+        tokenSaveFails = tokenSaveFails,
+        bindingSaveFails = bindingSaveFails,
         validateBehavior = validate,
-        syncBehavior = sync
+        syncBehavior = sync,
+        resetBehavior = reset
     )
 
     private companion object {
@@ -349,15 +1069,22 @@ class SessionCoordinatorTest {
     internal data class SyncOp(val token: String, val mode: SyncMode, val expectedOwner: String?)
 
     internal class FakeSessionRepository(
-        private val savedToken: Pair<String, Server>?,
+        private var savedToken: Pair<String, Server>?,
         initialPointer: String?,
         initialBoundPlayerId: String?,
         private val ownersWithRecords: Set<String>,
         // When UNSET_READBACK, getSessionToken returns the actually stored token.
         private val tokenReadback: Pair<String, Server>?,
         private val clearFails: Boolean,
+        private val clearTokenFails: Boolean,
+        private val cancelOnClearToken: Boolean,
+        private val cancelAfterClear: Boolean,
+        private val clearBlock: suspend () -> Unit,
+        private val tokenSaveFails: Boolean,
+        private val bindingSaveFails: Boolean,
         private val validateBehavior: suspend () -> Result<UserProfile>,
-        private val syncBehavior: suspend () -> Result<SyncSaveResult>
+        private val syncBehavior: suspend () -> Result<SyncSaveResult>,
+        private val resetBehavior: suspend () -> Result<String>
     ) : PhigrosRepository {
         val ops = mutableListOf<Op>()
         val syncOps = mutableListOf<SyncOp>()
@@ -366,6 +1093,11 @@ class SessionCoordinatorTest {
         var pointer: String? = initialPointer
         private var boundPlayerId: String? = initialBoundPlayerId
         var clearCalls = 0
+        var deactivateCalls = 0
+        var clearTokenCalls = 0
+        var resetStorageCalls = 0
+        var resetCalls = 0
+        var resetStorageResult: Result<Unit> = Result.success(Unit)
         var commitCompleted = false
 
         override suspend fun validateToken(sessionToken: String, server: Server): Result<UserProfile> {
@@ -401,6 +1133,7 @@ class SessionCoordinatorTest {
 
         override suspend fun saveSessionToken(token: String, server: Server) {
             ops += Op.SaveToken
+            if (tokenSaveFails) error("injected token save failure")
             storedTokens += token to server
         }
 
@@ -412,20 +1145,63 @@ class SessionCoordinatorTest {
         }
 
         override suspend fun clearCurrentAccountData(): Result<Unit> = runCatching {
-            clearCalls++
-            if (clearFails) error("database clear failed")
-            pointer = null
-            storedTokens.clear()
-            savedBinding = null
+            clearCurrentAccountRows().getOrThrow()
+            clearTokenSync()
         }
 
-        override suspend fun clearTokenSync() = Unit
+        override suspend fun clearCurrentAccountRows(): Result<Unit> = runCatching {
+            clearCalls++
+            if (clearFails) error("database clear failed")
+            clearBlock()
+            pointer = null
+            if (cancelAfterClear) kotlin.coroutines.coroutineContext.job.cancel()
+        }
+
+        override suspend fun deactivateCurrentAccount() {
+            deactivateCalls++
+            pointer = null
+        }
+
+        override suspend fun clearTokenSync() {
+            clearTokenCalls++
+            if (cancelOnClearToken) {
+                kotlin.coroutines.coroutineContext.job.cancel()
+                throw kotlinx.coroutines.CancellationException("cancelled during reset recovery")
+            }
+            if (clearTokenFails) error("injected token removal failure")
+            savedToken = null
+            storedTokens.clear()
+            savedBinding = null
+            boundPlayerId = null
+        }
+
+        override suspend fun resetCredentialStorage(): Result<Unit> {
+            resetStorageCalls++
+            if (resetStorageResult.isSuccess) {
+                savedToken = null
+                storedTokens.clear()
+                savedBinding = null
+                boundPlayerId = null
+            }
+            return resetStorageResult
+        }
+
         override suspend fun getCurrentAccountOwner(): String? = pointer
         override suspend fun hasLocalRecords(ownerPlayerId: String): Boolean = ownerPlayerId in ownersWithRecords
         override suspend fun getBoundPlayerId(): String? = boundPlayerId
         override suspend fun saveBoundPlayerId(playerId: String) {
+            if (bindingSaveFails) error("injected binding save failure")
             savedBinding = playerId
             boundPlayerId = playerId
+        }
+
+        override suspend fun resetSessionToken(
+            sessionToken: String,
+            server: Server,
+            userObjectId: String
+        ): Result<String> {
+            resetCalls++
+            return resetBehavior()
         }
 
         override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> = emptyMap()
@@ -461,8 +1237,36 @@ class SessionCoordinatorTest {
             ownersWithRecords = ownersWithRecords,
             tokenReadback = tokenReadback,
             clearFails = clearFails,
+            clearTokenFails = clearTokenFails,
+            cancelOnClearToken = cancelOnClearToken,
+            cancelAfterClear = cancelAfterClear,
+            clearBlock = clearBlock,
+            tokenSaveFails = tokenSaveFails,
+            bindingSaveFails = bindingSaveFails,
             validateBehavior = validateBehavior,
-            syncBehavior = syncBehavior
+            syncBehavior = syncBehavior,
+            resetBehavior = resetBehavior
         )
+    }
+}
+
+private class UnresolvedLegacyStorage(
+    var discardResult: Boolean = true
+) : FakeSecureKeyValueStorage(), LegacySessionMigrationSource {
+    var discarded = false
+
+    private var migration: LegacySessionMigration =
+        LegacySessionMigration.Unresolved(listOf("logout_pending"))
+
+    override val legacySessionMigration: LegacySessionMigration
+        get() = migration
+
+    override fun retryLegacySessionMigration() = Unit
+
+    override fun discardLegacySessionIntents(): Boolean {
+        if (!discardResult) return false
+        discarded = true
+        migration = LegacySessionMigration.Completed
+        return true
     }
 }

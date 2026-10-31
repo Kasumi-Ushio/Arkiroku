@@ -17,6 +17,9 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE playerId = :playerId")
     suspend fun getUserOnce(playerId: String): UserEntity?
 
+    @Query("UPDATE users SET avatarUri = :avatarUri WHERE playerId = :playerId")
+    suspend fun updateAvatarUri(playerId: String, avatarUri: String?): Int
+
     @Query("DELETE FROM users WHERE playerId = :playerId")
     suspend fun deleteByPlayer(playerId: String)
 }

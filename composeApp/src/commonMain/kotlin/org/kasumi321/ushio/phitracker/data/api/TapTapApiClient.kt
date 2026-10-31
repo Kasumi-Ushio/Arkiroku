@@ -5,6 +5,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.put
 import io.ktor.client.statement.HttpResponse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -52,6 +53,24 @@ class TapTapApiClient(
 
     suspend fun downloadSave(url: String): ByteArray = httpClient.get(url).body()
 
+    /**
+     * Rotates the account's sessionToken (TapTap built-in account REST API:
+     * PUT /1.1/users/<objectId>/refreshSessionToken, authenticated with the
+     * CURRENT sessionToken). The response carries the new token; the old one
+     * stops working immediately. The objectId never changes, so the caller can
+     * re-link the new credential to the existing local account data.
+     */
+    suspend fun resetSessionToken(
+        sessionToken: String,
+        server: Server,
+        userObjectId: String
+    ): SessionTokenResetResponse {
+        val url = "${TapTapConstants.baseUrl(server)}${TapTapConstants.Endpoints.refreshSessionToken(userObjectId)}"
+        return httpClient.put(url) {
+            buildHeaders(sessionToken, server).forEach { (key, value) -> header(key, value) }
+        }.rejectIfSessionTokenInvalid().body()
+    }
+
     private fun userPointerWhere(userObjectId: String): String =
         """{"user":{"__type":"Pointer","className":"_User","objectId":"$userObjectId"}}"""
 }
@@ -60,6 +79,13 @@ class TapTapApiClient(
 data class UserInfoResponse(
     val objectId: String,
     val nickname: String
+)
+
+@Serializable
+data class SessionTokenResetResponse(
+    val sessionToken: String,
+    val objectId: String = "",
+    val updatedAt: String? = null
 )
 
 @Serializable

@@ -4,12 +4,23 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.kasumi321.ushio.phitracker.data.platform.SecureKeyValueStorage
+import org.kasumi321.ushio.phitracker.data.platform.StorageWriteResult
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
 
 class SettingsRepositoryImpl(
     private val storage: SecureKeyValueStorage,
-    private val preloadStorage: SecureKeyValueStorage
+    private val preloadStorage: SecureKeyValueStorage,
+    // Credentials must be supplied explicitly so a wiring omission cannot put them in plain storage.
+    private val secureStorage: SecureKeyValueStorage,
+    private val legacySecureStorage: SecureKeyValueStorage? = null
 ) : SettingsRepository {
+
+    init {
+        storage.remove(KEY_MONEY_STRING)
+        storage.remove(KEY_AVATAR_URI)
+        migrateLegacyApiToken()
+    }
+
     private val themeModeState = MutableStateFlow(storage.getString(KEY_THEME_MODE)?.toIntOrNull() ?: 0)
     override val themeMode: Flow<Int> = themeModeState.asStateFlow()
 
@@ -164,27 +175,6 @@ class SettingsRepositoryImpl(
         preloadStorage.putString(KEY_PRELOAD_DONE, done.toString())
     }
 
-    private val avatarUriState = MutableStateFlow(storage.getString(KEY_AVATAR_URI))
-    override val avatarUri: Flow<String?> = avatarUriState.asStateFlow()
-
-    override suspend fun setAvatarUri(uri: String?) {
-        if (uri == null) {
-            storage.remove(KEY_AVATAR_URI)
-            avatarUriState.value = null
-        } else {
-            storage.putString(KEY_AVATAR_URI, uri)
-            avatarUriState.value = uri
-        }
-    }
-
-    private val moneyStringState = MutableStateFlow(storage.getString(KEY_MONEY_STRING) ?: "")
-    override val moneyString: Flow<String> = moneyStringState.asStateFlow()
-
-    override suspend fun setMoneyString(money: String) {
-        storage.putString(KEY_MONEY_STRING, money)
-        moneyStringState.value = money
-    }
-
     private val includePreReleaseState = MutableStateFlow(storage.getString(KEY_INCLUDE_PRE_RELEASE)?.toBooleanStrictOrNull() ?: false)
     override val includePreRelease: Flow<Boolean> = includePreReleaseState.asStateFlow()
 
@@ -252,13 +242,69 @@ class SettingsRepositoryImpl(
         apiPlatformIdState.value = trimmed
     }
 
-    private val apiTokenState = MutableStateFlow(storage.getString(KEY_API_TOKEN)?.trim() ?: "")
+    private val apiTokenState = MutableStateFlow(readApiToken())
     override val apiToken: Flow<String> = apiTokenState.asStateFlow()
 
-    override suspend fun setApiToken(apiToken: String) {
-        val trimmed = apiToken.trim()
-        storage.putString(KEY_API_TOKEN, trimmed)
-        apiTokenState.value = trimmed
+    override suspend fun setApiToken(apiToken: String): Result<Unit> {
+        val previousSecureValue = secureStorage.getString(KEY_API_TOKEN)
+        val result = runCatching {
+            val trimmed = apiToken.trim()
+            val writeResult = secureStorage.putString(KEY_API_TOKEN, trimmed)
+            check(writeResult == StorageWriteResult.Persisted && secureStorage.getString(KEY_API_TOKEN)?.trim() == trimmed) {
+                "API token was not persisted securely"
+            }
+            removeLegacyApiToken()
+            Unit
+        }
+        if (result.isFailure) {
+            runCatching {
+                if (previousSecureValue == null) {
+                    secureStorage.remove(KEY_API_TOKEN)
+                } else {
+                    secureStorage.putString(KEY_API_TOKEN, previousSecureValue)
+                }
+            }
+        }
+        // A failed write can still have changed or removed the underlying
+        // value. Never leave the in-memory form showing a stale credential.
+        apiTokenState.value = readApiToken()
+        return result
+    }
+
+    private fun readApiToken(): String =
+        secureStorage.getString(KEY_API_TOKEN)?.trim()
+            ?: legacySecureStorage?.getString(KEY_API_TOKEN)?.trim()
+            ?: storage.getString(KEY_API_TOKEN)?.trim().orEmpty()
+
+    private fun migrateLegacyApiToken() {
+        try {
+            val secured = secureStorage.getString(KEY_API_TOKEN)?.trim()
+            if (secured != null) {
+                removeLegacyApiToken()
+                return
+            }
+            val legacy = legacySecureStorage?.getString(KEY_API_TOKEN)?.trim().orEmpty().ifEmpty {
+                storage.getString(KEY_API_TOKEN)?.trim().orEmpty()
+            }
+            if (legacy.isEmpty()) return
+            val writeResult = secureStorage.putString(KEY_API_TOKEN, legacy)
+            if (writeResult == StorageWriteResult.Persisted && secureStorage.getString(KEY_API_TOKEN)?.trim() == legacy) {
+                removeLegacyApiToken()
+            }
+        } catch (_: Exception) {
+            // Legacy sources remain available for the next migration attempt.
+        }
+    }
+
+    private fun removeLegacyApiToken(): Boolean {
+        var removed = true
+        if (legacySecureStorage != null && legacySecureStorage !== secureStorage) {
+            removed = legacySecureStorage.remove(KEY_API_TOKEN) == StorageWriteResult.Persisted && removed
+        }
+        if (storage !== secureStorage && storage !== legacySecureStorage) {
+            removed = storage.remove(KEY_API_TOKEN) == StorageWriteResult.Persisted && removed
+        }
+        return removed
     }
 
     private val crashNotificationGuideShownState = MutableStateFlow(storage.getString(KEY_CRASH_NOTIFICATION_GUIDE_SHOWN)?.toBooleanStrictOrNull() ?: false)
@@ -348,8 +394,8 @@ class SettingsRepositoryImpl(
         const val KEY_B30_THEME_FOLLOW_GLOBAL = "b30_theme_follow_global"
         const val KEY_B30_EXPORT_THEME_MODE = "b30_export_theme_mode"
         const val KEY_PRELOAD_DONE = "preload_done"
-        const val KEY_AVATAR_URI = "avatar_uri"
-        const val KEY_MONEY_STRING = "money_string"
+        private const val KEY_AVATAR_URI = "avatar_uri"
+        private const val KEY_MONEY_STRING = "money_string"
         const val KEY_INCLUDE_PRE_RELEASE = "include_pre_release"
         const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
         const val KEY_AUTO_CHECK_SONG_DATA_UPDATE = "auto_check_song_data_update"

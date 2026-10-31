@@ -28,9 +28,13 @@ import org.kasumi321.ushio.phitracker.data.api.PhiPluginApi
 import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
+import org.kasumi321.ushio.phitracker.data.database.CurrentAccountEntity
+import org.kasumi321.ushio.phitracker.data.database.RecordEntity
+import org.kasumi321.ushio.phitracker.data.database.UserEntity
 import org.kasumi321.ushio.phitracker.data.parser.AesDecryptor
 import org.kasumi321.ushio.phitracker.data.parser.SaveParser
 import org.kasumi321.ushio.phitracker.data.platform.SecureKeyValueStorage
+import org.kasumi321.ushio.phitracker.data.platform.StorageWriteResult
 import org.kasumi321.ushio.phitracker.data.platform.TextAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.TokenManager
 import org.kasumi321.ushio.phitracker.domain.usecase.GetChartTagsUseCase
@@ -391,8 +395,41 @@ class PhigrosRepositoryImplApiDetailTest {
         assertEquals(3, requests.size)
     }
 
+    @Test
+    fun accountReadsRequireMatchingCredentialsAndTokenChangesAreObservable() = runTest {
+        val tokenManager = TokenManager(FakeStorage())
+        val repository = repository(mutableListOf(), tokenManager = tokenManager)
+        database.userDao().insertOrUpdate(
+            UserEntity("account-a", "Alice", "", "", "", 15f, 1, 3, "CN", 1L, "1MiB", "avatar-a")
+        )
+        database.recordDao().insertAll(
+            listOf(RecordEntity("account-a", "song-a.0", "IN", 950000, 95f, true, 1L))
+        )
+        database.currentAccountDao().setCurrent(CurrentAccountEntity("account-a"))
+
+        assertNull(repository.getUserProfile().first())
+        assertNull(repository.getCachedSave().first())
+        assertEquals(emptyMap(), repository.getClearCountsByDifficulty())
+
+        repository.saveSessionToken("new-token", Server.CN)
+        assertNull(repository.getUserProfile().first())
+        repository.saveBoundPlayerId("account-a")
+
+        val profile = repository.getUserProfile().first()
+        assertEquals("1MiB", profile?.moneyString)
+        assertEquals("avatar-a", profile?.avatarUri)
+        assertEquals(1, repository.getClearCountsByDifficulty().values.sum())
+        assertEquals("new-token", repository.observeSessionToken().first()?.first)
+        assertEquals(1, repository.getCachedSave().first()?.gameRecord?.size)
+
+        repository.clearTokenSync()
+        assertNull(repository.getUserProfile().first())
+        assertNull(repository.observeSessionToken().first())
+    }
+
     private fun repository(
         requests: MutableList<CapturedRequest>,
+        tokenManager: TokenManager = TokenManager(FakeStorage()),
         response: suspend (CapturedRequest) -> String = { request -> responseFor(request.path) }
     ): PhigrosRepositoryImpl {
         val json = Json { ignoreUnknownKeys = true }
@@ -419,7 +456,7 @@ class PhigrosRepositoryImplApiDetailTest {
             syncSnapshotDao = database.syncSnapshotDao(),
             songSyncHistoryDao = database.songSyncHistoryDao(),
             currentAccountDao = database.currentAccountDao(),
-            tokenManager = TokenManager(FakeStorage()),
+            tokenManager = tokenManager,
             json = json,
             songDataProvider = SongDataProvider(assetReader = EmptySongAssets)
         )
@@ -458,8 +495,14 @@ class PhigrosRepositoryImplApiDetailTest {
     private class FakeStorage : SecureKeyValueStorage {
         private val values = mutableMapOf<String, String>()
         override fun getString(key: String): String? = values[key]
-        override fun putString(key: String, value: String) { values[key] = value }
-        override fun remove(key: String) { values.remove(key) }
+        override fun putString(key: String, value: String): StorageWriteResult {
+            values[key] = value
+            return StorageWriteResult.Persisted
+        }
+        override fun remove(key: String): StorageWriteResult {
+            values.remove(key)
+            return StorageWriteResult.Persisted
+        }
     }
 
     private object EmptySongAssets : TextAssetReader {

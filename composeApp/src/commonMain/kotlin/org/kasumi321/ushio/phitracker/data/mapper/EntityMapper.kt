@@ -58,7 +58,9 @@ object EntityMapper {
         rks = rks,
         challengeModeRank = challengeModeRank,
         gameVersion = gameVersion,
-        updatedAt = formatTimestamp(lastSyncAt)
+        updatedAt = formatTimestamp(lastSyncAt),
+        moneyString = moneyString,
+        avatarUri = avatarUri
     )
 
     fun UserProfile.toEntity(server: Server, lastSyncAt: Long): UserEntity = UserEntity(
@@ -71,7 +73,9 @@ object EntityMapper {
         challengeModeRank = challengeModeRank,
         gameVersion = gameVersion,
         server = server.name,
-        lastSyncAt = lastSyncAt
+        lastSyncAt = lastSyncAt,
+        moneyString = moneyString,
+        avatarUri = avatarUri
     )
 
     fun SyncSnapshotEntity.toDomain(): SyncSnapshot = SyncSnapshot(

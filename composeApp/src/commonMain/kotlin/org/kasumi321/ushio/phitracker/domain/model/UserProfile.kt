@@ -12,7 +12,9 @@ data class UserProfile(
     val rks: Float,
     val challengeModeRank: Int,
     val gameVersion: Int,
-    val updatedAt: String
+    val updatedAt: String,
+    val moneyString: String = "",
+    val avatarUri: String? = null
 )
 
 @Serializable
@@ -35,6 +37,14 @@ data class GameProgress(
     val chapter8Passed: Boolean?,
     val chapter8SongUnlocked: Int?
 )
+
+fun formatMoneyString(money: List<Int>): String {
+    val units = listOf("KiB", "MiB", "GiB", "TiB", "PiB")
+    return money.withIndex()
+        .reversed()
+        .filter { it.value > 0 }
+        .joinToString(" ") { "${it.value}${units.getOrElse(it.index) { "" }}" }
+}
 
 @Serializable
 data class UserSettings(

@@ -47,7 +47,8 @@ internal class SyncWriter(
                     data.changedEntriesComparedTo(oldRecords)
                 }
 
-                userDao.insertOrUpdate(data.user)
+                val localAvatarUri = userDao.getUserOnce(owner)?.avatarUri
+                userDao.insertOrUpdate(data.user.copy(avatarUri = localAvatarUri))
                 recordDao.deleteByOwner(owner)
                 recordDao.insertAll(data.records)
 

@@ -705,6 +705,8 @@ class DomainUseCaseTest {
         override suspend fun clearData() = Unit
 
         override suspend fun clearTokenSync() = Unit
+        override suspend fun resetCredentialStorage(): Result<Unit> =
+            Result.failure(UnsupportedOperationException("credential reset is not used by this test"))
 
         override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> = emptyMap()
         override suspend fun getTotalFullComboCount(): Int = 0

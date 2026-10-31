@@ -16,12 +16,58 @@ class SessionTokenRejectedException(message: String = "session token rejected") 
 class SessionNotLoggedInException : Exception("no active session")
 
 /** The secure store dropped the credential write; the login attempt failed. */
-class SessionCredentialsPersistenceException : Exception("failed to persist session credentials")
+class SessionCredentialsPersistenceException(
+    val storageResetRequired: Boolean = false
+) : Exception("failed to persist session credentials")
+
+enum class SessionCleanupFailure {
+    PreviousAccountData,
+    PreviousCredentials,
+    LoginFinalization
+}
+
+class SessionCleanupRequiredException(
+    val failure: SessionCleanupFailure = SessionCleanupFailure.PreviousCredentials
+) : Exception("previous session cleanup is incomplete")
+
+/**
+ * A pre-Keychain session recovery intent could not be imported or proven
+ * stale, so no session may be established: replaying the old intent after a
+ * login would erase the new account's data. The block clears on a later
+ * startup once the secure store answers, or when the user explicitly resets
+ * the local session.
+ */
+class SessionRecoveryUnresolvedException : Exception("legacy session recovery state is unresolved")
+
+/**
+ * Result of a sessionToken reset request. The rotation is a revocation first:
+ * once TapTap accepts the request the OLD credential is dead even if we never
+ * learn the new one, so a network failure mid-flight leaves an uncertain state
+ * that must be reported honestly instead of masked as success or failure.
+ */
+sealed interface SessionResetOutcome {
+    /** Rotation confirmed and the new token is stored; local data untouched (objectId never rotates). */
+    data class Success(val playerId: String) : SessionResetOutcome
+
+    /** The request failed before a definitive answer: the server may or may not have rotated the token. */
+    data object OutcomeUnknown : SessionResetOutcome
+
+    /** TapTap rejected the current token (already reset/revoked elsewhere): a fresh login is needed. */
+    data object Rejected : SessionResetOutcome
+
+    /** No stored session: nothing to rotate. */
+    data object NotLoggedIn : SessionResetOutcome
+}
 
 data class SessionEstablished(
     val profile: UserProfile,
     val syncResult: SyncSaveResult
 )
+
+sealed interface SessionLogoutOutcome {
+    data object Completed : SessionLogoutOutcome
+    data object CredentialsCleanupPending : SessionLogoutOutcome
+}
 
 sealed interface SessionResumeOutcome {
     /**
@@ -38,7 +84,12 @@ sealed interface SessionResumeOutcome {
     }
 
     /** [hadToken] tells the login page whether to explain the fallback. */
-    data class RequiresLogin(val hadToken: Boolean) : SessionResumeOutcome
+    data class RequiresLogin(
+        val hadToken: Boolean,
+        val credentialCleanupPending: Boolean = false,
+        val localResetPending: Boolean = false,
+        val recoveryUnresolved: Boolean = false
+    ) : SessionResumeOutcome
 }
 
 /**
@@ -46,13 +97,15 @@ sealed interface SessionResumeOutcome {
  * QR login (post exchange), startup resume, save refresh and logout — so the
  * persistence orderings they rely on cannot interleave:
  *
- * - login validates the token and syncs BEFORE anything is persisted; on
- *   failure nothing is written (no "new token + old cache" state);
+ * - login records a durable pending owner before sync; credentials are
+ *   persisted in a short non-cancellable section and incomplete activation is
+ *   compensated on cancellation or the next resume;
  * - the sync mode is owner-scoped: an account with local records resumes with
  *   Refresh (score history continues across sessionToken resets), a new
  *   account bootstraps;
- * - logout cancels any in-flight operation first, then clears the current
- *   account's data transactionally;
+ * - logout records a durable intent before clearing rows and verifies token,
+ *   server and binding removal; a residual intent blocks automatic resume;
+ * - offline resume requires a non-null binding matching current_account;
  * - commits verify the current-account pointer is still what the operation
  *   started with, so a cancelled operation's late network result never
  *   writes back over a newer session state.
@@ -66,5 +119,18 @@ interface SessionCoordinator {
 
     suspend fun refresh(): Result<SyncSaveResult>
 
-    suspend fun logout(): Result<Unit>
+    suspend fun logout(): Result<SessionLogoutOutcome>
+
+    fun hasPendingRecovery(): Boolean = false
+
+    suspend fun resetLocalSession(): Result<Unit> =
+        Result.failure(UnsupportedOperationException("local session reset is not supported"))
+
+    /**
+     * Rotates the sessionToken of the CURRENT account. On success the new
+     * credential replaces the old one in secure storage while the account
+     * binding and every local row stay — objectIds survive token resets, so
+     * the inherited data simply continues under the new credential.
+     */
+    suspend fun resetSessionToken(): SessionResetOutcome
 }

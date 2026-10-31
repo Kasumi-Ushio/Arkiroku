@@ -2,6 +2,7 @@ package org.kasumi321.ushio.phitracker.domain.repository
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.JsonObject
 import org.kasumi321.ushio.phitracker.domain.model.Save
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
@@ -41,8 +42,11 @@ interface PhigrosRepository {
 
     fun getCachedSave(): Flow<Save?>
     fun getUserProfile(): Flow<UserProfile?>
+    suspend fun setAvatarUri(uri: String?): Result<Unit> =
+        Result.failure(UnsupportedOperationException("account avatar is not supported"))
     suspend fun saveSessionToken(token: String, server: Server)
     suspend fun getSessionToken(): Pair<String, Server>?
+    fun observeSessionToken(): Flow<Pair<String, Server>?> = flow { emit(getSessionToken()) }
     suspend fun clearData()
 
     /**
@@ -52,7 +56,14 @@ interface PhigrosRepository {
      */
     suspend fun clearCurrentAccountData(): Result<Unit> = runCatching { clearData() }
 
+    suspend fun clearCurrentAccountRows(): Result<Unit> = clearCurrentAccountData()
+
+    suspend fun deactivateCurrentAccount() {}
+
     suspend fun clearTokenSync()
+
+    /** Rebuilds permanently unavailable credential storage after explicit local-session reset. */
+    suspend fun resetCredentialStorage(): Result<Unit>
 
     /** The account (TapTap objectId) whose data is currently displayed, if any. */
     suspend fun getCurrentAccountOwner(): String? = null
@@ -64,6 +75,19 @@ interface PhigrosRepository {
     suspend fun getBoundPlayerId(): String? = null
 
     suspend fun saveBoundPlayerId(playerId: String) {}
+
+    /**
+     * Asks TapTap to rotate the sessionToken (PUT /users/<objectId>/
+     * refreshSessionToken, authenticated with the current token). On success
+     * the OLD token is dead and the returned string is the only valid
+     * credential. Fails with SessionTokenRejectedException when the current
+     * token is already invalid. Default keeps lightweight fakes compiling.
+     */
+    suspend fun resetSessionToken(
+        sessionToken: String,
+        server: Server,
+        userObjectId: String
+    ): Result<String> = Result.failure(UnsupportedOperationException("resetSessionToken not implemented"))
 
     suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int>
     suspend fun getTotalFullComboCount(): Int

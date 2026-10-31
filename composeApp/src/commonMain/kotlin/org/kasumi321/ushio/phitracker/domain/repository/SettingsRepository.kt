@@ -62,12 +62,6 @@ interface SettingsRepository {
     suspend fun setOverflowCount(count: Int)
     suspend fun getPreloadDone(): Boolean    suspend fun setPreloadDone(done: Boolean)
 
-    val avatarUri: Flow<String?>
-    suspend fun setAvatarUri(uri: String?)
-
-    val moneyString: Flow<String>
-    suspend fun setMoneyString(money: String)
-
     val includePreRelease: Flow<Boolean>
     val autoCheckUpdate: Flow<Boolean>
     val autoCheckSongDataUpdate: Flow<Boolean>
@@ -91,7 +85,7 @@ interface SettingsRepository {
     suspend fun setApiPlatformId(platformId: String)
 
     val apiToken: Flow<String>
-    suspend fun setApiToken(apiToken: String)
+    suspend fun setApiToken(apiToken: String): Result<Unit>
 
     val crashNotificationGuideShown: Flow<Boolean>
     suspend fun setCrashNotificationGuideShown(shown: Boolean)

@@ -1,5 +1,6 @@
 package org.kasumi321.ushio.phitracker.data.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -14,5 +15,7 @@ data class UserEntity(
     val challengeModeRank: Int,
     val gameVersion: Int,
     val server: String,
-    val lastSyncAt: Long
+    val lastSyncAt: Long,
+    @ColumnInfo(defaultValue = "''") val moneyString: String = "",
+    @ColumnInfo(defaultValue = "NULL") val avatarUri: String? = null
 )

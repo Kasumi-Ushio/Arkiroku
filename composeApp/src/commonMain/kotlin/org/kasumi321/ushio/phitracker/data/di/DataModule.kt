@@ -1,6 +1,7 @@
 package org.kasumi321.ushio.phitracker.data.di
 
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
@@ -23,12 +24,18 @@ import org.kasumi321.ushio.phitracker.data.platform.CoilIllustrationThumbnailPre
 import org.kasumi321.ushio.phitracker.data.platform.TokenManager
 import org.kasumi321.ushio.phitracker.data.platform.ArtworkFileCache
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
+import org.kasumi321.ushio.phitracker.data.platform.SecureKeyValueStorage
 import org.kasumi321.ushio.phitracker.data.platform.createPlatformPaths
+import org.kasumi321.ushio.phitracker.data.platform.createLegacySettingsStorage
+import org.kasumi321.ushio.phitracker.data.platform.createPlainKeyValueStorage
 import org.kasumi321.ushio.phitracker.data.platform.createSecureKeyValueStorage
+import org.kasumi321.ushio.phitracker.data.platform.createSessionStateStorage
 import org.kasumi321.ushio.phitracker.data.repository.PhigrosRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.repository.QrLoginRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.repository.SettingsRepositoryImpl
 import org.kasumi321.ushio.phitracker.data.session.SessionCoordinatorImpl
+import org.kasumi321.ushio.phitracker.data.session.SessionStateStore
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
@@ -53,6 +60,11 @@ val dataModule = module {
     single {
         HttpClient {
             install(ContentNegotiation) { json(get()) }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 60_000L
+                connectTimeoutMillis = 15_000L
+                socketTimeoutMillis = 60_000L
+            }
             // Debug builds only: request/response metadata goes through AppLogger
             // (file writer + Logcat/OSLog). Release installs nothing, so there is
             // no overhead and no header-leak surface.
@@ -81,12 +93,27 @@ val dataModule = module {
     single { get<AppDatabase>().syncSnapshotDao() }
     single { get<AppDatabase>().songSyncHistoryDao() }
     single { get<AppDatabase>().currentAccountDao() }
-    single<SessionCoordinator> { SessionCoordinatorImpl(get()) }
-    single { TokenManager(createSecureKeyValueStorage("phi_tracker_secure_prefs")) }
+    single { SessionStateStore(createSessionStateStorage("phi_tracker_session_state")) }
+    single<SessionCoordinator> { SessionCoordinatorImpl(get(), get()) }
+    // Shared credential store (iOS Keychain / Android EncryptedSharedPreferences):
+    // session token + account binding + Phi-Plugin api_token live here; normal
+    // settings use plain, restore-safe storage.
+    single<SecureKeyValueStorage> { createSecureKeyValueStorage("phi_tracker_secure_prefs") }
+    single {
+        TokenManager(
+            storage = get(),
+            recoverLegacyApiToken = {
+                createLegacySettingsStorage("phitracker_settings")?.getString("api_token")
+                    ?: createPlainKeyValueStorage("phitracker_settings").getString("api_token")
+            }
+        )
+    }
     single<SettingsRepository> {
         SettingsRepositoryImpl(
-            storage = createSecureKeyValueStorage("phitracker_settings"),
-            preloadStorage = createSecureKeyValueStorage("illustration_prefs")
+            storage = createPlainKeyValueStorage("phitracker_settings"),
+            preloadStorage = createPlainKeyValueStorage("illustration_prefs"),
+            secureStorage = get(),
+            legacySecureStorage = createLegacySettingsStorage("phitracker_settings")
         )
     }
     single { createPlatformPaths() }
@@ -125,6 +152,7 @@ val dataModule = module {
             collectibleDataUpdater = get()
         )
     }
+    single { CatalogRepairSession(get()) }
     single {
         IllustrationPreloadCoordinator(
             songDataProvider = get(),

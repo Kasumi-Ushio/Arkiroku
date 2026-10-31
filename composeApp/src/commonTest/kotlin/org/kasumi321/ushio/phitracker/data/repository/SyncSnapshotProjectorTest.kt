@@ -79,6 +79,21 @@ class SyncSnapshotProjectorTest {
     }
 
     @Test
+    fun projectsMoneyIntoTheAccountProfile(): Unit {
+        val data = projector().project(
+            save = emptySave().copy(
+                gameProgress = emptySave().gameProgress.copy(money = listOf(4, 3, 0, 2))
+            ),
+            profile = profile(rks = 15f),
+            server = Server.CN,
+            difficulties = emptyMap(),
+            songNames = emptyMap()
+        )
+
+        assertEquals("2TiB 3MiB 4KiB", data.user.moneyString)
+    }
+
+    @Test
     fun reusesOneClockValueAcrossEveryProjectedEntity(): Unit {
         val data = projector().project(
             save = saveWithRecords(),

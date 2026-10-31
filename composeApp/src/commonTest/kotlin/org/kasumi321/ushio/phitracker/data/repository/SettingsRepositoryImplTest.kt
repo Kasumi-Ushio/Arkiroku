@@ -12,7 +12,7 @@ class SettingsRepositoryImplTest {
     private fun createRepo(): SettingsRepositoryImpl {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
-        return SettingsRepositoryImpl(storage, preloadStorage)
+        return SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
     }
 
     @Test
@@ -85,39 +85,16 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun defaultsAvatarUriNull(): Unit = runTest {
-        val repo = createRepo()
-        assertNull(repo.avatarUri.first())
-    }
+    fun legacyGlobalAccountProfileValuesAreDiscarded(): Unit = runTest {
+        val storage = FakeSecureKeyValueStorage().apply {
+            map["avatar_uri"] = "file:///previous-account-avatar.png"
+            map["money_string"] = "999"
+        }
 
-    @Test
-    fun setAndReadAvatarUri(): Unit = runTest {
-        val repo = createRepo()
-        repo.setAvatarUri("https://example.test/avatar.png")
-        assertEquals("https://example.test/avatar.png", repo.avatarUri.first())
-    }
+        SettingsRepositoryImpl(storage, FakeSecureKeyValueStorage(), FakeSecureKeyValueStorage())
 
-    @Test
-    fun setAvatarUriNullRemovesKeyAndUpdatesState(): Unit = runTest {
-        val repo = createRepo()
-        repo.setAvatarUri("https://example.test/avatar.png")
-        assertEquals("https://example.test/avatar.png", repo.avatarUri.first())
-
-        repo.setAvatarUri(null)
-        assertNull(repo.avatarUri.first())
-    }
-
-    @Test
-    fun defaultsMoneyStringEmpty(): Unit = runTest {
-        val repo = createRepo()
-        assertEquals("", repo.moneyString.first())
-    }
-
-    @Test
-    fun setAndReadMoneyString(): Unit = runTest {
-        val repo = createRepo()
-        repo.setMoneyString("1024.64 KB")
-        assertEquals("1024.64 KB", repo.moneyString.first())
+        assertNull(storage.map["avatar_uri"])
+        assertNull(storage.map["money_string"])
     }
 
     @Test
@@ -189,18 +166,16 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setThemeMode(3)
-        repo1.setMoneyString("999")
         repo1.setApiId("myId")
         repo1.setApiPlatform("platform")
         repo1.setIncludePreRelease(true)
         repo1.setApiEnabled(true)
         repo1.setUseApiData(true)
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(3, repo2.themeMode.first())
-        assertEquals("999", repo2.moneyString.first())
         assertEquals("myId", repo2.apiId.first())
         assertEquals("platform", repo2.apiPlatform.first())
         assertEquals(true, repo2.includePreRelease.first())
@@ -213,7 +188,7 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(false, repo.getPreloadDone())
         repo.setPreloadDone(true)
         assertEquals(true, repo.getPreloadDone())
@@ -241,10 +216,10 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setCrashNotificationGuideShown(true)
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(true, repo2.crashNotificationGuideShown.first())
     }
 
@@ -268,10 +243,10 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setAutoCheckUpdate(false)
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(false, repo2.autoCheckUpdate.first())
     }
 
@@ -295,10 +270,10 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setAutoCheckSongDataUpdate(false)
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(false, repo2.autoCheckSongDataUpdate.first())
     }
 
@@ -308,7 +283,7 @@ class SettingsRepositoryImplTest {
         val preloadStorage = FakeSecureKeyValueStorage()
         storage.putString("overflow_count", "35")
 
-        val repo = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(30, repo.overflowCount.first())
     }
 
@@ -318,7 +293,7 @@ class SettingsRepositoryImplTest {
         val preloadStorage = FakeSecureKeyValueStorage()
         storage.putString("overflow_count", "0")
 
-        val repo = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(1, repo.overflowCount.first())
     }
 
@@ -359,11 +334,11 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setHazeBlurEnabled(false)
         repo1.setHazeBlurStrength(1.25f)
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(false, repo2.hazeBlurEnabled.first())
         assertEquals(1.25f, repo2.hazeBlurStrength.first())
     }
@@ -383,7 +358,7 @@ class SettingsRepositoryImplTest {
         val preloadStorage = FakeSecureKeyValueStorage()
         storage.putString("haze_blur_strength", "5.0")
 
-        val repo = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(1.5f, repo.hazeBlurStrength.first())
     }
 
@@ -398,10 +373,10 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setGameUpdateInfoCache("""{"version":"3.20.0","versionCode":154}""")
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals("""{"version":"3.20.0","versionCode":154}""", repo2.gameUpdateInfoCache.first())
     }
 
@@ -434,7 +409,7 @@ class SettingsRepositoryImplTest {
         val preloadStorage = FakeSecureKeyValueStorage()
         storage.putString("b30_card_style", "unknown_style")
 
-        val repo = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals("classic", repo.b30CardStyle.first())
 
         repo.setB30CardStyle("unknown_style")
@@ -446,10 +421,10 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setB30CardStyle("score_focus")
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals("score_focus", repo2.b30CardStyle.first())
     }
 
@@ -479,11 +454,11 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setB30ThemeFollowGlobal(false)
         repo1.setB30ExportThemeMode(2)
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(false, repo2.b30ThemeFollowGlobal.first())
         assertEquals(2, repo2.b30ExportThemeMode.first())
     }
@@ -509,7 +484,7 @@ class SettingsRepositoryImplTest {
         val preloadStorage = FakeSecureKeyValueStorage()
         storage.putString("app_language", "fr")
 
-        val repo = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals("system", repo.appLanguage.first())
 
         repo.setAppLanguage("fr")
@@ -521,10 +496,10 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setAppLanguage("en")
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals("en", repo2.appLanguage.first())
     }
 
@@ -552,13 +527,13 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(false, repo1.onboardingRerunRequested.first())
         repo1.setOnboardingRerunRequested(true)
         assertEquals(true, repo1.onboardingRerunRequested.first())
         assertEquals("true", storage.map["onboarding_rerun_requested"])
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(true, repo2.onboardingRerunRequested.first())
         repo2.setOnboardingRerunRequested(false)
         assertEquals(false, repo2.onboardingRerunRequested.first())
@@ -569,7 +544,7 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setOnboardingCompleted(true)
         repo1.setIllustrationPreloadRequested(true)
 
@@ -578,7 +553,7 @@ class SettingsRepositoryImplTest {
         assertEquals("true", storage.map["illustration_preload_requested"])
         assertEquals(null, preloadStorage.map["onboarding_completed"])
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(true, repo2.onboardingCompleted.first())
         assertEquals(true, repo2.illustrationPreloadRequested.first())
     }
@@ -588,11 +563,11 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.setIllustrationPreloadDeclined(true)
 
         assertEquals("true", storage.map["illustration_preload_declined"])
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(true, repo2.illustrationPreloadDeclined.first())
 
         repo2.setIllustrationPreloadDeclined(false)
@@ -610,7 +585,7 @@ class SettingsRepositoryImplTest {
         val storage = FakeSecureKeyValueStorage()
         val preloadStorage = FakeSecureKeyValueStorage()
 
-        val repo1 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo1 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         repo1.recordChartVote("taptap:player-id:api-user:song-a.0:IN")
         repo1.recordChartVote("taptap:player-id:api-user:song-a.0:EZ")
         assertEquals(
@@ -618,7 +593,7 @@ class SettingsRepositoryImplTest {
             repo1.chartVoteKeys.first()
         )
 
-        val repo2 = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo2 = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(
             setOf("taptap:player-id:api-user:song-a.0:IN", "taptap:player-id:api-user:song-a.0:EZ"),
             repo2.chartVoteKeys.first()
@@ -639,7 +614,7 @@ class SettingsRepositoryImplTest {
         val preloadStorage = FakeSecureKeyValueStorage()
         storage.putString("chart_vote_keys", "")
 
-        val repo = SettingsRepositoryImpl(storage, preloadStorage)
+        val repo = SettingsRepositoryImpl(storage, preloadStorage, FakeSecureKeyValueStorage())
         assertEquals(emptySet(), repo.chartVoteKeys.first())
     }
 }

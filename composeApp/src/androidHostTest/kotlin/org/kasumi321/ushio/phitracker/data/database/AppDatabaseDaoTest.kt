@@ -194,6 +194,26 @@ class AppDatabaseDaoTest {
     }
 
     @Test
+    fun syncWriterPreservesLocalAvatarWhileRefreshingRemoteProfile(): Unit = runTest {
+        database.userDao().insertOrUpdate(
+            UserEntity(
+                "new-player", "Old", "remote-old", "", "", 10f, 1, 1, "CN", 100L,
+                moneyString = "1 KiB", avatarUri = "file:///local-avatar.png"
+            )
+        )
+        val data = commitData().copy(
+            user = commitData().user.copy(avatar = "remote-new", moneyString = "2 MiB", avatarUri = null)
+        )
+
+        writer().commit(data, SyncMode.Refresh, expectedCurrentOwner = null)
+
+        val user = database.userDao().getUserOnce("new-player")
+        assertEquals("remote-new", user?.avatar)
+        assertEquals("2 MiB", user?.moneyString)
+        assertEquals("file:///local-avatar.png", user?.avatarUri)
+    }
+
+    @Test
     fun syncWriterUnchangedRefreshDoesNotCreateSnapshotOrHistory(): Unit = runTest {
         database.recordDao().insertAll(
             listOf(RecordEntity("new-player", "new-song.0", "IN", 950_000, 95f, false, 100L))
@@ -351,8 +371,8 @@ class AppDatabaseDaoTest {
     // ── migrations ────────────────────────────────────────────────────
 
     @Test
-    fun migrationFromV1ToV4AttributesSingleUserDataToThatAccount(): Unit = runTest {
-        val dbName = "migration_v1_to_v4_test.db"
+    fun migrationFromV1ToV5AttributesSingleUserDataToThatAccount(): Unit = runTest {
+        val dbName = "migration_v1_to_v5_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         context.deleteDatabase(dbName)
         context.getDatabasePath(dbName).parentFile?.mkdirs()
@@ -408,8 +428,8 @@ class AppDatabaseDaoTest {
     }
 
     @Test
-    fun migrationFromV2ToV4AttributesSnapshotsToTheSingleAccount(): Unit = runTest {
-        val dbName = "migration_v2_to_v4_test.db"
+    fun migrationFromV2ToV5KeepsRecordsAndDropsUnattributableSnapshots(): Unit = runTest {
+        val dbName = "migration_v2_to_v5_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         context.deleteDatabase(dbName)
         context.getDatabasePath(dbName).parentFile?.mkdirs()
@@ -447,7 +467,7 @@ class AppDatabaseDaoTest {
 
         assertEquals("song-v2.0", roomDb.recordDao().getAllRecordsOnce("player-v2").single().songId)
         assertEquals("V2", roomDb.userDao().getUserOnce("player-v2")?.nickname)
-        assertEquals(7L, roomDb.syncSnapshotDao().getAllOnce("player-v2").single().id)
+        assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player-v2").size)
         assertEquals("player-v2", roomDb.currentAccountDao().get()?.playerId)
 
         roomDb.close()
@@ -455,7 +475,7 @@ class AppDatabaseDaoTest {
     }
 
     @Test
-    fun migrationFromV3SingleUserAttributesEverythingToThatAccount(): Unit = runTest {
+    fun migrationFromV3SingleUserKeepsRecordsAndDropsUnattributableHistory(): Unit = runTest {
         val dbName = "migration_v3_single_user_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         seedRawV3Database(dbName) {
@@ -467,10 +487,35 @@ class AppDatabaseDaoTest {
         val roomDb = migrationDatabase(context, dbName)
 
         assertEquals(listOf("song-a.0"), roomDb.recordDao().getAllRecordsOnce("player1").map { it.songId })
-        assertEquals("Alice", roomDb.userDao().getUserOnce("player1")?.nickname)
-        assertEquals(listOf(3L), roomDb.syncSnapshotDao().getAllOnce("player1").map { it.id })
-        assertEquals(listOf(9L), roomDb.songSyncHistoryDao().getRecent("player1", 10).map { it.id })
+        val user = roomDb.userDao().getUserOnce("player1")
+        assertEquals("Alice", user?.nickname)
+        assertEquals("", user?.moneyString)
+        assertNull(user?.avatarUri)
+        assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player1").size)
+        assertEquals(0, roomDb.songSyncHistoryDao().getRecent("player1", 10).size)
         assertEquals("player1", roomDb.currentAccountDao().get()?.playerId)
+
+        roomDb.close()
+        context.deleteDatabase(dbName)
+    }
+
+    @Test
+    fun migrationFromV3SingleUserNeverClaimsAnotherAccountsResidualHistory(): Unit = runTest {
+        val dbName = "migration_v3_mixed_single_user_test.db"
+        val context: android.content.Context = ApplicationProvider.getApplicationContext()
+        seedRawV3Database(dbName) {
+            execSQL("INSERT INTO records VALUES ('song-c.0', 'IN', 950000, 95.0, 1, 3)")
+            execSQL("INSERT INTO users VALUES ('player-c', 'Current', '', '', '', 15.0, 1, 3, 'CN', 3)")
+            execSQL("INSERT INTO sync_snapshots VALUES (3, 1, 12.0, 'Previous', 1, 'song-a.0', 'EZ', 900000, 90.0)")
+            execSQL("INSERT INTO song_sync_history VALUES (9, 3, 'song-a.0', 'EZ', 900000, 90.0, 0, 1)")
+        }
+
+        val roomDb = migrationDatabase(context, dbName)
+
+        assertEquals(listOf("song-c.0"), roomDb.recordDao().getAllRecordsOnce("player-c").map { it.songId })
+        assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player-c").size)
+        assertEquals(0, roomDb.songSyncHistoryDao().getRecent("player-c", 10).size)
+        assertEquals("player-c", roomDb.currentAccountDao().get()?.playerId)
 
         roomDb.close()
         context.deleteDatabase(dbName)
@@ -594,7 +639,8 @@ class AppDatabaseDaoTest {
             .addMigrations(
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
-                AppDatabase.MIGRATION_3_4
+                AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5
             )
             .setQueryCoroutineContext(Dispatchers.Default)
             .build()
