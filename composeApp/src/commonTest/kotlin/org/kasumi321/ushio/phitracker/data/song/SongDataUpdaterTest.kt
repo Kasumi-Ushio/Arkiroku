@@ -9,9 +9,16 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import okio.FileSystem
+import okio.ForwardingFileSystem
+import okio.Path
 import okio.Path.Companion.toPath
+import org.kasumi321.ushio.phitracker.data.common.StagedUpdateBlockedException
 import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.TextAssetReader
 import kotlin.random.Random
@@ -20,8 +27,11 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SongDataUpdaterTest {
 
     private val fs = FileSystem.SYSTEM
@@ -59,6 +69,40 @@ class SongDataUpdaterTest {
     }
 
     private fun songDataDir() = testBaseDir / "song_data"
+
+    private fun songBackupDir() = testBaseDir / "song_data_backup"
+
+    private fun legacySongBackupDir() = paths.cacheDir.toPath() / "song_data_backup"
+
+    private fun manifestOf(backups: Map<String, String>): String = buildString {
+        append("PHI-PRESTATE-V1\n")
+        append(backups.size).append('\n')
+        for ((name, content) in backups) {
+            append(content.encodeToByteArray().size).append('\t').append(name).append('\n')
+        }
+    }
+
+    private fun writeRetainedScene(
+        state: String?,
+        manifest: String,
+        backups: Map<String, String>
+    ) {
+        val backup = songBackupDir()
+        fs.createDirectories(backup)
+        for ((name, content) in backups) fs.write(backup / name) { writeUtf8(content) }
+        fs.write(backup / "prestate.txt") { writeUtf8(manifest) }
+        if (state != null) fs.write(backup / "transaction.state") { writeUtf8("$state\n") }
+    }
+
+    private fun writeLegacyScene(
+        manifest: String?,
+        backups: Map<String, String>
+    ) {
+        val backup = legacySongBackupDir()
+        fs.createDirectories(backup)
+        for ((name, content) in backups) fs.write(backup / name) { writeUtf8(content) }
+        if (manifest != null) fs.write(backup / "prestate.txt") { writeUtf8(manifest) }
+    }
 
     private fun assertFileWritten(fileName: String) {
         val file = songDataDir() / fileName
@@ -206,7 +250,7 @@ class SongDataUpdaterTest {
         // No stale staging or backup residue should remain
         val stagingDir = paths.cacheDir.toPath() / "song_data_staging"
         assertFalse(fs.exists(stagingDir), "Staging dir should be cleaned up after failure")
-        val backupDir = paths.cacheDir.toPath() / "song_data_backup"
+        val backupDir = songBackupDir()
         assertFalse(fs.exists(backupDir), "Backup dir should be cleaned up after failure")
     }
 
@@ -259,23 +303,305 @@ class SongDataUpdaterTest {
         assertTrue(result.isFailure, "Expected checkUpstreamChanged to fail on network error")
     }
 
-    /*
-     * Note on commit-phase rollback testing:
-     *
-     * Simulating an `atomicMove` failure during the commit phase requires
-     * injecting a mock FileSystem. The current SongDataUpdater constructor
-     * uses `FileSystem.SYSTEM` directly. Adding constructor-level FileSystem
-     * injection solely for this test edge case would be a broader refactor
-     * than the scope allows.
-     *
-     * The backup-commit-rollback logic is verified indirectly:
-     * - `updateAllDownloadsAllFourFilesAndInvalidatesCache` proves
-     *   backup→commit→cleanup succeeds for the happy path.
-     * - `partialDownloadFailureLeavesExistingPersistentFilesUntouched`
-     *   verifies the pre-commit invariant (Phase 1 failures leave
-     *   persistent files unchanged and staging/backup cleaned).
-     * - The rollback path (Phase 2c) follows the same file operation
-     *   patterns as the happy-path commit — the difference is only
-     *   the source (backup dir instead of staging dir).
-     */
+    @Test
+    fun cancellationDuringDownloadPropagatesAsCancellationAndCleansStaging() {
+        val testDispatcher = StandardTestDispatcher()
+        runTest(testDispatcher) {
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val client = HttpClient(
+                MockEngine(
+                    io.ktor.client.engine.mock.MockEngineConfig().apply {
+                        dispatcher = testDispatcher
+                        addHandler {
+                            gate.await()
+                            respond(ByteReadChannel("never-reached"))
+                        }
+                    }
+                )
+            )
+            val provider = fakeProvider()
+            val updater = SongDataUpdater(client, paths, provider)
+            var returned: Result<Unit>? = null
+
+            val job = launch { returned = updater.updateAll() }
+            runCurrent()
+            assertTrue(fs.exists(paths.cacheDir.toPath() / "song_data_staging"), "staging exists while downloading")
+
+            job.cancelAndJoin()
+
+            assertTrue(job.isCancelled, "cancellation must propagate, not convert into a failure Result")
+            assertEquals(null, returned, "a cancelled update must not produce a Result")
+            assertFalse(fs.exists(paths.cacheDir.toPath() / "song_data_staging"), "cancelled update cleans staging")
+            assertFalse(fs.exists(songBackupDir()), "cancelled update cleans the persistent backup")
+            assertEquals(emptyList<String>(), songDataDir().let { if (fs.exists(it)) fs.list(it) else emptyList() }, "no persistent file written")
+        }
+    }
+
+    @Test
+    fun checkUpstreamChangedReturnsTrueWhenPendingRecoveryExists() = runTest {
+        fs.createDirectories(songBackupDir())
+        val mockEngine = MockEngine {
+            throw RuntimeException("network must not be probed while a recovery scene is pending")
+        }
+        val updater = SongDataUpdater(HttpClient(mockEngine), paths, fakeProvider())
+
+        val result = updater.checkUpstreamChanged()
+
+        assertTrue(result.isSuccess, "A pending scene must report a change without a network round trip")
+        assertEquals(true, result.getOrNull())
+    }
+
+    @Test
+    fun updateAllRecoversPendingSceneAndInvalidatesProviderCacheEvenWhenDownloadFails() = runTest {
+        val header = "id\tsong\tcomposer\tillustrator\tEZC\tHDC\tINC\tATC\tEZ\tHD\tIN\tAT\n"
+        val oldInfo = header + "old\tOld Song\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val mixedInfo = header + "mixed\tMixed Song\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val provider = fakeProvider()
+        fs.createDirectories(songDataDir())
+        fs.write(songDataDir() / "info.csv") { writeUtf8(mixedInfo) }
+        assertEquals("Mixed Song", provider.getSongs()["mixed.0"]?.name, "the provider caches the mixed on-disk state")
+        writeRetainedScene(
+            state = "COMMITTING",
+            manifest = manifestOf(mapOf("info.csv" to oldInfo)),
+            backups = mapOf("info.csv" to oldInfo)
+        )
+
+        val engine = MockEngine { respondError(HttpStatusCode.InternalServerError) }
+        val result = SongDataUpdater(HttpClient(engine), paths, provider).updateAll()
+
+        assertTrue(result.isFailure, "the download after recovery still fails")
+        assertEquals(oldInfo, fs.read(songDataDir() / "info.csv") { readUtf8() })
+        assertEquals(
+            "Old Song",
+            provider.getSongs()["old.0"]?.name,
+            "recovery rewrote info.csv; the provider must not keep serving the mixed cache"
+        )
+        assertNull(provider.getSongs()["mixed.0"])
+        assertFalse(fs.exists(songBackupDir()), "a recovered scene is consumed")
+    }
+
+    @Test
+    fun twoUpdatesInARowDoNotLockAfterPartialBackupResidue() = runTest {
+        fs.createDirectories(songBackupDir())
+        fs.write(songBackupDir() / "infolist.json") { writeUtf8("partial-copy-from-a-crashed-run") }
+        val mockEngine = MockEngine { request ->
+            val fileName = request.url.encodedPath.substringAfterLast('/')
+            respond(
+                content = ByteReadChannel("mock-content-$fileName"),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "text/plain")
+            )
+        }
+        val provider = fakeProvider()
+        val updater = SongDataUpdater(HttpClient(mockEngine), paths, provider)
+
+        val first = updater.updateAll()
+        val second = updater.updateAll()
+
+        assertTrue(first.isSuccess, "an uncommitted partial backup must not block the next update: $first")
+        assertTrue(second.isSuccess, "repeated updates must keep working: $second")
+        assertFalse(fs.exists(songBackupDir()))
+    }
+
+    @Test
+    fun resetPendingUpdateClearsBlockedSceneWithoutTouchingPersistentData() = runTest {
+        val header = "id\tsong\tcomposer\tillustrator\tEZC\tHDC\tINC\tATC\tEZ\tHD\tIN\tAT\n"
+        val currentInfo = header + "current\tCurrent\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        fs.createDirectories(songDataDir())
+        fs.write(songDataDir() / "info.csv") { writeUtf8(currentInfo) }
+        writeRetainedScene(
+            state = "COMMITTING",
+            manifest = "",
+            backups = mapOf("info.csv" to "old")
+        )
+        val updater = SongDataUpdater(HttpClient(MockEngine { error("unused") }), paths, fakeProvider())
+
+        val blocked = updater.recoverPendingUpdate()
+
+        assertIs<StagedUpdateBlockedException>(blocked.exceptionOrNull())
+        assertTrue(updater.hasPendingRecovery())
+        assertEquals(currentInfo, fs.read(songDataDir() / "info.csv") { readUtf8() })
+
+        assertTrue(updater.resetPendingUpdate().isSuccess)
+        assertFalse(updater.hasPendingRecovery())
+        assertEquals(currentInfo, fs.read(songDataDir() / "info.csv") { readUtf8() }, "reset never restores or deletes data")
+    }
+
+    @Test
+    fun committingSceneNeedsExplicitRecoveryBeforeTheProviderSeesRestoredData() = runTest {
+        val header = "id\tsong\tcomposer\tillustrator\tEZC\tHDC\tINC\tATC\tEZ\tHD\tIN\tAT\n"
+        val oldInfo = header + "old\tOld Song\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val mixedInfo = header + "mixed\tMixed Song\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val provider = fakeProvider()
+        fs.createDirectories(songDataDir())
+        fs.write(songDataDir() / "info.csv") { writeUtf8(mixedInfo) }
+        assertEquals("Mixed Song", provider.getSongs()["mixed.0"]?.name)
+        writeRetainedScene(
+            state = "COMMITTING",
+            manifest = manifestOf(mapOf("info.csv" to oldInfo)),
+            backups = mapOf("info.csv" to oldInfo)
+        )
+        assertTrue(fs.exists(songBackupDir()), "the new scene lives under filesDir")
+        assertFalse(fs.exists(legacySongBackupDir()), "a new-format scene is not written to cacheDir")
+        val updater = SongDataUpdater(HttpClient(MockEngine { error("unused") }), paths, provider)
+
+        assertEquals(
+            "Mixed Song",
+            provider.getSongs()["mixed.0"]?.name,
+            "nothing may be read as recovered before the explicit recovery ran"
+        )
+
+        val recovered = updater.recoverPendingUpdate()
+
+        assertTrue(recovered.isSuccess, "explicit recovery restores the COMMITTING scene: $recovered")
+        assertEquals(oldInfo, fs.read(songDataDir() / "info.csv") { readUtf8() })
+        assertEquals("Old Song", provider.getSongs()["old.0"]?.name, "the provider cache is invalidated by recovery")
+        assertNull(provider.getSongs()["mixed.0"])
+        assertFalse(fs.exists(songBackupDir()))
+    }
+
+    @Test
+    fun legacyNoStateCacheSceneIsRestoredWithCommittingSemantics() = runTest {
+        val header = "id\tsong\tcomposer\tillustrator\tEZC\tHDC\tINC\tATC\tEZ\tHD\tIN\tAT\n"
+        val oldInfo = header + "old\tOld Song\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val mixedInfo = header + "mixed\tMixed Song\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val provider = fakeProvider()
+        fs.createDirectories(songDataDir())
+        fs.write(songDataDir() / "info.csv") { writeUtf8(mixedInfo) }
+        fs.write(songDataDir() / "notesInfo.json") { writeUtf8("newly-committed") }
+        assertEquals("Mixed Song", provider.getSongs()["mixed.0"]?.name)
+        // Old versions wrote one filename per line and no transaction state.
+        writeLegacyScene(manifest = "info.csv", backups = mapOf("info.csv" to oldInfo))
+
+        val updater = SongDataUpdater(HttpClient(MockEngine { error("unused") }), paths, provider)
+        val recovered = updater.recoverPendingUpdate()
+
+        assertTrue(recovered.isSuccess, "a valid non-empty legacy scene is recoverable: $recovered")
+        assertEquals(oldInfo, fs.read(songDataDir() / "info.csv") { readUtf8() })
+        assertNull(provider.getSongs()["mixed.0"])
+        assertEquals("Old Song", provider.getSongs()["old.0"]?.name)
+        assertFalse(fs.exists(songDataDir() / "notesInfo.json"), "COMMITTING semantics remove files the prestate lacked")
+        assertFalse(fs.exists(legacySongBackupDir()), "the migrated legacy scene is consumed")
+        assertFalse(fs.exists(songBackupDir()), "recovery never leaves a new-format scene behind")
+    }
+
+    @Test
+    fun emptyOrInvalidLegacyCacheScenesFailClosedUntilReset() = runTest {
+        val header = "id\tsong\tcomposer\tillustrator\tEZC\tHDC\tINC\tATC\tEZ\tHD\tIN\tAT\n"
+        val currentInfo = header + "current\tCurrent\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val oldInfo = header + "old\tOld Song\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        val invalidScenes: List<Pair<String?, Map<String, String>>> = listOf(
+            null to mapOf("info.csv" to oldInfo),
+            "" to mapOf("info.csv" to oldInfo),
+            "info.csv\n" to mapOf("info.csv" to oldInfo),
+            "info.csv\ninfo.csv" to mapOf("info.csv" to oldInfo),
+            "unknown.csv" to mapOf("unknown.csv" to "old"),
+            "info.csv" to emptyMap()
+        )
+        for ((manifest, backups) in invalidScenes) {
+            setUp(); try {
+                fs.createDirectories(songDataDir())
+                fs.write(songDataDir() / "info.csv") { writeUtf8(currentInfo) }
+                writeLegacyScene(manifest = manifest, backups = backups)
+                val updater = SongDataUpdater(HttpClient(MockEngine { error("unused") }), paths, fakeProvider())
+
+                val recovered = updater.recoverPendingUpdate()
+
+                assertIs<StagedUpdateBlockedException>(
+                    recovered.exceptionOrNull(),
+                    "legacy scene must fail closed: manifest=$manifest backups=${backups.keys}"
+                )
+                assertEquals(currentInfo, fs.read(songDataDir() / "info.csv") { readUtf8() })
+                assertTrue(updater.hasPendingRecovery(), "the ambiguous legacy scene is retained")
+                assertTrue(fs.exists(legacySongBackupDir()))
+
+                val reset = updater.resetPendingUpdate()
+
+                assertTrue(reset.isSuccess, "reset clears an unrecoverable legacy scene: $reset")
+                assertFalse(fs.exists(legacySongBackupDir()))
+                assertTrue(updater.hasPendingRepair(), "reset records the outstanding full download")
+            } finally {
+                tearDown()
+            }
+        }
+    }
+
+    @Test
+    fun resetRequiresAFullUpdateAndFailedUpdateKeepsTheRepairMarker() = runTest {
+        val header = "id\tsong\tcomposer\tillustrator\tEZC\tHDC\tINC\tATC\tEZ\tHD\tIN\tAT\n"
+        val currentInfo = header + "current\tCurrent\tComp\tIll\t\t\t\t\t1.0\t2.0\t3.0\t"
+        fs.createDirectories(songDataDir())
+        fs.write(songDataDir() / "info.csv") { writeUtf8(currentInfo) }
+        writeRetainedScene(
+            state = "COMMITTING",
+            manifest = "",
+            backups = mapOf("info.csv" to "garbage")
+        )
+        val updater = SongDataUpdater(
+            HttpClient(MockEngine { error("network must not be probed while the marker is pending") }),
+            paths,
+            fakeProvider()
+        )
+        assertIs<StagedUpdateBlockedException>(updater.recoverPendingUpdate().exceptionOrNull())
+
+        val reset = updater.resetPendingUpdate()
+
+        assertTrue(reset.isSuccess)
+        assertTrue(updater.hasPendingRepair(), "reset must leave a persistent repair obligation")
+        val check = updater.checkUpstreamChanged()
+        assertTrue(check.isSuccess)
+        assertEquals(true, check.getOrNull(), "the marker forces an update without a network probe")
+
+        val failed = updater.updateAll()
+        assertTrue(failed.isFailure)
+        assertTrue(updater.hasPendingRepair(), "a failed full update must not clear the marker")
+
+        val working = SongDataUpdater(
+            HttpClient(MockEngine { request ->
+                val fileName = request.url.encodedPath.substringAfterLast('/')
+                respond(
+                    content = ByteReadChannel("mock-content-$fileName"),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
+            }),
+            paths,
+            fakeProvider()
+        )
+        val healed = working.updateAll()
+
+        assertTrue(healed.isSuccess, "a successful full update clears the repair marker: $healed")
+        assertFalse(working.hasPendingRepair())
+        assertEquals("mock-content-info.csv", fs.read(songDataDir() / "info.csv") { readUtf8() })
+    }
+
+    @Test
+    fun resetFailsClosedWhenTheRepairMarkerCannotBePersisted() = runTest {
+        fs.createDirectories(songDataDir())
+        writeRetainedScene(
+            state = "COMMITTING",
+            manifest = "",
+            backups = mapOf("info.csv" to "garbage")
+        )
+        val failure = IllegalStateException("injected marker move failure")
+        val marker = songDataDir() / "repair-required.marker"
+        val faultyFs = object : ForwardingFileSystem(fs) {
+            override fun atomicMove(source: Path, target: Path) {
+                if (target == marker) throw failure
+                delegate.atomicMove(source, target)
+            }
+        }
+        val updater = SongDataUpdater(
+            HttpClient(MockEngine { error("unused") }),
+            paths,
+            fakeProvider(),
+            faultyFs
+        )
+
+        val reset = updater.resetPendingUpdate()
+
+        assertTrue(reset.isFailure, "an unpersisted marker must fail the reset")
+        assertEquals(failure, reset.exceptionOrNull())
+        assertTrue(fs.exists(songBackupDir()), "the scene is retained when the marker cannot be written")
+    }
 }

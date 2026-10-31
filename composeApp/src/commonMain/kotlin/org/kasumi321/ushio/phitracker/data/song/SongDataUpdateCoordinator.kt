@@ -6,6 +6,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import org.kasumi321.ushio.phitracker.data.common.resultOf
 import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.CoilIllustrationThumbnailPreloader
@@ -14,6 +15,19 @@ import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.platform.clearImageCacheUrls
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 
+/** Another entry point's update is already running; the caller keeps its own UI state. */
+class UpdateAlreadyInProgressException : Exception("a song data update is already in progress")
+
+/**
+ * Both datasets committed, but some newly added illustrations could not be
+ * downloaded. The data itself is authoritative (never rolled back); callers
+ * report a partial success so the user can retry the artwork later.
+ */
+class IllustrationSyncPartialException(
+    val failures: Int,
+    val addedSongNames: List<String>
+) : Exception("图鉴信息已更新，但部分曲绘未能下载，可稍后在设置中重试")
+
 /**
  * Shared song-data update flow used by the settings entry, the songs tab
  * pull-to-refresh and the onboarding wizard: checks and downloads the song
@@ -21,7 +35,8 @@ import org.kasumi321.ushio.phitracker.domain.model.Difficulty
  * then reconciles the illustration cache for added/removed songs, reporting
  * per-phase progress. Each dataset keeps its own updater discipline:
  * staging → backup → atomic commit → cache invalidation only after its own
- * full success, so one dataset's failure never commits the other.
+ * full success. A later dataset or illustration failure is reported without
+ * rolling back an already committed dataset.
  */
 class SongDataUpdateCoordinator(
     private val songDataUpdater: SongDataUpdater,
@@ -43,15 +58,143 @@ class SongDataUpdateCoordinator(
     )
 
     /**
+     * Serializes updates across ALL entry points (home pull-to-refresh,
+     * Settings, onboarding). The ViewModels' own in-flight flags are UI state
+     * only; this mutex is the correctness boundary — a second entry arriving
+     * while an update runs fails fast instead of queueing a duplicate run or
+     * racing the shared staging/backup directories.
+     */
+    private val updateMutex = Mutex()
+
+    /**
      * Combined upstream-change probe: true when EITHER the song data
      * (info.csv compare) or the collectible data (collection_version.txt
-     * compare) changed upstream. A failure in either probe fails the whole
-     * check, so a broken network is never misread as "up to date".
+     * compare) changed upstream. A pending recovery scene always reports a
+     * change so the update flow gets a chance to resolve it. A failure in
+     * either probe fails the whole check, so a broken network is never
+     * misread as "up to date".
      */
-    suspend fun checkUpstreamChanged(): Result<Boolean> = runCatching {
-        val songsChanged = songDataUpdater.checkUpstreamChanged().getOrThrow()
-        val collectiblesChanged = collectibleDataUpdater.checkUpstreamChanged().getOrThrow()
-        songsChanged || collectiblesChanged
+    suspend fun checkUpstreamChanged(): Result<Boolean> = updateMutex.withLock {
+        resultOf {
+            if (hasPendingRecovery() || hasPendingRepair()) return@resultOf true
+            val songsChanged = songDataUpdater.checkUpstreamChanged().getOrThrow()
+            val collectiblesChanged = collectibleDataUpdater.checkUpstreamChanged().getOrThrow()
+            songsChanged || collectiblesChanged
+        }
+    }
+
+    /** True when either dataset retains a transaction scene to recover. */
+    fun hasPendingRecovery(): Boolean =
+        songDataUpdater.hasPendingRecovery() || collectibleDataUpdater.hasPendingRecovery()
+
+    /** True when a reset still owes a full download (survives process death). */
+    fun hasPendingRepair(): Boolean =
+        songDataUpdater.hasPendingRepair() || collectibleDataUpdater.hasPendingRepair()
+
+    /**
+     * True while either dataset serves the bundled catalog because its
+     * downloaded copy was quarantined by an explicit offline fallback.
+     */
+    fun isUsingBundledCatalogFallback(): Boolean =
+        songDataUpdater.isUsingBundledFallback() || collectibleDataUpdater.isUsingBundledFallback()
+
+    /**
+     * Re-persists the repair obligation for both datasets. A partially failed
+     * run may already have committed (and discharged the marker of) one
+     * dataset; keeping both markers is what makes "not recovered until both
+     * complete" survive process death. Failures are reported to the caller but
+     * never erase an existing obligation.
+     */
+    suspend fun markRepairRequired(): Result<Unit> = updateMutex.withLock {
+        var firstFailure: Throwable? = null
+        songDataUpdater.markRepairRequired().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        collectibleDataUpdater.markRepairRequired().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        firstFailure?.let { Result.failure(it) } ?: Result.success(Unit)
+    }
+
+    /**
+     * User-approved offline degradation: both datasets move their downloaded
+     * files aside and read the bundled assets until a later full update
+     * succeeds. Both datasets are attempted even when one fails; the first
+     * failure is reported so the caller keeps the blocking UI instead of
+     * showing a half-bundled/half-downloaded catalog.
+     */
+    suspend fun useBundledCatalogFallback(): Result<Unit> = updateMutex.withLock {
+        var firstFailure: Throwable? = null
+        songDataUpdater.useBundledFallback().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        collectibleDataUpdater.useBundledFallback().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        firstFailure?.let { Result.failure(it) } ?: Result.success(Unit)
+    }
+
+    /**
+     * Resolves retained scenes for both datasets before any caller reads
+     * [songDataProvider]. The mutex excludes a concurrent update; both
+     * datasets are attempted even when one fails, and the first failure is
+     * reported. A failed dataset keeps its scene untouched.
+     */
+    suspend fun recoverPendingUpdate(): Result<Unit> = updateMutex.withLock {
+        recoverPendingUpdateLocked()
+    }
+
+    private suspend fun recoverPendingUpdateLocked(): Result<Unit> {
+        var firstFailure: Throwable? = null
+        songDataUpdater.recoverPendingUpdate().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        collectibleDataUpdater.recoverPendingUpdate().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        return firstFailure?.let { Result.failure(it) } ?: Result.success(Unit)
+    }
+
+    /**
+     * Explicit recovery escape hatch: discards both retained scenes and
+     * staging residue without restoring them, then immediately runs the full
+     * download (illustration reconciliation included by default, so a reset
+     * leaves the catalog fully usable). A persisted repair marker keeps the
+     * obligation alive if this process dies before a later update succeeds;
+     * the marker is cleared only by a fully successful dataset update.
+     * Returns the update outcome, so a reset can never be reported as complete
+     * without fresh data.
+     */
+    suspend fun resetPendingUpdate(
+        syncIllustrations: Boolean = false,
+        onFileProgress: (Int, Int, String) -> Unit = { _, _, _ -> },
+        onIllustrationProgress: (IllustrationSyncProgress) -> Unit = {}
+    ): Result<UpdateOutcome> = updateMutex.withLock {
+        val resetFailure = resetPendingUpdateLocked()
+        if (resetFailure != null) {
+            Result.failure(resetFailure)
+        } else {
+            // The pre-reset files may be mixed or unreadable; never let an
+            // unreadable baseline abort the repair, and treat every song as
+            // newly added so illustrations are reconciled for the whole set.
+            updateLocked(
+                syncIllustrations = syncIllustrations,
+                onFileProgress = onFileProgress,
+                onIllustrationProgress = onIllustrationProgress,
+                tolerateUnreadableBaseline = true
+            )
+        }
+    }
+
+    private suspend fun resetPendingUpdateLocked(): Throwable? {
+        var firstFailure: Throwable? = null
+        songDataUpdater.resetPendingUpdate().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        collectibleDataUpdater.resetPendingUpdate().onFailure {
+            if (firstFailure == null) firstFailure = it
+        }
+        return firstFailure
     }
 
     /**
@@ -71,7 +214,32 @@ class SongDataUpdateCoordinator(
         onFileProgress: (Int, Int, String) -> Unit = { _, _, _ -> },
         onIllustrationProgress: (IllustrationSyncProgress) -> Unit = {}
     ): Result<UpdateOutcome> {
-        val oldSongIds = songDataProvider.getSongs().keys.toSet()
+        if (!updateMutex.tryLock()) {
+            return Result.failure(UpdateAlreadyInProgressException())
+        }
+        try {
+            return updateLocked(syncIllustrations, onFileProgress, onIllustrationProgress)
+        } finally {
+            updateMutex.unlock()
+        }
+    }
+
+    /** Caller must hold [updateMutex]; reuses the unlocked recovery path. */
+    private suspend fun updateLocked(
+        syncIllustrations: Boolean,
+        onFileProgress: (Int, Int, String) -> Unit = { _, _, _ -> },
+        onIllustrationProgress: (IllustrationSyncProgress) -> Unit = {},
+        tolerateUnreadableBaseline: Boolean = false
+    ): Result<UpdateOutcome> {
+        // Resolve any retained scene before the provider is read: a mixed
+        // or half-committed on-disk state must not leak into oldSongIds.
+        recoverPendingUpdateLocked().getOrElse { return Result.failure(it) }
+        val oldSongIds = resultOf { songDataProvider.getSongs().keys.toSet() }.getOrElse { error ->
+            // A reset may have left an unreadable (mixed) baseline; the
+            // obligation is still a full download, so proceed with an empty
+            // baseline instead of aborting before any data is fetched.
+            if (tolerateUnreadableBaseline) emptySet() else return Result.failure(error)
+        }
         val songResult = songDataUpdater.updateAll(onFileProgress)
         if (songResult.isFailure) {
             return Result.failure(songResult.exceptionOrNull() ?: RuntimeException("unknown"))
@@ -87,7 +255,7 @@ class SongDataUpdateCoordinator(
             return Result.failure(collectibleResult.exceptionOrNull() ?: RuntimeException("unknown"))
         }
         if (!syncIllustrations) {
-            return runCatching {
+            return resultOf {
                 val newSongIds = songDataProvider.getSongs().keys.toSet()
                 val songNames = songDataProvider.getSongNameMap()
                 UpdateOutcome(
@@ -95,7 +263,7 @@ class SongDataUpdateCoordinator(
                 )
             }
         }
-        return runCatching {
+        return resultOf {
             reconcileIllustrationCache(
                 oldSongIds,
                 songDataProvider.getSongs().keys.toSet(),
@@ -124,7 +292,7 @@ class SongDataUpdateCoordinator(
                         mutex.withLock {
                             onProgress(IllustrationSyncProgress(completed, added.size, name))
                         }
-                        val result = runCatching {
+                        val result = resultOf {
                             val variants = illustrationProvider.variantDifficulties(songId)
                             if (variants.isEmpty()) {
                                 val localUri = artworkFileCache.getOrDownloadThumbnail(songId, illustrationProvider.getLowUrl(songId))
@@ -171,9 +339,8 @@ class SongDataUpdateCoordinator(
             artworkFileCache.clearStandard(removedCacheKeys)
         }
         AppLogger.event("cache", "song_data_illustration_reconcile", mapOf("added" to added.size.toString(), "addedSuccess" to (added.size - failures).toString(), "addedFailure" to failures.toString(), "removed" to removed.size.toString()))
-        if (failures > 0) throw IllegalStateException("图鉴信息已更新，但部分曲绘未能下载，可稍后在设置中重试")
-        return UpdateOutcome(
-            addedSongNames = added.map { songNames[it] ?: it }
-        )
+        val addedSongNames = added.map { songNames[it] ?: it }
+        if (failures > 0) throw IllustrationSyncPartialException(failures, addedSongNames)
+        return UpdateOutcome(addedSongNames = addedSongNames)
     }
 }

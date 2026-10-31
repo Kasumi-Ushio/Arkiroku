@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy (pre-API 31) auto backup rules: the credential store is EXCLUDED.
+  EncryptedSharedPreferences ciphertext is useless (and dangerous to restore)
+  without the Android Keystore master key, which never leaves the device; a
+  restored backup must simply ask for a fresh login. Plain settings and the
+  Room database stay backed up.
+
+  Downloaded catalog data and all update transaction artifacts are EXCLUDED:
+  a retained COMMITTING scene, a partially committed dataset, a repair/fallback
+  marker or quarantined data must never be replayed on another device. The
+  catalog is reproducible; the bundled copy remains available until re-download.
+-->
+<full-backup-content>
+    <exclude
+        domain="sharedpref"
+        path="phi_tracker_secure_prefs.xml" />
+    <exclude
+        domain="sharedpref"
+        path="phi_tracker_session_state_plain.xml" />
+    <exclude
+        domain="file"
+        path="song_data/" />
+    <exclude
+        domain="file"
+        path="collectible_data/" />
+    <exclude
+        domain="file"
+        path="song_data_backup/" />
+    <exclude
+        domain="file"
+        path="collectible_data_backup/" />
+    <exclude
+        domain="file"
+        path="song_data_quarantine/" />
+    <exclude
+        domain="file"
+        path="collectible_data_quarantine/" />
+</full-backup-content>

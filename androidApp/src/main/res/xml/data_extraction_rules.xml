@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 31+ backup / device-transfer rules: the credential store is EXCLUDED
+  from both cloud backups and device transfers. EncryptedSharedPreferences
+  ciphertext cannot be decrypted without the original device's Keystore key,
+  so restoring it could only produce a broken-keystore startup state; the
+  correct behavior after restore is a clean re-login (objectId inheritance
+  keeps the account's local data usable). Plain settings and the Room
+  database remain backed up.
+
+  Downloaded catalog data and all update transaction artifacts are excluded
+  from BOTH paths: a retained COMMITTING scene or partially committed dataset
+  must never be replayed on a new device. The bundled catalog remains usable
+  until fresh data can be downloaded. Staging lives under cacheDir.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude
+            domain="sharedpref"
+            path="phi_tracker_secure_prefs.xml" />
+        <exclude
+            domain="sharedpref"
+            path="phi_tracker_session_state_plain.xml" />
+        <exclude
+            domain="file"
+            path="song_data/" />
+        <exclude
+            domain="file"
+            path="collectible_data/" />
+        <exclude
+            domain="file"
+            path="song_data_backup/" />
+        <exclude
+            domain="file"
+            path="collectible_data_backup/" />
+        <exclude
+            domain="file"
+            path="song_data_quarantine/" />
+        <exclude
+            domain="file"
+            path="collectible_data_quarantine/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude
+            domain="sharedpref"
+            path="phi_tracker_secure_prefs.xml" />
+        <exclude
+            domain="sharedpref"
+            path="phi_tracker_session_state_plain.xml" />
+        <exclude
+            domain="file"
+            path="song_data/" />
+        <exclude
+            domain="file"
+            path="collectible_data/" />
+        <exclude
+            domain="file"
+            path="song_data_backup/" />
+        <exclude
+            domain="file"
+            path="collectible_data_backup/" />
+        <exclude
+            domain="file"
+            path="song_data_quarantine/" />
+        <exclude
+            domain="file"
+            path="collectible_data_quarantine/" />
+    </device-transfer>
+</data-extraction-rules>
