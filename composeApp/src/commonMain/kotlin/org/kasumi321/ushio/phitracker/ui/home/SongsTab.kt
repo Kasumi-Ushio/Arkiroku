@@ -72,6 +72,7 @@ import org.kasumi321.ushio.phitracker.ui.theme.DifficultyColors
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
 import org.kasumi321.ushio.phitracker.ui.utils.chapterDisplayNameLocalized
 import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.common_cancel
 import phitracker.composeapp.generated.resources.songs_action_done
 import phitracker.composeapp.generated.resources.songs_action_reset
 import phitracker.composeapp.generated.resources.songs_chapter_label
@@ -241,6 +242,7 @@ private fun SongDataUpdateBanner(onRefreshSongData: () -> Unit) {
 fun SongDataRefreshProgressCard(
     statusText: String,
     progressFraction: Float?,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -254,12 +256,18 @@ fun SongDataRefreshProgressCard(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onCancel) {
+                    Text(stringResource(Res.string.common_cancel))
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             if (progressFraction != null) {
                 LinearProgressIndicator(

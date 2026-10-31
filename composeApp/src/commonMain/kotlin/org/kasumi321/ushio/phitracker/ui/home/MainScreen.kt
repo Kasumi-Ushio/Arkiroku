@@ -851,7 +851,7 @@ fun MainScreen(
                     ProfileTab(
                         state = state.profile,
                         displayRks = state.b30.displayRks,
-                        isLoggedIn = state.tools.sessionToken != null,
+                        isLoggedIn = state.profile.hasAccountAccess,
                         onNavigateToLogin = onNavigateToLogin,
                         onAvatarSelected = { viewModel.setAvatarUri(it) },
                         onSongClick = { songId, difficulty ->
@@ -1042,6 +1042,7 @@ fun MainScreen(
                         SongDataRefreshProgressCard(
                             statusText = songDataStatusText.asString(),
                             progressFraction = state.songs.songDataProgressFraction,
+                            onCancel = viewModel::cancelSongDataRefresh,
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 .padding(

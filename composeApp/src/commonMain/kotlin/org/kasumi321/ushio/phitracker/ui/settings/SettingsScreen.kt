@@ -9,6 +9,7 @@ import org.kasumi321.ushio.phitracker.data.platform.getAppMetadata
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
 import org.kasumi321.ushio.phitracker.data.platform.triggerAppRestart
 import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.settings_logout_credential_pending
 import phitracker.composeapp.generated.resources.settings_logout_failed
 import phitracker.composeapp.generated.resources.settings_restart_required_message
 import phitracker.composeapp.generated.resources.settings_restart_required_title
@@ -26,12 +27,18 @@ fun SettingsScreen(
     val restartRequiredTitle = stringResource(Res.string.settings_restart_required_title)
     val restartRequiredMessage = stringResource(Res.string.settings_restart_required_message)
     val logoutFailedMessage = stringResource(Res.string.settings_logout_failed)
+    val logoutCredentialPendingMessage = stringResource(Res.string.settings_logout_credential_pending)
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 SettingsEvent.LoggedOut -> onLogout()
+                SettingsEvent.LoggedOutCredentialsPending -> {
+                    showPlatformMessage(logoutCredentialPendingMessage)
+                    onLogout()
+                }
                 SettingsEvent.LogoutFailed -> showPlatformMessage(logoutFailedMessage)
+                SettingsEvent.LocalSessionReset -> onLogout()
                 SettingsEvent.RestartRequested ->
                     triggerAppRestart(restartRequiredTitle, restartRequiredMessage)
             }
@@ -69,6 +76,13 @@ fun SettingsScreen(
         onRedownloadIllustrations = { viewModel.resetIllustrationDownload() },
         onNavigateToAbout = onNavigateToAbout,
         onLogout = { viewModel.logout() },
+        isResettingSessionToken = state.isResettingSessionToken,
+        sessionTokenResetMessage = state.sessionTokenResetMessage,
+        onResetSessionToken = { viewModel.resetSessionToken() },
+        onDismissSessionTokenResetMessage = { viewModel.dismissSessionTokenResetMessage() },
+        isResettingLocalSession = state.isResettingLocalSession,
+        localSessionResetMessage = state.localSessionResetMessage,
+        onResetLocalSession = { viewModel.resetLocalSession() },
         onNavigateBack = onNavigateBack,
         tip = state.tip,
         apiEnabled = state.apiEnabled,
@@ -91,10 +105,14 @@ fun SettingsScreen(
         updateDataTotal = state.updateDataTotal,
         updateDataFileName = state.updateDataFileName,
         updateDataPhase = state.updateDataPhase,
-        updateDataError = state.updateDataError,
+        updateDataError = state.updateDataBusyMessage ?: state.updateDataError,
         updateResultSongNames = state.updateResultSongNames,
+        updatePartialIllustrationFailures = state.updatePartialIllustrationFailures,
+        catalogDegraded = state.catalogDegraded,
         collectibleDataVersion = state.collectibleDataVersion,
         onUpdateSongData = { viewModel.updateSongData() },
+        onCancelSongDataUpdate = { viewModel.cancelSongDataUpdate() },
+        onResetPendingUpdate = { viewModel.resetPendingUpdate() },
         onDismissUpdateError = { viewModel.dismissUpdateDataError() },
         includePreRelease = state.includePreRelease,
         autoCheckUpdate = state.autoCheckUpdate,

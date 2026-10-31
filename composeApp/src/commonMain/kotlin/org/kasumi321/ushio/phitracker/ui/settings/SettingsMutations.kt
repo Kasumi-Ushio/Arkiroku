@@ -2,6 +2,10 @@ package org.kasumi321.ushio.phitracker.ui.settings
 
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.setAppLocale
+import org.kasumi321.ushio.phitracker.ui.utils.UiText
+import org.kasumi321.ushio.phitracker.ui.utils.resolve
+import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.settings_api_token_save_failed
 
 fun SettingsViewModel.setThemeMode(value: Int) = launchSetting { settingsRepository.setThemeMode(value) }
 
@@ -75,7 +79,11 @@ fun SettingsViewModel.setUseApiData(value: Boolean) = launchSetting {
 fun SettingsViewModel.setApiUserId(value: String) = launchSetting { settingsRepository.setApiId(value) }
 fun SettingsViewModel.setApiPlatform(value: String) = launchSetting { settingsRepository.setApiPlatform(value) }
 fun SettingsViewModel.setApiPlatformId(value: String) = launchSetting { settingsRepository.setApiPlatformId(value) }
-fun SettingsViewModel.setApiToken(value: String) = launchSetting { settingsRepository.setApiToken(value) }
+fun SettingsViewModel.setApiToken(value: String) = launchSetting {
+    settingsRepository.setApiToken(value).onFailure {
+        platformMessage(UiText.Res(Res.string.settings_api_token_save_failed).resolve())
+    }
+}
 fun SettingsViewModel.setIncludePreRelease(value: Boolean) = launchSetting { settingsRepository.setIncludePreRelease(value) }
 fun SettingsViewModel.setAutoCheckUpdate(value: Boolean) = launchSetting { settingsRepository.setAutoCheckUpdate(value) }
 fun SettingsViewModel.setAutoCheckSongDataUpdate(value: Boolean) = launchSetting { settingsRepository.setAutoCheckSongDataUpdate(value) }

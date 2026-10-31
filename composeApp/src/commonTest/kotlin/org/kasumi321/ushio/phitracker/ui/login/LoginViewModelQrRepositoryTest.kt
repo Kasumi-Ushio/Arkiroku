@@ -20,6 +20,7 @@ import org.kasumi321.ushio.phitracker.domain.model.UserSettings
 import org.kasumi321.ushio.phitracker.domain.repository.QrLoginRepository
 import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
 import org.kasumi321.ushio.phitracker.domain.session.SessionEstablished
+import org.kasumi321.ushio.phitracker.domain.session.SessionLogoutOutcome
 import org.kasumi321.ushio.phitracker.domain.session.SessionNotLoggedInException
 import org.kasumi321.ushio.phitracker.domain.session.SessionResumeOutcome
 import org.kasumi321.ushio.phitracker.ui.ViewModelTestLifecycle
@@ -264,7 +265,10 @@ class LoginViewModelQrRepositoryTest {
 
         override suspend fun refresh(): Result<SyncSaveResult> = Result.failure(SessionNotLoggedInException())
 
-        override suspend fun logout(): Result<Unit> = Result.success(Unit)
+        override suspend fun logout(): Result<SessionLogoutOutcome> = Result.success(SessionLogoutOutcome.Completed)
+
+        override suspend fun resetSessionToken(): org.kasumi321.ushio.phitracker.domain.session.SessionResetOutcome =
+            org.kasumi321.ushio.phitracker.domain.session.SessionResetOutcome.NotLoggedIn
     }
 
     private companion object {

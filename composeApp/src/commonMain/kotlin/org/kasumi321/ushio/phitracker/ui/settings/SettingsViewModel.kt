@@ -24,10 +24,14 @@ import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.platform.clearAllImageCache
 import org.kasumi321.ushio.phitracker.data.platform.clearImageCacheUrls
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairEntryPoint
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairFailure
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStage
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStartResult
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStatus
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
-import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
-import org.kasumi321.ushio.phitracker.data.song.SongDataUpdater
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
@@ -38,6 +42,7 @@ import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.update.toUpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import org.kasumi321.ushio.phitracker.ui.utils.resolve
+import org.kasumi321.ushio.phitracker.ui.utils.toCatalogRepairErrorText
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.api_error_missing_fields
 import phitracker.composeapp.generated.resources.common_unknown_error
@@ -47,6 +52,8 @@ import phitracker.composeapp.generated.resources.settings_api_test_partial
 import phitracker.composeapp.generated.resources.settings_b30_cache_no_songs
 import phitracker.composeapp.generated.resources.settings_b30_cache_partial_failed
 import phitracker.composeapp.generated.resources.settings_redownload_failed
+
+internal fun CatalogRepairFailure?.toUpdateErrorText(): UiText = toCatalogRepairErrorText()
 
 internal class NoB30SongsToCacheException : IllegalStateException("no B30 songs to cache")
 internal class B30ArtworkCachePartialFailure(val failures: Int) :
@@ -59,7 +66,7 @@ class SettingsViewModel(
     private val checkForUpdateUseCase: CheckForUpdateUseCase,
     getB30UseCase: GetB30UseCase,
     private val songDataProvider: SongDataProvider,
-    private val songDataUpdateCoordinator: SongDataUpdateCoordinator,
+    internal val catalogRepairSession: CatalogRepairSession,
     private val illustrationProvider: IllustrationProvider,
     private val artworkFileCache: StandardArtworkCache,
     internal val runtimeLogExporter: RuntimeLogExporter,
@@ -68,7 +75,7 @@ class SettingsViewModel(
     private val thumbnailPreloader: IllustrationThumbnailPreloader = CoilIllustrationThumbnailPreloader,
     private val clearCacheUrls: suspend (List<String>) -> Unit = ::clearImageCacheUrls,
     private val clearAllCache: suspend () -> Unit = ::clearAllImageCache,
-    private val platformMessage: (String) -> Unit = ::showPlatformMessage,
+    internal val platformMessage: (String) -> Unit = ::showPlatformMessage,
     private val collectibleDataVersionProvider: () -> String = { "" }
 ) : ViewModel() {
     internal val mutableUiState = MutableStateFlow(
@@ -86,11 +93,90 @@ class SettingsViewModel(
 
     init {
         observeSettings()
+        observeCatalogRepair()
         viewModelScope.launch {
             getB30UseCase(
                 songDataProvider.getDifficultyMap(),
                 songDataProvider.getSongNameMap()
             ).collect { (records, _) -> b30 = records }
+        }
+    }
+
+    /**
+     * The repair/reset download is owned by [CatalogRepairSession]; Settings
+     * only mirrors its state, so leaving the screen never cancels a download
+     * and a second entry point sees the same run instead of starting another.
+     */
+    private fun observeCatalogRepair() {
+        viewModelScope.launch {
+            var previousStatus: CatalogRepairStatus? = null
+            catalogRepairSession.state.collect { repair ->
+                val wasActive = previousStatus == CatalogRepairStatus.Running ||
+                    previousStatus == CatalogRepairStatus.Cancelling
+                val ownsRun = repair.resultOwner == CatalogRepairEntryPoint.Settings
+                val isActive = repair.status == CatalogRepairStatus.Running ||
+                    repair.status == CatalogRepairStatus.Cancelling
+                val isRunning = ownsRun && isActive
+                val justFinished = wasActive && !isActive
+                val terminalAvailable = previousStatus == null && !isActive &&
+                    repair.status != CatalogRepairStatus.Idle
+                previousStatus = repair.status
+                mutableUiState.update { state ->
+                    state.copy(
+                        isUpdatingData = isRunning,
+                        updateDataPhase = if (repair.stage == CatalogRepairStage.Illustrations) {
+                            UpdateDataPhase.Illustrations
+                        } else {
+                            UpdateDataPhase.Files
+                        },
+                        updateDataProgress = repair.completed,
+                        updateDataTotal = repair.total,
+                        updateDataFileName = repair.currentItem,
+                        updateDataError = when {
+                            !ownsRun || isRunning -> null
+                            repair.status == CatalogRepairStatus.Failed &&
+                                repair.resultAvailable && !repair.resultDismissed ->
+                                repair.failure.toUpdateErrorText()
+                            repair.status == CatalogRepairStatus.Failed ||
+                                repair.status == CatalogRepairStatus.Succeeded -> null
+                            else -> state.updateDataError
+                        },
+                        updateResultSongNames = when {
+                            !ownsRun || isRunning -> null
+                            repair.status == CatalogRepairStatus.Succeeded &&
+                                repair.resultAvailable && !repair.resultDismissed ->
+                                repair.addedSongNames
+                            repair.status == CatalogRepairStatus.Succeeded -> null
+                            else -> state.updateResultSongNames
+                        },
+                        updatePartialIllustrationFailures = when {
+                            !ownsRun || isRunning -> 0
+                            repair.status == CatalogRepairStatus.Succeeded &&
+                                repair.resultAvailable && !repair.resultDismissed ->
+                                repair.partialIllustrationFailures
+                            repair.status == CatalogRepairStatus.Succeeded -> 0
+                            else -> state.updatePartialIllustrationFailures
+                        },
+                        updateDataBusyMessage = if (justFinished) null else state.updateDataBusyMessage,
+                        catalogDegraded = repair.degraded,
+                        collectibleDataVersion = if (justFinished || terminalAvailable) {
+                            collectibleDataVersionProvider()
+                        } else {
+                            state.collectibleDataVersion
+                        }
+                    )
+                }
+                if (justFinished) {
+                    AppLogger.event(
+                        "data",
+                        "settings_catalog_repair_finished",
+                        mapOf(
+                            "status" to repair.status.name.lowercase(),
+                            "partialIllustrations" to repair.partialIllustrationFailures.toString()
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -267,54 +353,26 @@ class SettingsViewModel(
 
     fun updateSongData() {
         if (mutableUiState.value.isUpdatingData) return
-        viewModelScope.launch {
-            val total = SongDataUpdater.FILE_NAMES.size
-            mutableUiState.update { it.copy(isUpdatingData = true, updateDataPhase = UpdateDataPhase.Files, updateDataProgress = 0, updateDataTotal = total, updateDataFileName = "", updateDataError = null, updateResultSongNames = null) }
-            AppLogger.event("data", "update_song_data_started", mapOf("totalFiles" to total.toString()))
-            val result = songDataUpdateCoordinator.update(
-                onFileProgress = { current, count, fileName ->
-                    mutableUiState.update { it.copy(updateDataPhase = UpdateDataPhase.Files, updateDataProgress = current, updateDataTotal = count, updateDataFileName = fileName) }
-                },
-                onIllustrationProgress = { progress ->
-                    mutableUiState.update {
-                        it.copy(
-                            updateDataPhase = UpdateDataPhase.Illustrations,
-                            updateDataProgress = progress.completed,
-                            updateDataTotal = progress.total,
-                            updateDataFileName = progress.currentSongName
-                        )
-                    }
-                }
-            )
-            result.fold(
-                onSuccess = { outcome ->
-                    mutableUiState.update {
-                        it.copy(
-                            isUpdatingData = false,
-                            updateDataProgress = total,
-                            updateDataFileName = "",
-                            updateDataError = null,
-                            updateResultSongNames = outcome.addedSongNames,
-                            collectibleDataVersion = collectibleDataVersionProvider()
-                        )
-                    }
-                    AppLogger.event("data", "update_song_data_success", mapOf("addedSongs" to outcome.addedSongNames.size.toString()))
-                },
-                onFailure = { error ->
-                    val message = error.message
-                    // Files may already be committed before a partial
-                    // illustration failure, so re-read the version as well.
-                    mutableUiState.update {
-                        it.copy(
-                            isUpdatingData = false,
-                            updateDataError = message?.let(UiText::Raw),
-                            collectibleDataVersion = collectibleDataVersionProvider()
-                        )
-                    }
-                    AppLogger.event("data", "update_song_data_failed", mapOf("error" to (message ?: "unknown")), throwable = error)
-                }
-            )
+        when (catalogRepairSession.startUpdate(CatalogRepairEntryPoint.Settings)) {
+            CatalogRepairStartResult.Started -> mutableUiState.update {
+                it.copy(
+                    updateDataError = null,
+                    updateDataBusyMessage = null,
+                    updateResultSongNames = null,
+                    updatePartialIllustrationFailures = 0
+                )
+            }
+            CatalogRepairStartResult.AlreadyRunning -> mutableUiState.update {
+                it.copy(updateDataBusyMessage = CatalogRepairFailure.Busy.toUpdateErrorText())
+            }
         }
+    }
+
+    fun cancelSongDataUpdate() {
+        if (catalogRepairSession.state.value.resultOwner == CatalogRepairEntryPoint.Settings) {
+            catalogRepairSession.cancelRunning()
+        }
+        mutableUiState.update { it.copy(isUpdatingData = false) }
     }
 
     private fun b30ArtworkCacheErrorText(error: Throwable): UiText = when (error) {
@@ -323,8 +381,34 @@ class SettingsViewModel(
         else -> error.message?.let(UiText::Raw) ?: UiText.Res(Res.string.common_unknown_error)
     }
 
+    fun resetPendingUpdate() {
+        if (mutableUiState.value.isUpdatingData) return
+        when (catalogRepairSession.startResetAndRedownload()) {
+            CatalogRepairStartResult.Started -> mutableUiState.update {
+                it.copy(
+                    updateDataError = null,
+                    updateDataBusyMessage = null,
+                    updateResultSongNames = null,
+                    updatePartialIllustrationFailures = 0
+                )
+            }
+            CatalogRepairStartResult.AlreadyRunning -> mutableUiState.update {
+                it.copy(updateDataBusyMessage = CatalogRepairFailure.Busy.toUpdateErrorText())
+            }
+        }
+    }
+
+    internal fun acknowledgeCatalogRepairResult() {
+        if (catalogRepairSession.state.value.resultOwner == CatalogRepairEntryPoint.Settings) {
+            catalogRepairSession.dismissResult()
+        }
+    }
+
     fun dismissUpdateDataResult() {
-        mutableUiState.update { it.copy(updateResultSongNames = null) }
+        acknowledgeCatalogRepairResult()
+        mutableUiState.update {
+            it.copy(updateResultSongNames = null, updatePartialIllustrationFailures = 0)
+        }
     }
 
 }

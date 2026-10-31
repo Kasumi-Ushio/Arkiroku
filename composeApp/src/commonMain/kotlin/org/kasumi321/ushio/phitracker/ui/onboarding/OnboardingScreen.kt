@@ -155,6 +155,7 @@ import phitracker.composeapp.generated.resources.settings_theme_amoled
 import phitracker.composeapp.generated.resources.settings_theme_dark
 import phitracker.composeapp.generated.resources.settings_theme_follow_system
 import phitracker.composeapp.generated.resources.settings_theme_light
+import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
 import phitracker.composeapp.generated.resources.songs_songdata_checking
 import phitracker.composeapp.generated.resources.songs_songdata_downloading
 import phitracker.composeapp.generated.resources.songs_songdata_updated
@@ -258,8 +259,10 @@ fun OnboardingScreen(
                         completed = state.songDataCompleted,
                         total = state.songDataTotal,
                         currentFile = state.songDataCurrentFile,
+                        partialIllustrationFailures = state.songDataPartialIllustrationFailures,
                         onCheck = viewModel::checkSongDataUpdate,
-                        onUpdate = viewModel::startSongDataUpdate
+                        onUpdate = viewModel::startSongDataUpdate,
+                        onCancel = viewModel::cancelSongDataUpdate
                     )
                     OnboardingStep.IllustrationPreload -> PreloadChoiceStep(
                         choice = state.preloadChoice,
@@ -824,8 +827,10 @@ private fun SongDataUpdateStep(
     completed: Int,
     total: Int,
     currentFile: String?,
+    partialIllustrationFailures: Int,
     onCheck: () -> Unit,
-    onUpdate: () -> Unit
+    onUpdate: () -> Unit,
+    onCancel: () -> Unit
 ) {
     // Entering the step is the explicit request for the upstream probe,
     // regardless of the auto-check toggle.
@@ -889,6 +894,10 @@ private fun SongDataUpdateStep(
                             textAlign = TextAlign.Center
                         )
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(onClick = onCancel) {
+                        Text(stringResource(Res.string.onboarding_preload_cancel))
+                    }
                 }
 
                 OnboardingSongDataStatus.Updated -> {
@@ -900,9 +909,21 @@ private fun SongDataUpdateStep(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = stringResource(Res.string.songs_songdata_updated),
+                        text = if (partialIllustrationFailures > 0) {
+                            stringResource(
+                                Res.string.settings_update_partial_illustrations,
+                                partialIllustrationFailures
+                            )
+                        } else {
+                            stringResource(Res.string.songs_songdata_updated)
+                        },
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        color = if (partialIllustrationFailures > 0) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        textAlign = TextAlign.Center
                     )
                 }
 

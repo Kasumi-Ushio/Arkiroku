@@ -1,16 +1,24 @@
 package org.kasumi321.ushio.phitracker.ui
 
 import androidx.compose.runtime.saveable.SaverScope
+import androidx.lifecycle.SavedStateHandle
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportPayload
 import org.kasumi321.ushio.phitracker.ui.b30.B30MissingPayloadRecovery
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
+import org.kasumi321.ushio.phitracker.ui.navigation.LoginBackStackPolicy
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationGateway
+import org.kasumi321.ushio.phitracker.ui.b30.claimPayload
 import org.kasumi321.ushio.phitracker.ui.home.CollectiblesChapterState
 import org.kasumi321.ushio.phitracker.ui.home.HomeTab
 import org.kasumi321.ushio.phitracker.ui.home.HomeTabState
@@ -24,6 +32,7 @@ class PhiTrackerNavHostTest {
         val gateway = RecordingGateway("home")
         val coordinator = B30NavigationCoordinator(gateway)
         coordinator.openB30(payload("current"))
+        val ownerGeneration = coordinator.payloadGeneration
         gateway.observePayload = { coordinator.payload }
 
         coordinator.toolbarBack()
@@ -35,7 +44,7 @@ class PhiTrackerNavHostTest {
         assertNotNull(coordinator.payload)
         assertEquals(listOf("home"), gateway.routes)
 
-        coordinator.destinationDisposed()
+        coordinator.destinationDisposed(ownerGeneration)
         assertNull(coordinator.payload)
     }
 
@@ -45,13 +54,78 @@ class PhiTrackerNavHostTest {
             val gateway = RecordingGateway("home")
             val coordinator = B30NavigationCoordinator(gateway)
             coordinator.openB30(payload("current"))
+            val ownerGeneration = coordinator.payloadGeneration
 
             gateway.systemBack()
-            coordinator.destinationDisposed()
+            coordinator.destinationDisposed(ownerGeneration)
 
             assertNull(coordinator.payload)
             assertEquals(listOf("home"), gateway.routes)
         }
+    }
+
+    @Test
+    fun disposalOfAnExitingEntryKeepsThePayloadOfTheNewerEntry() {
+        // User pops the image and reopens it while the exit transition still
+        // keeps the old destination composed: the old entry's disposal must
+        // not release the payload the new entry already renders.
+        val gateway = RecordingGateway("home")
+        val coordinator = B30NavigationCoordinator(gateway)
+        coordinator.openB30(payload("first"))
+        val firstGeneration = coordinator.payloadGeneration
+        coordinator.toolbarBack()
+
+        coordinator.openB30(payload("second"))
+        val secondGeneration = coordinator.payloadGeneration
+        assertTrue(secondGeneration != firstGeneration)
+
+        coordinator.destinationDisposed(firstGeneration)
+
+        assertEquals("second", coordinator.payload?.b30?.single()?.songId)
+
+        coordinator.destinationDisposed(secondGeneration)
+        assertNull(coordinator.payload)
+    }
+
+    @Test
+    fun recreatedExitingEntryKeepsItsSavedGenerationAndCannotClearNewPayload() {
+        val gateway = RecordingGateway("home")
+        val coordinator = B30NavigationCoordinator(gateway)
+        coordinator.openB30(payload("first"))
+        val oldHandle = SavedStateHandle()
+        val first = coordinator.claimPayload(oldHandle)
+        assertEquals("first", first.payload?.b30?.single()?.songId)
+        coordinator.toolbarBack()
+        coordinator.openB30(payload("second"))
+
+        // iOS dispose/recreate uses the same entry SavedStateHandle, not the
+        // latest generation published for the incoming entry.
+        val recreatedOld = coordinator.claimPayload(oldHandle)
+        assertEquals(first.generation, recreatedOld.generation)
+        assertNull(recreatedOld.payload)
+        coordinator.destinationDisposed(recreatedOld.generation)
+        assertEquals("second", coordinator.payload?.b30?.single()?.songId)
+
+        val incoming = coordinator.claimPayload(SavedStateHandle())
+        assertEquals("second", incoming.payload?.b30?.single()?.songId)
+        coordinator.destinationDisposed(incoming.generation)
+        assertNull(coordinator.payload)
+    }
+
+    @Test
+    fun disposalAfterSessionLevelClearCannotReleaseALaterPayload() {
+        val gateway = RecordingGateway("home")
+        val coordinator = B30NavigationCoordinator(gateway)
+        coordinator.openB30(payload("previous-session"))
+        val staleGeneration = coordinator.payloadGeneration
+        coordinator.loginSuccess()
+
+        coordinator.openB30(payload("new-session"))
+        val currentPayload = coordinator.payload
+
+        coordinator.destinationDisposed(staleGeneration)
+
+        assertSame(currentPayload, coordinator.payload)
     }
 
     @Test
@@ -100,6 +174,19 @@ class PhiTrackerNavHostTest {
     }
 
     @Test
+    fun guestHomeIsReplacedOnLoginSuccessLeavingExactlyOneHome() {
+        // Guest Home opened Login; success must REPLACE that Home entry, not
+        // stack a second one on top of the stale guest page.
+        val gateway = RecordingGateway("home", "login")
+        val coordinator = B30NavigationCoordinator(gateway)
+
+        coordinator.loginSuccess()
+
+        assertEquals(listOf("home"), gateway.routes)
+        assertEquals(1, gateway.routes.count { it == "home" }, "exactly one Home entry after login")
+    }
+
+    @Test
     fun skipLoginPopsBackToHomeWhenHomeIsBelowLogin() {
         val gateway = RecordingGateway("home", "login")
         val coordinator = B30NavigationCoordinator(gateway)
@@ -107,6 +194,7 @@ class PhiTrackerNavHostTest {
         coordinator.skipLoginToHome()
 
         assertEquals(listOf("home"), gateway.routes)
+        assertEquals(1, gateway.clearDetailCalls, "skip is a session replacement")
     }
 
     @Test
@@ -117,6 +205,30 @@ class PhiTrackerNavHostTest {
         coordinator.skipLoginToHome()
 
         assertEquals(listOf("home"), gateway.routes)
+        assertEquals(1, gateway.clearDetailCalls)
+    }
+
+    @Test
+    fun sessionResumeKeepsRestoredDetailWithoutSessionReplacement() {
+        val gateway = RecordingGateway("login")
+        val coordinator = B30NavigationCoordinator(gateway)
+
+        coordinator.resumeSession()
+
+        assertEquals(listOf("home"), gateway.routes)
+        assertEquals(0, gateway.clearDetailCalls)
+    }
+
+    @Test
+    fun sessionResumePopsBackToExistingHomeWithoutReplacingIt() {
+        val gateway = RecordingGateway("home", "login")
+        val coordinator = B30NavigationCoordinator(gateway)
+
+        coordinator.resumeSession()
+
+        assertEquals(listOf("home"), gateway.routes)
+        assertEquals(1, gateway.routes.count { it == "home" }, "the existing Home entry is kept")
+        assertEquals(0, gateway.clearDetailCalls)
     }
 
     @Test
@@ -182,22 +294,102 @@ class PhiTrackerNavHostTest {
     }
 
     @Test
-    fun pendingRouteQueuedBeforeGraphReadyWinsOverRestoredRoute() {
+    fun pendingRouteQueuedBeforeGraphReadyIsDeliveredOnce() {
         val state = DetailPaneState()
-        val restored = DetailRouteRequest.Plain(Screen.Settings.route)
         val queued = DetailRouteRequest.Plain(Screen.About.route)
         state.setPendingRoute(queued)
 
-        assertEquals(queued, state.consumePendingRouteOr(restored))
+        assertEquals(DetailPendingAction.Navigate(queued), state.consumePendingAction())
         assertNull(state.consumePendingRoute())
     }
 
     @Test
-    fun restoredRouteIsUsedWhenNothingWasQueuedBeforeGraphReady() {
+    fun noPendingActionLeavesControllerRestoredStackUntouched() {
         val state = DetailPaneState()
-        val restored = DetailRouteRequest.SongDetail("光.姜米條.0", "AT")
 
-        assertEquals(restored, state.consumePendingRouteOr(restored))
+        assertEquals(DetailPendingAction.None, state.consumePendingAction())
+    }
+
+    @Test
+    fun sessionReplacementRequestsReset() {
+        val state = DetailPaneState(DetailRouteRequest.Plain(Screen.Settings.route))
+        state.clearForSessionReplacement()
+
+        assertTrue(state.pendingReset)
+        assertNull(state.consumePendingRoute())
+        assertEquals(DetailPendingAction.Reset, state.consumePendingAction())
+        assertTrue(state.pendingReset, "the reset stays pending until the pane applies it")
+        state.completePendingReset()
+        assertFalse(state.pendingReset)
+    }
+
+    @Test
+    fun routeQueuedAfterSessionReplacementSupersedesReset() {
+        val state = DetailPaneState()
+        state.clearForSessionReplacement()
+        state.setPendingRoute(DetailRouteRequest.Plain(Screen.About.route))
+
+        assertFalse(state.pendingReset)
+        assertEquals(
+            DetailPendingAction.Navigate(DetailRouteRequest.Plain(Screen.About.route)),
+            state.consumePendingAction()
+        )
+    }
+
+    @Test
+    fun mirroredNullDoesNotCancelPendingReset() {
+        val state = DetailPaneState()
+        state.clearForSessionReplacement()
+
+        state.setPendingRoute(null)
+
+        assertTrue(state.pendingReset)
+    }
+
+    @Test
+    fun staleGenerationCannotRequestReset() {
+        val state = DetailPaneState()
+        val staleGeneration = state.generation
+        state.clearForSessionReplacement()
+        state.completePendingReset()
+
+        state.requestReset(staleGeneration)
+        assertFalse(state.pendingReset)
+
+        state.requestReset()
+        assertTrue(state.pendingReset)
+    }
+
+    @Test
+    fun pendingResetIsDeliveredToGraphReadyEffect() {
+        val state = DetailPaneState()
+        state.clearForSessionReplacement()
+
+        assertEquals(DetailPendingAction.Reset, state.consumePendingAction())
+    }
+
+    @Test
+    fun missingB30PayloadInDetailRequestsPaneResetWithoutOuterRecovery() {
+        val gateway = RecordingGateway("home", "b30image")
+        val coordinator = B30NavigationCoordinator(gateway)
+        val state = DetailPaneState()
+
+        recoverMissingB30Payload(B30Host.DetailPane, state, coordinator)
+
+        assertTrue(state.pendingReset)
+        assertEquals(listOf("home", "b30image"), gateway.routes)
+    }
+
+    @Test
+    fun missingB30PayloadOnOuterGraphUsesExistingRecovery() {
+        val gateway = RecordingGateway("home", "b30image")
+        val coordinator = B30NavigationCoordinator(gateway)
+        val state = DetailPaneState()
+
+        recoverMissingB30Payload(B30Host.OuterGraph, state, coordinator)
+
+        assertFalse(state.pendingReset)
+        assertEquals(listOf("home"), gateway.routes)
     }
 
     @Test
@@ -256,6 +448,36 @@ class PhiTrackerNavHostTest {
             DetailRouteRequest.Collectible("额外章节", "mope1"),
             detailRestored?.consumePendingRoute()
         )
+    }
+
+    @Test
+    fun detailPaneStateSaverPersistsResetAcrossRecreation() {
+        // A session replacement can land between save and the next composition;
+        // the reset flag must survive with no route left to carry it.
+        val state = DetailPaneState(DetailRouteRequest.Plain(Screen.Settings.route))
+        state.clearForSessionReplacement()
+
+        val saved = with(DetailPaneState.Saver) {
+            with(SaverScope { true }) { save(state) }
+        }
+        val restored = DetailPaneState.Saver.restore(checkNotNull(saved))
+
+        assertTrue(checkNotNull(restored).pendingReset)
+        assertNull(restored.consumePendingRoute())
+    }
+
+    @Test
+    fun detailPaneStateSaverRestoresLegacyRouteOnlyFormat() {
+        // Previous releases persisted only the route JSON. An upgrade in the
+        // middle of an Activity recreation must still restore that page.
+        val legacyRequest: DetailRouteRequest = DetailRouteRequest.Plain(Screen.Settings.route)
+        val legacySaved = Json.encodeToString(legacyRequest)
+
+        val restored = DetailPaneState.Saver.restore(legacySaved)
+
+        assertNotNull(restored)
+        assertFalse(restored.pendingReset)
+        assertEquals(legacyRequest, restored.consumePendingRoute())
     }
 
     @Test
@@ -333,6 +555,7 @@ class PhiTrackerNavHostTest {
     private class RecordingGateway(vararg initialRoutes: String) : B30NavigationGateway {
         val routes = initialRoutes.toMutableList()
         var hasDetailPane: Boolean = false
+        var clearDetailCalls: Int = 0
         var observePayload: () -> B30ExportPayload? = { null }
         var payloadObservedDuringNavigation: B30ExportPayload? = null
             private set
@@ -345,19 +568,42 @@ class PhiTrackerNavHostTest {
 
         override fun navigateHomeReplacingLogin() {
             observeDuringNavigation()
-            routes.clear()
+            // Mirrors the real gateway: the policy decides which entry to pop
+            // through; the fake models NavController's popUpTo (search from
+            // the top) instead of clearing the whole stack.
+            val replacement = LoginBackStackPolicy.homeReplacingLogin(
+                backStackRoutes = routes.toList(),
+                homeRoute = "home",
+                loginRoute = "login"
+            )
+            popUpTo(replacement.popUpToRoute, replacement.inclusive)
             routes += "home"
+        }
+
+        override fun navigateHomeResumingSession() {
+            // Mirrors popToHomeOrReplaceLogin: keep an existing Home below
+            // Login instead of replacing it.
+            navigateHomeSkippingLogin()
+        }
+
+        override fun clearDetailForSessionReplacement() {
+            clearDetailCalls++
         }
 
         override fun navigateLoginReplacingHome() {
             observeDuringNavigation()
-            routes.clear()
+            popUpTo("home", inclusive = true)
             routes += "login"
         }
 
         override fun navigateHomeSkippingLogin() {
-            routes.removeAll { it == "login" }
-            routes += "home"
+            val homeIndex = routes.indexOfLast { it == "home" }
+            if (homeIndex >= 0) {
+                while (routes.lastIndex > homeIndex) routes.removeLast()
+            } else {
+                popUpTo("login", inclusive = true)
+                routes += "home"
+            }
         }
 
         override fun popCurrent() {
@@ -386,6 +632,14 @@ class PhiTrackerNavHostTest {
 
         fun systemBack() {
             routes.removeLast()
+        }
+
+        /** NavController-style popUpTo: find the topmost match, drop it and everything above. */
+        private fun popUpTo(route: String, inclusive: Boolean) {
+            val index = routes.indexOfLast { it == route }
+            if (index < 0) return
+            val keepUpTo = if (inclusive) index else index + 1
+            while (routes.lastIndex >= keepUpTo) routes.removeLast()
         }
 
         private fun observeDuringNavigation() {

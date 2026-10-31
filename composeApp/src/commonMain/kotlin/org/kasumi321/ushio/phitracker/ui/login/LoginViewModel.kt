@@ -17,7 +17,10 @@ import org.kasumi321.ushio.phitracker.domain.model.QrLoginPollResult
 import org.kasumi321.ushio.phitracker.domain.model.Server
 import org.kasumi321.ushio.phitracker.domain.repository.QrLoginRepository
 import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
+import org.kasumi321.ushio.phitracker.domain.session.SessionCleanupFailure
+import org.kasumi321.ushio.phitracker.domain.session.SessionCleanupRequiredException
 import org.kasumi321.ushio.phitracker.domain.session.SessionCredentialsPersistenceException
+import org.kasumi321.ushio.phitracker.domain.session.SessionRecoveryUnresolvedException
 import org.kasumi321.ushio.phitracker.domain.session.SessionResumeOutcome
 import org.kasumi321.ushio.phitracker.domain.session.SessionTokenRejectedException
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
@@ -25,12 +28,20 @@ import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.login_error_credential_expired
 import phitracker.composeapp.generated.resources.login_error_empty_token
 import phitracker.composeapp.generated.resources.login_error_expired_no_save
+import phitracker.composeapp.generated.resources.login_error_login_finalization
 import phitracker.composeapp.generated.resources.login_error_persist_failed
+import phitracker.composeapp.generated.resources.login_error_previous_credential_cleanup
+import phitracker.composeapp.generated.resources.login_error_previous_data_cleanup
+import phitracker.composeapp.generated.resources.login_error_recovery_unresolved
+import phitracker.composeapp.generated.resources.login_error_reset_failed
+import phitracker.composeapp.generated.resources.login_error_reset_pending
+import phitracker.composeapp.generated.resources.login_error_storage_rebuild_required
 import phitracker.composeapp.generated.resources.login_error_sync_failed
 import phitracker.composeapp.generated.resources.login_qr_auth_failed
 import phitracker.composeapp.generated.resources.login_qr_fetch_failed
 import phitracker.composeapp.generated.resources.login_qr_status_failed
 import phitracker.composeapp.generated.resources.login_qr_sync_failed
+import phitracker.composeapp.generated.resources.settings_logout_credential_pending
 
 /** QR 扫码状态 */
 enum class QrStatus {
@@ -50,6 +61,7 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val error: UiText? = null,
     val isLoggedIn: Boolean = false,
+    val sessionRestored: Boolean = false,
     val isCheckingToken: Boolean = true,
     val qrCodeUrl: String? = null,
     val qrStatus: QrStatus = QrStatus.Idle,
@@ -80,6 +92,7 @@ class LoginViewModel(
                         it.copy(
                             isCheckingToken = false,
                             isLoggedIn = true,
+                            sessionRestored = true,
                             server = _uiState.value.server
                         )
                     }
@@ -93,12 +106,17 @@ class LoginViewModel(
                 is SessionResumeOutcome.RequiresLogin -> {
                     _uiState.update {
                         it.copy(
+                            isLoading = false,
                             isCheckingToken = false,
                             isLoggedIn = false,
-                            error = if (outcome.hadToken) {
-                                UiText.Res(Res.string.login_error_expired_no_save)
-                            } else {
-                                null
+                            sessionRestored = false,
+                            error = when {
+                                outcome.recoveryUnresolved -> UiText.Res(Res.string.login_error_recovery_unresolved)
+                                outcome.localResetPending -> UiText.Res(Res.string.login_error_reset_pending)
+                                outcome.credentialCleanupPending ->
+                                    UiText.Res(Res.string.settings_logout_credential_pending)
+                                outcome.hadToken -> UiText.Res(Res.string.login_error_expired_no_save)
+                                else -> null
                             }
                         )
                     }
@@ -128,13 +146,13 @@ class LoginViewModel(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, sessionRestored = false, error = null) }
 
             val result = sessionCoordinator.login(state.token, state.server)
             result.fold(
                 onSuccess = {
                     _uiState.update { state0 ->
-                        state0.copy(isLoading = false, isLoggedIn = true)
+                        state0.copy(isLoading = false, isLoggedIn = true, sessionRestored = false)
                     }
                 },
                 onFailure = { throwable ->
@@ -148,8 +166,50 @@ class LoginViewModel(
 
     private fun mapLoginError(throwable: Throwable): UiText = when (throwable) {
         is SessionTokenRejectedException -> UiText.Res(Res.string.login_error_credential_expired)
-        is SessionCredentialsPersistenceException -> UiText.Res(Res.string.login_error_persist_failed)
+        is SessionRecoveryUnresolvedException -> UiText.Res(Res.string.login_error_recovery_unresolved)
+        is SessionCredentialsPersistenceException -> UiText.Res(
+            if (throwable.storageResetRequired) {
+                Res.string.login_error_storage_rebuild_required
+            } else {
+                Res.string.login_error_persist_failed
+            }
+        )
+        is SessionCleanupRequiredException -> UiText.Res(
+            when (throwable.failure) {
+                SessionCleanupFailure.PreviousAccountData -> Res.string.login_error_previous_data_cleanup
+                SessionCleanupFailure.PreviousCredentials -> Res.string.login_error_previous_credential_cleanup
+                SessionCleanupFailure.LoginFinalization -> Res.string.login_error_login_finalization
+            }
+        )
         else -> UiText.Res(Res.string.login_error_sync_failed)
+    }
+
+    fun resetLocalSession() {
+        cancelQrLogin()
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isLoading = true, isCheckingToken = true, sessionRestored = false, error = null)
+            }
+            val result = try {
+                sessionCoordinator.resetLocalSession()
+            } catch (failure: Throwable) {
+                currentCoroutineContext().ensureActive()
+                Result.failure(failure)
+            }
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isCheckingToken = false,
+                    isLoggedIn = false,
+                    sessionRestored = false,
+                    error = if (result.isSuccess) {
+                        null
+                    } else {
+                        UiText.Res(Res.string.login_error_reset_failed)
+                    }
+                )
+            }
+        }
     }
 
     fun startQrLogin() {
@@ -189,11 +249,8 @@ class LoginViewModel(
                                 _uiState.update {
                                     it.copy(
                                         qrStatus = QrStatus.Error,
-                                        qrError = if (loginResult.exceptionOrNull() is SessionTokenRejectedException) {
-                                            UiText.Res(Res.string.login_qr_auth_failed)
-                                        } else {
-                                            UiText.Res(Res.string.login_qr_sync_failed)
-                                        }
+                                        qrError = loginResult.exceptionOrNull()?.let(::mapLoginError)
+                                            ?: UiText.Res(Res.string.login_qr_sync_failed)
                                     )
                                 }
                                 return@launch
@@ -203,6 +260,7 @@ class LoginViewModel(
                                 it.copy(
                                     qrStatus = QrStatus.Success,
                                     isLoggedIn = true,
+                                    sessionRestored = false,
                                     token = sessionToken
                                 )
                             }

@@ -160,8 +160,6 @@ internal class FakeSettingsRepository : SettingsRepository {
     private val chartVoteKeysState = MutableStateFlow<Set<String>>(emptySet())
     override val chartVoteKeys: Flow<Set<String>> = chartVoteKeysState
     val chartVoteKeyWrites = mutableListOf<String>()
-    override val avatarUri: Flow<String?> = flowOf(null)
-    override val moneyString: Flow<String> = flowOf("")
     override suspend fun setThemeMode(mode: Int) { themeModeState.value = mode }
     override suspend fun setAmoledBlack(enabled: Boolean) { amoledBlackState.value = enabled }
     override suspend fun setThemeColorSource(source: String) { colorSourceState.value = source }
@@ -183,8 +181,6 @@ internal class FakeSettingsRepository : SettingsRepository {
         preloadDoneWrites += done
         preloadDoneState.value = done
     }
-    override suspend fun setAvatarUri(uri: String?) = Unit
-    override suspend fun setMoneyString(money: String) = Unit
     override suspend fun setIncludePreRelease(enabled: Boolean) { includeState.value = enabled }
     override suspend fun setAutoCheckUpdate(enabled: Boolean) { autoState.value = enabled }
     override suspend fun setAutoCheckSongDataUpdate(enabled: Boolean) { autoSongDataState.value = enabled }
@@ -193,7 +189,10 @@ internal class FakeSettingsRepository : SettingsRepository {
     override suspend fun setApiId(apiId: String) { apiIdState.value = apiId.trim() }
     override suspend fun setApiPlatform(platform: String) { platformState.value = platform.trim() }
     override suspend fun setApiPlatformId(platformId: String) { platformIdState.value = platformId.trim() }
-    override suspend fun setApiToken(apiToken: String) { apiTokenState.value = apiToken.trim() }
+    override suspend fun setApiToken(apiToken: String): Result<Unit> {
+        apiTokenState.value = apiToken.trim()
+        return Result.success(Unit)
+    }
     override suspend fun setCrashNotificationGuideShown(shown: Boolean) { guideState.value = shown }
     override suspend fun setOnboardingCompleted(completed: Boolean) { onboardingCompletedState.value = completed }
     override suspend fun setOnboardingRerunRequested(requested: Boolean) { onboardingRerunRequestedState.value = requested }
@@ -236,6 +235,8 @@ internal class FakePhigrosRepository : PhigrosRepository {
     override suspend fun getSessionToken(): Pair<String, Server>? = null
     override suspend fun clearData() = Unit
     override suspend fun clearTokenSync() = Unit
+    override suspend fun resetCredentialStorage(): Result<Unit> =
+        Result.failure(UnsupportedOperationException("credential reset is not used by this test"))
     override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> = emptyMap()
     override suspend fun getTotalFullComboCount() = 0
     override suspend fun getTotalPhiCount() = 0

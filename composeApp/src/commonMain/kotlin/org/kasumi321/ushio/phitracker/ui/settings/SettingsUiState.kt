@@ -34,6 +34,14 @@ data class SettingsUiState(
     val updateDataTotal: Int = 0,
     val updateDataFileName: String = "",
     val updateDataError: UiText? = null,
+    // Local rejection feedback; unlike session errors, other owners' progress must not clear it.
+    val updateDataBusyMessage: UiText? = null,
+    // Non-zero when the last update committed the index but some newly added
+    // illustrations failed; shown alongside the success result.
+    val updatePartialIllustrationFailures: Int = 0,
+    // True while the bundled catalog is served because the downloaded copy was
+    // set aside by an explicit offline fallback.
+    val catalogDegraded: Boolean = false,
     // Text of the currently effective collection_version.txt, shown alongside
     // the index-data update row in Settings.
     val collectibleDataVersion: String = "",
@@ -47,6 +55,11 @@ data class SettingsUiState(
     val hasRuntimeLogs: Boolean = false,
     val hasCrashLogs: Boolean = false,
     val crashNotificationGuideShown: Boolean = false,
+    // sessionToken reset (account security): in-flight flag + last result text.
+    val isResettingSessionToken: Boolean = false,
+    val sessionTokenResetMessage: UiText? = null,
+    val isResettingLocalSession: Boolean = false,
+    val localSessionResetMessage: UiText? = null,
     val tip: String = ""
 )
 
@@ -57,6 +70,8 @@ enum class UpdateDataPhase {
 
 sealed interface SettingsEvent {
     data object LoggedOut : SettingsEvent
+    data object LoggedOutCredentialsPending : SettingsEvent
     data object LogoutFailed : SettingsEvent
+    data object LocalSessionReset : SettingsEvent
     data object RestartRequested : SettingsEvent
 }

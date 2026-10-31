@@ -3,13 +3,17 @@ package org.kasumi321.ushio.phitracker.ui.settings
 import androidx.lifecycle.viewModelScope
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.JsonObject
@@ -22,10 +26,12 @@ import org.kasumi321.ushio.phitracker.data.logging.RuntimeLogExporter
 import org.kasumi321.ushio.phitracker.data.platform.IllustrationThumbnailPreloader
 import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
 import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
 import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
+import org.kasumi321.ushio.phitracker.data.common.CatalogDownloadException
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdater
 import org.kasumi321.ushio.phitracker.domain.model.ReleaseInfo
@@ -34,6 +40,9 @@ import org.kasumi321.ushio.phitracker.domain.usecase.CheckForUpdateUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetB30UseCase
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.ViewModelTestLifecycle
+import org.kasumi321.ushio.phitracker.ui.utils.UiText
+import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.catalog_update_error_network_message
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -195,9 +204,36 @@ class SettingsViewModelTest {
         assertEquals("v2", viewModel.uiState.value.collectibleDataVersion)
     }
 
-    private class FakeCollectibleDataUpdater : CollectibleDataUpdater(
+    @Test
+    fun updateProgressAndFailureMirrorTheSharedSession(): Unit = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val viewModel = createViewModel(
+            updaterResult = Result.failure(CatalogDownloadException()),
+            progressGate = gate
+        )
+        advanceUntilIdle()
+
+        viewModel.updateSongData()
+        runCurrent()
+
+        assertTrue(viewModel.uiState.value.isUpdatingData, "the dialog follows the session, not the ViewModel")
+        assertEquals(1, viewModel.uiState.value.updateDataProgress)
+        assertEquals(4, viewModel.uiState.value.updateDataTotal)
+        assertEquals("info.csv", viewModel.uiState.value.updateDataFileName)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isUpdatingData)
+        assertEquals(
+            UiText.Res(Res.string.catalog_update_error_network_message),
+            viewModel.uiState.value.updateDataError
+        )
+    }
+
+    private class FakeCollectibleDataUpdater(paths: PlatformPaths) : CollectibleDataUpdater(
         HttpClient(MockEngine { error("unused") }),
-        PlatformPaths("/tmp/settings-test", "/tmp/settings-test-cache"),
+        paths,
         CollectibleDataProvider(TestAssets)
     ) {
         override suspend fun checkUpstreamChanged(): Result<Boolean> = Result.success(false)
@@ -215,34 +251,41 @@ class SettingsViewModelTest {
         },
         clearCacheUrls: suspend (List<String>) -> Unit = {},
         prepareLogStore: (LogFileStore) -> Unit = {},
-        collectibleDataVersionProvider: () -> String = { "" }
+        collectibleDataVersionProvider: () -> String = { "" },
+        progressGate: CompletableDeferred<Unit>? = null
     ): SettingsViewModel {
         val provider = SongDataProvider(TestAssets)
-        val paths = PlatformPaths("/tmp/settings-test", "/tmp/settings-test-cache")
+        val base = "/tmp/settings-vm-paths-${kotlin.random.Random.nextInt()}"
+        val paths = PlatformPaths(base, "$base/cache")
         val updater = object : SongDataUpdater(HttpClient(MockEngine { error("unused") }), paths, provider) {
             override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> {
                 onProgress(1, FILE_NAMES.size, "info.csv")
+                progressGate?.await()
                 return updaterResult
             }
         }
         val root = "/tmp/settings-vm-${kotlin.random.Random.nextInt()}"
         val store = LogFileStore(FileSystem.SYSTEM, "$root/runtime".toPath(), "$root/crash".toPath())
         prepareLogStore(store)
+        val coordinator = SongDataUpdateCoordinator(
+            songDataUpdater = updater,
+            songDataProvider = provider,
+            illustrationProvider = IllustrationProvider(),
+            artworkFileCache = artworkCache,
+            collectibleDataUpdater = FakeCollectibleDataUpdater(paths),
+            thumbnailPreloader = thumbnailPreloader,
+            clearCacheUrls = clearCacheUrls
+        )
         return SettingsViewModel(
             repository = repository,
-            sessionCoordinator = SessionCoordinatorImpl(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository, org.kasumi321.ushio.phitracker.data.session.SessionStateStore(org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage())),
             settingsRepository = settings,
             checkForUpdateUseCase = CheckForUpdateUseCase(repository),
             getB30UseCase = GetB30UseCase(repository),
             songDataProvider = provider,
-            songDataUpdateCoordinator = SongDataUpdateCoordinator(
-                songDataUpdater = updater,
-                songDataProvider = provider,
-                illustrationProvider = IllustrationProvider(),
-                artworkFileCache = artworkCache,
-                collectibleDataUpdater = FakeCollectibleDataUpdater(),
-                thumbnailPreloader = thumbnailPreloader,
-                clearCacheUrls = clearCacheUrls
+            catalogRepairSession = CatalogRepairSession(
+                coordinator,
+                CoroutineScope(SupervisorJob() + dispatcher)
             ),
             illustrationProvider = IllustrationProvider(),
             artworkFileCache = artworkCache,

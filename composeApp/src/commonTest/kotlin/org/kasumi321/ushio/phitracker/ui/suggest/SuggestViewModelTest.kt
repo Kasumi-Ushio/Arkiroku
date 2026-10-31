@@ -235,6 +235,8 @@ class SuggestViewModelTest {
         override suspend fun getSessionToken(): Pair<String, Server>? = null
         override suspend fun clearData() = Unit
         override suspend fun clearTokenSync() = Unit
+        override suspend fun resetCredentialStorage(): Result<Unit> =
+            Result.failure(UnsupportedOperationException("credential reset is not used by this test"))
 
         override suspend fun apiTest(): Result<JsonObject> =
             Result.failure(IllegalStateException("Not needed for this test"))

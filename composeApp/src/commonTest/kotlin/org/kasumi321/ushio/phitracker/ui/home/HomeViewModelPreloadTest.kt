@@ -32,6 +32,7 @@ import org.kasumi321.ushio.phitracker.data.platform.TextAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.IllustrationThumbnailPreloader
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
@@ -64,6 +65,8 @@ import org.kasumi321.ushio.phitracker.domain.usecase.GetSuggestUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.RksCalculator
 import org.kasumi321.ushio.phitracker.domain.usecase.SearchSongUseCase
 import org.kasumi321.ushio.phitracker.data.session.SessionCoordinatorImpl
+import org.kasumi321.ushio.phitracker.data.session.SessionStateStore
+import org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.ViewModelTestLifecycle
 import okio.FileSystem
@@ -81,6 +84,7 @@ import kotlin.time.TimeSource
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.b30_tag_analysis_failed
+import phitracker.composeapp.generated.resources.catalog_update_error_network_message
 import phitracker.composeapp.generated.resources.songs_preload_partial_failed
 import phitracker.composeapp.generated.resources.tools_api_query_failed
 
@@ -433,6 +437,167 @@ class HomeViewModelPreloadTest {
     }
 
     @Test
+    fun accountProfileDataAndAvatarFollowOwnerAndClearForGuest(): Unit = runTest(dispatcher) {
+        val profiles = MutableStateFlow<UserProfile?>(null)
+        val repository = object : FakePhigrosRepository() {
+            override fun getUserProfile(): Flow<UserProfile?> = profiles
+            override suspend fun setAvatarUri(uri: String?): Result<Unit> {
+                val current = profiles.value ?: return Result.failure(IllegalStateException("guest"))
+                profiles.value = current.copy(avatarUri = uri)
+                return Result.success(Unit)
+            }
+        }
+        val viewModel = createViewModel(FakeSettingsRepository(preloadDone = true), repository = repository)
+        fun profile(owner: String, money: String, avatar: String) = UserProfile(
+            playerId = owner, nickname = owner, avatar = "", selfIntro = "", background = "",
+            rks = 15f, challengeModeRank = 1, gameVersion = 3, updatedAt = "",
+            moneyString = money, avatarUri = avatar
+        )
+        val accountA = profile("A", "1 MiB", "avatar-a")
+        val accountB = profile("B", "2 GiB", "avatar-b")
+
+        profiles.value = accountA
+        advanceUntilIdle()
+        assertEquals("1 MiB", viewModel.uiState.value.profile.moneyString)
+        assertEquals("avatar-a", viewModel.uiState.value.profile.avatarUri)
+
+        profiles.value = accountB
+        advanceUntilIdle()
+        assertEquals("2 GiB", viewModel.uiState.value.profile.moneyString)
+        assertEquals("avatar-b", viewModel.uiState.value.profile.avatarUri)
+
+        profiles.value = accountA
+        advanceUntilIdle()
+        assertEquals("1 MiB", viewModel.uiState.value.profile.moneyString)
+        assertEquals("avatar-a", viewModel.uiState.value.profile.avatarUri)
+
+        viewModel.setAvatarUri("avatar-a-new")
+        advanceUntilIdle()
+        assertEquals("avatar-a-new", viewModel.uiState.value.profile.avatarUri)
+
+        profiles.value = null
+        advanceUntilIdle()
+        assertEquals("", viewModel.uiState.value.profile.moneyString)
+        assertNull(viewModel.uiState.value.profile.avatarUri)
+        viewModel.setAvatarUri("guest-avatar")
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.profile.avatarUri)
+    }
+
+    @Test
+    fun rejectedSessionClearsHomeProjectionsAndSameAccountCanRebuildThem(): Unit = runTest(dispatcher) {
+        val profiles = MutableStateFlow<UserProfile?>(null)
+        val tokens = MutableStateFlow<Pair<String, Server>?>("secret" to Server.CN)
+        val repository = object : FakePhigrosRepository() {
+            override fun getUserProfile(): Flow<UserProfile?> = profiles
+            override fun observeSessionToken(): Flow<Pair<String, Server>?> = tokens
+            override suspend fun getBoundPlayerId(): String = "test-owner"
+            override suspend fun syncSave(
+                sessionToken: String,
+                server: Server,
+                mode: SyncMode
+            ): Result<SyncSaveResult> = Result.success(
+                SyncSaveResult(
+                    save = emptySave(),
+                    committedAt = 9_000L,
+                    changedEntryCount = 1,
+                    snapshotCreated = true
+                )
+            )
+        }.apply {
+            clearCounts = mapOf(Difficulty.IN to 4)
+            fullComboCount = 5
+            phiCount = 2
+            snapshots = listOf(syncSnapshot(id = 1L, timestamp = 1_000L, dataCount = 1))
+            historyBySnapshot = mapOf(
+                1L to listOf(syncHistory(snapshotId = 1L, songId = "song-a.0", difficulty = "IN"))
+            )
+        }
+        val viewModel = createViewModel(FakeSettingsRepository(preloadDone = true), repository = repository)
+        profiles.value = UserProfile(
+            playerId = "test-owner", nickname = "Player", avatar = "", selfIntro = "", background = "",
+            rks = 15f, challengeModeRank = 1, gameVersion = 3, updatedAt = ""
+        )
+        advanceUntilIdle()
+        assertEquals(4, viewModel.uiState.value.profile.clearCounts["IN"])
+        assertEquals("secret", viewModel.uiState.value.tools.sessionToken)
+        assertTrue(viewModel.uiState.value.profile.recentSyncedRecords.isNotEmpty())
+
+        profiles.value = null
+        advanceUntilIdle()
+
+        assertEquals(ProfileUiState(), viewModel.uiState.value.profile)
+        assertNull(viewModel.uiState.value.b30.histogram)
+        assertTrue(viewModel.uiState.value.tools.syncSnapshots.isEmpty())
+        assertTrue(viewModel.uiState.value.tools.apiHistorySnapshots.isEmpty())
+        assertNull(viewModel.uiState.value.tools.sessionToken)
+        tokens.value = "residual-secret" to Server.CN
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.tools.sessionToken, "a credential that failed deletion must stay hidden")
+
+        profiles.value = UserProfile(
+            playerId = "test-owner", nickname = "Player", avatar = "", selfIntro = "", background = "",
+            rks = 15f, challengeModeRank = 1, gameVersion = 3, updatedAt = ""
+        )
+        advanceUntilIdle()
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertEquals(4, viewModel.uiState.value.profile.clearCounts["IN"])
+        assertEquals(5, viewModel.uiState.value.profile.fcCount)
+        assertEquals(2, viewModel.uiState.value.profile.phiCount)
+        assertEquals(9_000L, viewModel.uiState.value.profile.lastSyncTime)
+        assertTrue(viewModel.uiState.value.profile.recentSyncedRecords.isNotEmpty())
+        assertEquals("residual-secret", viewModel.uiState.value.tools.sessionToken)
+    }
+
+    @Test
+    fun lateApiHistoryFromInvalidatedSessionCannotRepopulateTools(): Unit = runTest(dispatcher) {
+        val profiles = MutableStateFlow<UserProfile?>(
+            UserProfile("owner", "Player", "", "", "", 15f, 1, 3, "")
+        )
+        val historyStarted = CompletableDeferred<Unit>()
+        val releaseHistory = CompletableDeferred<Unit>()
+        val repository = object : FakePhigrosRepository() {
+            override fun getUserProfile(): Flow<UserProfile?> = profiles
+            override suspend fun apiGetSaveHistory(
+                platform: String,
+                platformId: String,
+                apiUserId: String,
+                request: List<String>
+            ): Result<JsonObject> {
+                historyStarted.complete(Unit)
+                releaseHistory.await()
+                return Result.success(
+                    Json.parseToJsonElement(
+                        """{"data":{"rks":[{"date":"2024-01-01T00:00:00Z","value":15.5}]}}"""
+                    ) as JsonObject
+                )
+            }
+        }
+        val viewModel = createViewModel(
+            FakeSettingsRepository(
+                preloadDone = true,
+                apiEnabled = true,
+                useApiData = true,
+                apiUserId = "user",
+                apiPlatform = "taptap",
+                apiPlatformId = "player"
+            ),
+            repository = repository
+        )
+        historyStarted.await()
+
+        profiles.value = null
+        runCurrent()
+        releaseHistory.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.tools.apiHistorySnapshots.isEmpty())
+        assertEquals(ProfileUiState(), viewModel.uiState.value.profile)
+    }
+
+    @Test
     fun repositoryPersistenceReadsKeepEmptyStateAndSkipUnknownDifficulty(): Unit = runTest(dispatcher) {
         val settings = FakeSettingsRepository(preloadDone = true, autoCheckUpdate = false)
         val repository = FakePhigrosRepository().apply {
@@ -521,14 +686,18 @@ class HomeViewModelPreloadTest {
         val viewModel = HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            sessionCoordinator = SessionCoordinatorImpl(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository, SessionStateStore(FakeSecureKeyValueStorage())),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = testSongDataProvider,
             illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
             tipsProvider = TipsProvider(FakeTextAssetReader),
             settingsRepository = settings,
             illustrationPreloadCoordinator = preloadCoordinator(preloader = preloader),
-            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator()
+            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator(),
+            catalogRepairSession = CatalogRepairSession(
+                fakeSongDataUpdateCoordinator(),
+                CoroutineScope(dispatcher)
+            )
         ).let(viewModelLifecycle::track)
         advanceUntilIdle()
 
@@ -571,14 +740,18 @@ class HomeViewModelPreloadTest {
         val viewModel = HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            sessionCoordinator = SessionCoordinatorImpl(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository, SessionStateStore(FakeSecureKeyValueStorage())),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = testSongDataProvider,
             illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
             tipsProvider = TipsProvider(FakeTextAssetReader),
             settingsRepository = settings,
             illustrationPreloadCoordinator = preloadCoordinator(preloader = preloader),
-            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator()
+            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator(),
+            catalogRepairSession = CatalogRepairSession(
+                fakeSongDataUpdateCoordinator(),
+                CoroutineScope(dispatcher)
+            )
         ).let(viewModelLifecycle::track)
         advanceUntilIdle()
 
@@ -645,14 +818,18 @@ class HomeViewModelPreloadTest {
         val viewModel = HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            sessionCoordinator = SessionCoordinatorImpl(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository, SessionStateStore(FakeSecureKeyValueStorage())),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = testSongDataProvider,
             illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
             tipsProvider = TipsProvider(FakeTextAssetReader),
             settingsRepository = settings,
             illustrationPreloadCoordinator = preloadCoordinator(preloader = preloader),
-            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator()
+            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator(),
+            catalogRepairSession = CatalogRepairSession(
+                fakeSongDataUpdateCoordinator(),
+                CoroutineScope(dispatcher)
+            )
         ).let(viewModelLifecycle::track)
         advanceUntilIdle()
 
@@ -765,10 +942,15 @@ class HomeViewModelPreloadTest {
             artworkFileCache = artworkFileCache,
             preloader = preloader
         )
+        val updateCoordinator = fakeSongDataUpdateCoordinator(
+            songDataProvider = songDataProvider,
+            artworkFileCache = artworkFileCache,
+            updater = songDataUpdater
+        )
         return HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            sessionCoordinator = SessionCoordinatorImpl(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository, SessionStateStore(FakeSecureKeyValueStorage())),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = songDataProvider,
             illustrationProvider = illustrationProvider,
@@ -777,10 +959,10 @@ class HomeViewModelPreloadTest {
             artworkFileCache = artworkFileCache,
             illustrationPreloadCoordinator = coordinator,
             appVersionNameProvider = { appVersionName },
-            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator(
-                songDataProvider = songDataProvider,
-                artworkFileCache = artworkFileCache,
-                updater = songDataUpdater
+            songDataUpdateCoordinator = updateCoordinator,
+            catalogRepairSession = CatalogRepairSession(
+                updateCoordinator,
+                CoroutineScope(dispatcher)
             ),
             preloadSession = IllustrationPreloadSession(
                 coordinator = coordinator,
@@ -842,6 +1024,8 @@ class HomeViewModelPreloadTest {
         private val rankGate = CompletableDeferred<Unit>()
         var rankByPositionCallCount: Int = 0
             private set
+
+        override suspend fun getBoundPlayerId(): String = "test-owner"
 
         override suspend fun syncSave(
             sessionToken: String,
@@ -1015,8 +1199,6 @@ class HomeViewModelPreloadTest {
             preloadDone = done
         }
 
-        override val avatarUri: Flow<String?> = flowOf(null)
-        override suspend fun setAvatarUri(uri: String?) = Unit
         private val _gameUpdateCache = MutableStateFlow<String?>(null)
         val gameUpdateCacheWrites = mutableListOf<String?>()
         override val gameUpdateInfoCache: Flow<String?> = _gameUpdateCache.asStateFlow()
@@ -1024,8 +1206,6 @@ class HomeViewModelPreloadTest {
             gameUpdateCacheWrites += cache
             _gameUpdateCache.value = cache
         }
-        override val moneyString: Flow<String> = flowOf("")
-        override suspend fun setMoneyString(money: String) = Unit
         private val _includePreRelease = MutableStateFlow(includePreRelease)
         override val includePreRelease: Flow<Boolean> = _includePreRelease.asStateFlow()
         private val _autoCheckUpdate = MutableStateFlow(autoCheckUpdate)
@@ -1055,7 +1235,7 @@ class HomeViewModelPreloadTest {
         override val apiPlatformId: Flow<String> = flowOf(apiPlatformId)
         override suspend fun setApiPlatformId(platformId: String) = Unit
         override val apiToken: Flow<String> = flowOf("")
-        override suspend fun setApiToken(apiToken: String) = Unit
+        override suspend fun setApiToken(apiToken: String): Result<Unit> = Result.success(Unit)
         override val crashNotificationGuideShown: Flow<Boolean> = flowOf(false)
         override suspend fun setCrashNotificationGuideShown(shown: Boolean) = Unit
         override val onboardingCompleted: Flow<Boolean> = flowOf(true)
@@ -1125,6 +1305,8 @@ class HomeViewModelPreloadTest {
         override suspend fun getSessionToken(): Pair<String, Server>? = Pair("fake-token", Server.CN)
         override suspend fun clearData() = Unit
         override suspend fun clearTokenSync() = Unit
+        override suspend fun resetCredentialStorage(): Result<Unit> =
+            Result.failure(UnsupportedOperationException("credential reset is not used by this test"))
         override suspend fun getCurrentAccountOwner(): String? = "test-owner"
         override suspend fun hasLocalRecords(ownerPlayerId: String): Boolean = cachedSave != null
 
@@ -1191,19 +1373,6 @@ class HomeViewModelPreloadTest {
         var gameUpdateInfoResult: Result<GameUpdateInfo> =
             Result.failure(IllegalStateException("Not configured"))
         override suspend fun fetchGameUpdateInfo(): Result<GameUpdateInfo> = gameUpdateInfoResult
-    }
-
-    private class FakeRecordDao : RecordDao {
-        override suspend fun insertAll(records: List<RecordEntity>) = Unit
-        override fun getAllRecords(owner: String): Flow<List<RecordEntity>> = flowOf(emptyList())
-        override suspend fun getAllRecordsOnce(owner: String): List<RecordEntity> = emptyList()
-        override suspend fun getRecordsBySong(owner: String, songId: String): List<RecordEntity> = emptyList()
-        override suspend fun deleteByOwner(owner: String) = Unit
-        override suspend fun getRecordCount(owner: String): Int = 0
-        override suspend fun getDistinctSongCount(owner: String): Int = 0
-        override suspend fun getClearCountByDifficulty(owner: String, difficulty: String): Int = 0
-        override suspend fun getTotalFcCount(owner: String): Int = 0
-        override suspend fun getTotalPhiCount(owner: String): Int = 0
     }
 
     private class FakeSongDataUpdater(
@@ -1274,7 +1443,12 @@ class HomeViewModelPreloadTest {
         private val snapshotCreated: Boolean = false
     ) : FakePhigrosRepository() {
         val syncModes = mutableListOf<SyncMode>()
+        private var boundPlayerId: String? = "test-owner"
         override fun getCachedSave(): Flow<Save?> = flowOf(initialCachedSave)
+        override suspend fun getBoundPlayerId(): String? = boundPlayerId
+        override suspend fun saveBoundPlayerId(playerId: String) {
+            boundPlayerId = playerId
+        }
 
         override suspend fun syncSave(
             sessionToken: String,
@@ -1620,14 +1794,18 @@ class HomeViewModelPreloadTest {
         return HomeViewModel(
             repository = repository,
             getB30UseCase = GetB30UseCase(repository),
-            sessionCoordinator = SessionCoordinatorImpl(repository),
+            sessionCoordinator = SessionCoordinatorImpl(repository, SessionStateStore(FakeSecureKeyValueStorage())),
             searchSongUseCase = SearchSongUseCase(),
             songDataProvider = songDataProvider,
             illustrationProvider = illustrationProvider,
             tipsProvider = TipsProvider(FakeTextAssetReader),
             settingsRepository = settingsRepository,
             illustrationPreloadCoordinator = preloadCoordinator(songDataProvider = songDataProvider),
-            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator(songDataProvider = songDataProvider)
+            songDataUpdateCoordinator = fakeSongDataUpdateCoordinator(songDataProvider = songDataProvider),
+            catalogRepairSession = CatalogRepairSession(
+                fakeSongDataUpdateCoordinator(songDataProvider = songDataProvider),
+                CoroutineScope(dispatcher)
+            )
         ).let(viewModelLifecycle::track)
     }
 
@@ -1694,6 +1872,32 @@ class HomeViewModelPreloadTest {
             "Should NOT call fetchLatestRelease when auto-check is disabled")
         assertTrue(viewModel.uiState.value.sync.updateCheckState is UpdateCheckState.Idle,
             "UpdateCheckState should remain Idle")
+    }
+
+    @Test
+    fun homeCatalogUpdateUsesSharedSessionAndLocalizedFailure(): Unit = runTest(dispatcher) {
+        val settings = FakeSettingsRepository(preloadDone = true)
+        val updater = FakeSongDataUpdater(
+            onUpdate = {
+                Result.failure(
+                    org.kasumi321.ushio.phitracker.data.common.CatalogDownloadException(
+                        IllegalStateException("raw transport detail")
+                    )
+                )
+            }
+        ).apply { upstreamChanged = true }
+        val viewModel = createViewModel(settings, songDataUpdater = updater)
+        advanceUntilIdle()
+
+        viewModel.refreshSongData()
+        advanceUntilIdle()
+
+        assertTrue(updater.updateCalled)
+        assertEquals(
+            UiText.Res(phitracker.composeapp.generated.resources.Res.string.catalog_update_error_network_message),
+            viewModel.uiState.value.songs.songDataMessage
+        )
+        assertFalse(viewModel.uiState.value.songs.isSongDataRefreshing)
     }
 
     @Test

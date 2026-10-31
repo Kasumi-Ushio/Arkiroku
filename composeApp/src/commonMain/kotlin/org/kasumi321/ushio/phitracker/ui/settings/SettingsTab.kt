@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VpnKey
@@ -93,6 +95,7 @@ import phitracker.composeapp.generated.resources.settings_cache_b30_artwork_desc
 import phitracker.composeapp.generated.resources.settings_caching_progress
 import phitracker.composeapp.generated.resources.settings_cancel
 import phitracker.composeapp.generated.resources.settings_category_about
+import phitracker.composeapp.generated.resources.settings_catalog_using_bundled
 import phitracker.composeapp.generated.resources.settings_category_b30
 import phitracker.composeapp.generated.resources.settings_category_data_cache
 import phitracker.composeapp.generated.resources.settings_category_diagnostics
@@ -148,6 +151,13 @@ import phitracker.composeapp.generated.resources.settings_later
 import phitracker.composeapp.generated.resources.settings_logout
 import phitracker.composeapp.generated.resources.settings_logout_confirm
 import phitracker.composeapp.generated.resources.settings_logout_dialog_text
+import phitracker.composeapp.generated.resources.settings_reset_pending_update
+import phitracker.composeapp.generated.resources.settings_reset_pending_update_desc
+import phitracker.composeapp.generated.resources.settings_reset_pending_update_dialog_text
+import phitracker.composeapp.generated.resources.settings_reset_token
+import phitracker.composeapp.generated.resources.settings_reset_token_confirm
+import phitracker.composeapp.generated.resources.settings_reset_token_desc
+import phitracker.composeapp.generated.resources.settings_reset_token_dialog_text
 import phitracker.composeapp.generated.resources.settings_no_crash_log
 import phitracker.composeapp.generated.resources.settings_no_crash_log_title
 import phitracker.composeapp.generated.resources.settings_no_runtime_log
@@ -180,10 +190,14 @@ import phitracker.composeapp.generated.resources.settings_update_error_message
 import phitracker.composeapp.generated.resources.settings_update_failed
 import phitracker.composeapp.generated.resources.settings_update_new_songs
 import phitracker.composeapp.generated.resources.settings_update_no_new_songs
+import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
+import phitracker.composeapp.generated.resources.settings_update_preparing
 import phitracker.composeapp.generated.resources.settings_update_song_data
 import phitracker.composeapp.generated.resources.settings_update_song_data_desc
 import phitracker.composeapp.generated.resources.settings_use_api_data
 import phitracker.composeapp.generated.resources.settings_use_api_data_desc
+import phitracker.composeapp.generated.resources.login_reset_local_session
+import phitracker.composeapp.generated.resources.login_reset_local_session_dialog_text
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,6 +232,13 @@ fun SettingsTab(
         onRedownloadIllustrations: () -> Unit,
         onNavigateToAbout: () -> Unit,
         onLogout: () -> Unit,
+        isResettingSessionToken: Boolean = false,
+        sessionTokenResetMessage: UiText? = null,
+        onResetSessionToken: () -> Unit = {},
+        onDismissSessionTokenResetMessage: () -> Unit = {},
+        isResettingLocalSession: Boolean = false,
+        localSessionResetMessage: UiText? = null,
+        onResetLocalSession: () -> Unit = {},
         onNavigateBack: (() -> Unit)? = null,
         tip: String = "",
         apiEnabled: Boolean = false,
@@ -242,8 +263,12 @@ fun SettingsTab(
         updateDataPhase: UpdateDataPhase = UpdateDataPhase.Files,
         updateDataError: UiText? = null,
         updateResultSongNames: List<String>? = null,
+        updatePartialIllustrationFailures: Int = 0,
+        catalogDegraded: Boolean = false,
         collectibleDataVersion: String = "",
         onUpdateSongData: () -> Unit = {},
+        onCancelSongDataUpdate: () -> Unit = {},
+        onResetPendingUpdate: () -> Unit = {},
         onDismissUpdateError: () -> Unit = {},
         includePreRelease: Boolean = false,
         autoCheckUpdate: Boolean = true,
@@ -284,12 +309,15 @@ fun SettingsTab(
             stringResource(Res.string.settings_notification_permission_denied_toast)
 
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showLocalSessionResetDialog by remember { mutableStateOf(false) }
+    var showResetTokenDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showRedownloadDialog by remember { mutableStateOf(false) }
     var showApiRiskDialog by remember { mutableStateOf(false) }
     var showApiCredentialDialog by remember { mutableStateOf(false) }
     var apiTokenVisible by remember { mutableStateOf(false) }
     var showUpdateDataDialog by remember { mutableStateOf(false) }
+    var showResetPendingDialog by remember { mutableStateOf(false) }
     var notificationPermissionGranted by remember {
         mutableStateOf(hasCrashNotificationPermission())
     }
@@ -948,6 +976,13 @@ fun SettingsTab(
                         supportingContent = {
                             Column {
                                 Text(stringResource(Res.string.settings_update_song_data_desc))
+                                if (catalogDegraded) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                            text = stringResource(Res.string.settings_catalog_using_bundled),
+                                            color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                         stringResource(
@@ -961,6 +996,13 @@ fun SettingsTab(
                             Icon(Icons.Default.CloudDownload, contentDescription = null)
                         },
                         modifier = Modifier.clickable { showUpdateDataDialog = true }
+                )
+
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.settings_reset_pending_update)) },
+                        supportingContent = { Text(stringResource(Res.string.settings_reset_pending_update_desc)) },
+                        leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                        modifier = Modifier.clickable { showResetPendingDialog = true }
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
@@ -1161,6 +1203,67 @@ fun SettingsTab(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.settings_reset_token)) },
+                        supportingContent = { Text(stringResource(Res.string.settings_reset_token_desc)) },
+                        leadingContent = { Icon(Icons.Default.VpnKey, contentDescription = null) },
+                        trailingContent = {
+                            if (isResettingSessionToken) {
+                                CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                )
+                            }
+                        },
+                        modifier =
+                                Modifier.clickable(enabled = !isResettingSessionToken) {
+                                    showResetTokenDialog = true
+                                }
+                )
+                sessionTokenResetMessage?.let { message ->
+                    Text(
+                            text = message.asString(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier =
+                                    Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp)
+                                            .clickable { onDismissSessionTokenResetMessage() }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.login_reset_local_session)) },
+                        supportingContent = {
+                            Text(stringResource(Res.string.login_reset_local_session_dialog_text))
+                        },
+                        leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                        trailingContent = {
+                            if (isResettingLocalSession) {
+                                CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                )
+                            }
+                        },
+                        modifier = Modifier.clickable(enabled = !isResettingLocalSession) {
+                            showLocalSessionResetDialog = true
+                        }
+                )
+                localSessionResetMessage?.let { message ->
+                    Text(
+                            text = message.asString(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedButton(
                         onClick = { showLogoutDialog = true },
                         modifier = Modifier.fillMaxWidth(),
@@ -1173,6 +1276,51 @@ fun SettingsTab(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    if (showResetTokenDialog) {
+        AnimatedAlertDialog(
+                onDismissRequest = { showResetTokenDialog = false },
+                icon = { Icon(Icons.Default.VpnKey, contentDescription = null) },
+                title = { Text(stringResource(Res.string.settings_reset_token)) },
+                text = {
+                    Text(stringResource(Res.string.settings_reset_token_dialog_text))
+                },
+                confirmButton = {
+                    TextButton(
+                            onClick = {
+                                showResetTokenDialog = false
+                                onResetSessionToken()
+                            }
+                    ) { Text(stringResource(Res.string.settings_reset_token_confirm)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetTokenDialog = false }) {
+                        Text(stringResource(Res.string.settings_cancel))
+                    }
+                }
+        )
+    }
+
+    if (showLocalSessionResetDialog) {
+        AnimatedAlertDialog(
+                onDismissRequest = { showLocalSessionResetDialog = false },
+                title = { Text(stringResource(Res.string.login_reset_local_session)) },
+                text = { Text(stringResource(Res.string.login_reset_local_session_dialog_text)) },
+                confirmButton = {
+                    TextButton(
+                            onClick = {
+                                showLocalSessionResetDialog = false
+                                onResetLocalSession()
+                            }
+                    ) { Text(stringResource(Res.string.login_reset_local_session)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLocalSessionResetDialog = false }) {
+                        Text(stringResource(Res.string.settings_cancel))
+                    }
+                }
+        )
     }
 
     if (showLogoutDialog) {
@@ -1421,6 +1569,27 @@ fun SettingsTab(
         )
     }
 
+    if (showResetPendingDialog) {
+        AnimatedAlertDialog(
+                onDismissRequest = { showResetPendingDialog = false },
+                title = { Text(stringResource(Res.string.settings_reset_pending_update)) },
+                text = { Text(stringResource(Res.string.settings_reset_pending_update_dialog_text)) },
+                confirmButton = {
+                    TextButton(
+                            onClick = {
+                                showResetPendingDialog = false
+                                onResetPendingUpdate()
+                            }
+                    ) { Text(stringResource(Res.string.common_confirm)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetPendingDialog = false }) {
+                        Text(stringResource(Res.string.settings_cancel))
+                    }
+                }
+        )
+    }
+
     if (isUpdatingData) {
         AnimatedAlertDialog(
                 onDismissRequest = {},
@@ -1434,20 +1603,23 @@ fun SettingsTab(
                     ) {
                         Text(
                                 text =
-                                        if (updateDataPhase == UpdateDataPhase.Illustrations)
-                                                stringResource(
-                                                        Res.string.settings_syncing_new_artwork,
-                                                        updateDataFileName,
-                                                        updateDataProgress,
-                                                        updateDataTotal
-                                                )
-                                        else
-                                                stringResource(
-                                                        Res.string.settings_downloading_file,
-                                                        updateDataFileName,
-                                                        updateDataProgress,
-                                                        updateDataTotal
-                                                ),
+                                        when {
+                                            updateDataPhase == UpdateDataPhase.Illustrations ->
+                                                    stringResource(
+                                                            Res.string.settings_syncing_new_artwork,
+                                                            updateDataFileName,
+                                                            updateDataProgress,
+                                                            updateDataTotal
+                                                    )
+                                            updateDataTotal > 0 ->
+                                                    stringResource(
+                                                            Res.string.settings_downloading_file,
+                                                            updateDataFileName,
+                                                            updateDataProgress,
+                                                            updateDataTotal
+                                                    )
+                                            else -> stringResource(Res.string.settings_update_preparing)
+                                        },
                                 style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -1467,7 +1639,12 @@ fun SettingsTab(
                         )
                     }
                 },
-                confirmButton = {}
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = onCancelSongDataUpdate) {
+                        Text(stringResource(Res.string.settings_cancel))
+                    }
+                }
         )
     }
 
@@ -1496,20 +1673,32 @@ fun SettingsTab(
                 onDismissRequest = onDismissUpdateResult,
                 title = { Text(stringResource(Res.string.settings_update_complete)) },
                 text = {
-                    if (updateResultSongNames.isEmpty()) {
-                        Text(stringResource(Res.string.settings_update_no_new_songs))
-                    } else {
-                        Text(
-                                stringResource(
-                                        Res.string.settings_update_new_songs,
-                                        updateResultSongNames.size
-                                ) +
-                                        updateResultSongNames.joinToString(
-                                                stringResource(
-                                                        Res.string.settings_song_name_separator
-                                                )
-                                        )
-                        )
+                    Column {
+                        if (updateResultSongNames.isEmpty()) {
+                            Text(stringResource(Res.string.settings_update_no_new_songs))
+                        } else {
+                            Text(
+                                    stringResource(
+                                            Res.string.settings_update_new_songs,
+                                            updateResultSongNames.size
+                                    ) +
+                                            updateResultSongNames.joinToString(
+                                                    stringResource(
+                                                            Res.string.settings_song_name_separator
+                                                    )
+                                            )
+                            )
+                        }
+                        if (updatePartialIllustrationFailures > 0) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                    text = stringResource(
+                                            Res.string.settings_update_partial_illustrations,
+                                            updatePartialIllustrationFailures
+                                    ),
+                                    color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 },
                 confirmButton = {

@@ -14,6 +14,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.ConfigureCoilImageLoader
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
+import org.kasumi321.ushio.phitracker.ui.DataRecoveryGate
 import org.kasumi321.ushio.phitracker.ui.PhiTrackerNavHost
 import org.kasumi321.ushio.phitracker.ui.components.PlatformAlertHost
 import org.kasumi321.ushio.phitracker.ui.glass.GlassSettings
@@ -71,7 +72,9 @@ fun App() {
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
             ) {
-                PhiTrackerNavHost()
+                DataRecoveryGate {
+                    PhiTrackerNavHost()
+                }
                 PlatformAlertHost()
             }
         }

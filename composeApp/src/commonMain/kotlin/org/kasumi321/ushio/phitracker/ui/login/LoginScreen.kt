@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,6 +51,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -87,6 +89,8 @@ import phitracker.composeapp.generated.resources.login_qr_scanned
 import phitracker.composeapp.generated.resources.login_qr_tap_hint
 import phitracker.composeapp.generated.resources.login_qr_waiting_scan
 import phitracker.composeapp.generated.resources.login_regenerate_qr
+import phitracker.composeapp.generated.resources.login_reset_local_session
+import phitracker.composeapp.generated.resources.login_reset_local_session_dialog_text
 import phitracker.composeapp.generated.resources.login_retry
 import phitracker.composeapp.generated.resources.login_security_tip
 import phitracker.composeapp.generated.resources.login_select_server
@@ -104,15 +108,18 @@ private val QrCodeMaxSize = 280.dp
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onSessionResumed: () -> Unit,
     onSkip: () -> Unit,
+    onResetLocalSession: () -> Unit,
     viewModel: LoginViewModel
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showResetDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isLoggedIn) {
         if (state.isLoggedIn) {
-            onLoginSuccess()
+            if (state.sessionRestored) onSessionResumed() else onLoginSuccess()
         }
     }
 
@@ -183,9 +190,18 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                TextButton(onClick = onSkip) {
+                TextButton(onClick = onSkip, enabled = !state.isLoading && !state.isCheckingToken) {
                     Text(
                         text = stringResource(Res.string.login_skip_to_home),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                TextButton(
+                    onClick = { showResetDialog = true },
+                    enabled = !state.isLoading && !state.isCheckingToken
+                ) {
+                    Text(
+                        text = stringResource(Res.string.login_reset_local_session),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -193,6 +209,26 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
+    }
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringResource(Res.string.login_reset_local_session)) },
+            text = { Text(stringResource(Res.string.login_reset_local_session_dialog_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetDialog = false
+                        onResetLocalSession()
+                    }
+                ) { Text(stringResource(Res.string.login_reset_local_session)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text(stringResource(Res.string.login_cancel))
+                }
+            }
+        )
     }
 }
 

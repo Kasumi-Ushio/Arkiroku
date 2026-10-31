@@ -11,6 +11,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.setAppLocale
+import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
+import org.kasumi321.ushio.phitracker.ui.utils.UiText
+import org.kasumi321.ushio.phitracker.ui.utils.resolve
+import org.kasumi321.ushio.phitracker.ui.utils.toCatalogRepairErrorText
+import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.settings_api_token_save_failed
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairEntryPoint
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairFailure
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStartResult
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStatus
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadRunStatus
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationUriResolver
@@ -105,6 +116,7 @@ data class OnboardingUiState(
     val songDataCompleted: Int = 0,
     val songDataTotal: Int = 0,
     val songDataCurrentFile: String? = null,
+    val songDataPartialIllustrationFailures: Int = 0,
     val autoCheckUpdate: Boolean = true,
     val autoCheckSongDataUpdate: Boolean = true,
     val includePreRelease: Boolean = false,
@@ -140,8 +152,10 @@ class OnboardingViewModel(
     private val getB30UseCase: GetB30UseCase,
     private val songDataProvider: SongDataProvider,
     private val songDataUpdateCoordinator: SongDataUpdateCoordinator,
+    private val catalogRepairSession: CatalogRepairSession,
     private val illustrationUriResolver: IllustrationUriResolver,
-    private val applyLocale: (String?) -> Boolean = ::setAppLocale
+    private val applyLocale: (String?) -> Boolean = ::setAppLocale,
+    private val platformMessage: suspend (UiText) -> Unit = { showPlatformMessage(it.resolve()) }
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
@@ -150,6 +164,7 @@ class OnboardingViewModel(
     private var illustrationPreloadDeclined = false
 
     init {
+        observeCatalogRepair()
         viewModelScope.launch {
             val language = settingsRepository.appLanguage.first()
             val autoUpdate = settingsRepository.autoCheckUpdate.first()
@@ -371,7 +386,13 @@ class OnboardingViewModel(
     fun setApiToken(token: String) {
         viewModelScope.launch {
             settingsRepository.setApiToken(token)
-            _uiState.update { refreshed(it.copy(apiToken = token)) }
+                .onSuccess {
+                    _uiState.update { refreshed(it.copy(apiToken = token)) }
+                }
+                .onFailure {
+                    _uiState.update { refreshed(it.copy(apiToken = settingsRepository.apiToken.first())) }
+                    platformMessage(UiText.Res(Res.string.settings_api_token_save_failed))
+                }
         }
     }
 
@@ -433,59 +454,80 @@ class OnboardingViewModel(
      * reconcile added/removed song illustrations, mirroring the home
      * pull-to-refresh path; refreshes the disclosed song count on success.
      */
-    fun startSongDataUpdate() {
-        if (_uiState.value.songDataStatus == OnboardingSongDataStatus.Updating) return
+    private fun observeCatalogRepair() {
         viewModelScope.launch {
-            _uiState.update {
-                refreshed(
-                    it.copy(
-                        songDataStatus = OnboardingSongDataStatus.Updating,
-                        songDataCompleted = 0,
-                        songDataTotal = 0,
-                        songDataCurrentFile = null
-                    )
-                )
+            var handledTerminalGeneration = catalogRepairSession.state.value.let {
+                if (it.status == CatalogRepairStatus.Running || it.status == CatalogRepairStatus.Cancelling) {
+                    -1L
+                } else {
+                    it.resultGeneration
+                }
             }
-            songDataUpdateCoordinator.update(
-                onFileProgress = { done, total, file ->
-                    _uiState.update {
-                        refreshed(
-                            it.copy(
-                                songDataCompleted = done,
-                                songDataTotal = total,
-                                songDataCurrentFile = file
-                            )
-                        )
+            catalogRepairSession.state.collect { repair ->
+                if (repair.resultOwner != CatalogRepairEntryPoint.Onboarding) {
+                    if (_uiState.value.songDataStatus == OnboardingSongDataStatus.Updating) {
+                        _uiState.update { refreshed(it.copy(songDataStatus = OnboardingSongDataStatus.Idle)) }
                     }
-                },
-                onIllustrationProgress = { progress ->
-                    _uiState.update {
-                        refreshed(
-                            it.copy(
-                                songDataCompleted = progress.completed,
-                                songDataTotal = progress.total,
-                                songDataCurrentFile = progress.currentSongName
-                            )
-                        )
-                    }
+                    return@collect
                 }
-            ).fold(
-                onSuccess = {
-                    songDataProvider.invalidateCache()
-                    _uiState.update {
-                        refreshed(
-                            it.copy(
-                                songDataStatus = OnboardingSongDataStatus.Updated,
-                                illustrationTotalCount = songDataProvider.getSongs().size
-                            )
-                        )
+                val status = when (repair.status) {
+                    CatalogRepairStatus.Running, CatalogRepairStatus.Cancelling ->
+                        OnboardingSongDataStatus.Updating
+                    CatalogRepairStatus.Succeeded -> {
+                        if (handledTerminalGeneration == repair.resultGeneration) return@collect
+                        handledTerminalGeneration = repair.resultGeneration
+                        OnboardingSongDataStatus.Updated
                     }
-                },
-                onFailure = {
-                    _uiState.update { refreshed(it.copy(songDataStatus = OnboardingSongDataStatus.Failed)) }
+                    CatalogRepairStatus.Failed -> {
+                        if (handledTerminalGeneration == repair.resultGeneration) return@collect
+                        handledTerminalGeneration = repair.resultGeneration
+                        OnboardingSongDataStatus.Failed
+                    }
+                    CatalogRepairStatus.Degraded -> {
+                        if (handledTerminalGeneration == repair.resultGeneration) return@collect
+                        handledTerminalGeneration = repair.resultGeneration
+                        OnboardingSongDataStatus.Updated
+                    }
+                    CatalogRepairStatus.Idle -> OnboardingSongDataStatus.Idle
                 }
-            )
+                if (status == OnboardingSongDataStatus.Updated) songDataProvider.invalidateCache()
+                _uiState.update {
+                    refreshed(
+                        it.copy(
+                            songDataStatus = status,
+                            songDataCompleted = repair.completed,
+                            songDataTotal = repair.total,
+                            songDataCurrentFile = repair.currentItem,
+                            songDataPartialIllustrationFailures = repair.partialIllustrationFailures,
+                            illustrationTotalCount = if (status == OnboardingSongDataStatus.Updated) {
+                                songDataProvider.getSongs().size
+                            } else {
+                                it.illustrationTotalCount
+                            }
+                        )
+                    )
+                }
+            }
         }
+    }
+
+    fun startSongDataUpdate() {
+        if (_uiState.value.songDataStatus == OnboardingSongDataStatus.Checking) return
+        if (_uiState.value.songDataStatus == OnboardingSongDataStatus.Updating) return
+        if (catalogRepairSession.startUpdate(CatalogRepairEntryPoint.Onboarding) ==
+            CatalogRepairStartResult.AlreadyRunning
+        ) {
+            viewModelScope.launch {
+                platformMessage(CatalogRepairFailure.Busy.toCatalogRepairErrorText())
+            }
+        }
+    }
+
+    fun cancelSongDataUpdate() {
+        if (catalogRepairSession.state.value.resultOwner == CatalogRepairEntryPoint.Onboarding) {
+            catalogRepairSession.cancelRunning()
+        }
+        _uiState.update { refreshed(it.copy(songDataStatus = OnboardingSongDataStatus.Idle)) }
     }
 
     /**

@@ -25,6 +25,8 @@ import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.platform.TextAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.platformFileSystem
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairEntryPoint
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
@@ -40,6 +42,9 @@ import org.kasumi321.ushio.phitracker.ui.settings.FakePhigrosRepository
 import org.kasumi321.ushio.phitracker.ui.settings.FakeSettingsRepository
 import org.kasumi321.ushio.phitracker.ui.settings.TestAssets
 import org.kasumi321.ushio.phitracker.ui.settings.b30FixtureSave
+import org.kasumi321.ushio.phitracker.ui.utils.UiText
+import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.catalog_update_error_busy_message
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -73,7 +78,9 @@ class OnboardingViewModelTest {
         songDataUpdateCoordinator: SongDataUpdateCoordinator = songDataCoordinator(songDataProvider),
         illustrationUriResolver: IllustrationUriResolver = previewResolver(),
         applyLocale: (String?) -> Boolean = { false },
-        preloadSession: IllustrationPreloadSession? = null
+        preloadSession: IllustrationPreloadSession? = null,
+        catalogRepairSession: CatalogRepairSession? = null,
+        platformMessage: suspend (UiText) -> Unit = {}
     ): OnboardingViewModel = viewModelLifecycle.track(
         OnboardingViewModel(
             settingsRepository = settings,
@@ -85,22 +92,28 @@ class OnboardingViewModelTest {
             getB30UseCase = GetB30UseCase(repository),
             songDataProvider = songDataProvider,
             songDataUpdateCoordinator = songDataUpdateCoordinator,
+            catalogRepairSession = catalogRepairSession ?: CatalogRepairSession(
+                songDataUpdateCoordinator,
+                CoroutineScope(dispatcher)
+            ),
             illustrationUriResolver = illustrationUriResolver,
-            applyLocale = applyLocale
+            applyLocale = applyLocale,
+            platformMessage = platformMessage
         )
     )
 
     private fun songDataCoordinator(
         provider: SongDataProvider,
         updater: SongDataUpdater = FakeSongDataUpdater(provider),
-        artworkCache: StandardArtworkCache = EmptyArtworkCache
+        artworkCache: StandardArtworkCache = EmptyArtworkCache,
+        thumbnailPreloader: IllustrationThumbnailPreloader = SuccessPreloader()
     ): SongDataUpdateCoordinator = SongDataUpdateCoordinator(
         songDataUpdater = updater,
         songDataProvider = provider,
         illustrationProvider = IllustrationProvider().apply { setBaseUrl("https://example.test") },
         artworkFileCache = artworkCache,
         collectibleDataUpdater = FakeCollectibleDataUpdater(),
-        thumbnailPreloader = SuccessPreloader(),
+        thumbnailPreloader = thumbnailPreloader,
         clearCacheUrls = {}
     )
 
@@ -768,7 +781,7 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun songDataUpdateSkipsIllustrationSyncButStillRefreshesSongCount() = runTest(dispatcher) {
+    fun songDataUpdateReconcilesIllustrationsAndRefreshesSongCount() = runTest(dispatcher) {
         val suffix = kotlin.random.Random.nextInt(Int.MAX_VALUE)
         val paths = PlatformPaths("/tmp/onboarding_sd_skip_$suffix", "/tmp/onboarding_sd_skip_cache_$suffix")
         val provider = SongDataProvider(TestAssets, paths)
@@ -792,10 +805,77 @@ class OnboardingViewModelTest {
 
         assertEquals(OnboardingSongDataStatus.Updated, vm.uiState.value.songDataStatus)
         assertEquals(3, vm.uiState.value.illustrationTotalCount)
-        // Wizard path: no per-diff thumbnail downloads, and no cache cleanup
-        // either — nothing already on disk is touched.
-        assertTrue(recordingCache.thumbnailDownloads.isEmpty())
+        assertTrue(recordingCache.thumbnailDownloads.isNotEmpty())
         assertTrue(recordingCache.clearedThumbnailIds.isEmpty())
+    }
+
+    @Test
+    fun partialIllustrationFailureStillCompletesOnboardingCatalogUpdate() = runTest(dispatcher) {
+        val suffix = kotlin.random.Random.nextInt(Int.MAX_VALUE)
+        val paths = PlatformPaths("/tmp/onboarding_sd_partial_$suffix", "/tmp/onboarding_sd_partial_cache_$suffix")
+        val provider = SongDataProvider(TestAssets, paths)
+        val updater = FakeSongDataUpdater(
+            provider,
+            paths,
+            upstreamChanged = true,
+            writeThreeSongCsv = true
+        )
+        val vm = viewModel(
+            songDataProvider = provider,
+            songDataUpdateCoordinator = songDataCoordinator(
+                provider,
+                updater,
+                RecordingArtworkCache(),
+                thumbnailPreloader = object : IllustrationThumbnailPreloader {
+                    override suspend fun preload(url: String): Result<Unit> =
+                        Result.failure(IllegalStateException("offline"))
+                }
+            )
+        )
+        advanceUntilIdle()
+
+        vm.startSongDataUpdate()
+        advanceUntilIdle()
+
+        assertEquals(OnboardingSongDataStatus.Updated, vm.uiState.value.songDataStatus)
+        assertEquals(3, vm.uiState.value.illustrationTotalCount)
+        assertEquals(1, vm.uiState.value.songDataPartialIllustrationFailures)
+        assertTrue(vm.uiState.value.canAdvance)
+    }
+
+    @Test
+    fun anotherEntryPointRejectsOnboardingUpdateWithBusyAndKeepsOldResult() = runTest(dispatcher) {
+        val updater = FakeSongDataUpdater(songDataProvider)
+        val coordinator = songDataCoordinator(songDataProvider, updater)
+        val session = CatalogRepairSession(coordinator, CoroutineScope(dispatcher))
+        val messages = mutableListOf<UiText>()
+        val vm = viewModel(
+            songDataUpdateCoordinator = coordinator,
+            catalogRepairSession = session,
+            platformMessage = { messages += it }
+        )
+        advanceUntilIdle()
+        vm.startSongDataUpdate()
+        advanceUntilIdle()
+        assertEquals(OnboardingSongDataStatus.Updated, vm.uiState.value.songDataStatus)
+
+        updater.updateGate = CompletableDeferred()
+        session.startUpdate(CatalogRepairEntryPoint.Home)
+        vm.startSongDataUpdate()
+        runCurrent()
+
+        assertEquals(OnboardingSongDataStatus.Updated, vm.uiState.value.songDataStatus)
+        assertEquals(2, updater.updateCalls, "the rejected click must not start a third update")
+        assertEquals(CatalogRepairEntryPoint.Home, session.state.value.resultOwner)
+
+        updater.updateGate?.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(
+            listOf<UiText>(UiText.Res(Res.string.catalog_update_error_busy_message)),
+            messages
+        )
+        assertEquals(OnboardingSongDataStatus.Updated, vm.uiState.value.songDataStatus)
+        assertEquals(CatalogRepairEntryPoint.Home, session.state.value.resultOwner)
     }
 
     @Test
@@ -960,7 +1040,7 @@ class OnboardingViewModelTest {
     }
 
     private class FakeSongDataUpdater(
-        songDataProvider: SongDataProvider,
+        private val songDataProvider: SongDataProvider,
         private val paths: PlatformPaths = PlatformPaths(
             "/tmp/onboarding_sd_default_${kotlin.random.Random.nextInt(Int.MAX_VALUE)}",
             "/tmp/onboarding_sd_default_cache_${kotlin.random.Random.nextInt(Int.MAX_VALUE)}"
@@ -1000,6 +1080,7 @@ class OnboardingViewModelTest {
                 } finally {
                     sink.close()
                 }
+                songDataProvider.invalidateCache()
             }
             return Result.success(Unit)
         }

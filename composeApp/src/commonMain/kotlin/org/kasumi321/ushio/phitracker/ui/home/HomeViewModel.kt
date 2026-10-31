@@ -29,12 +29,19 @@ import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.NoOpStandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
 import org.kasumi321.ushio.phitracker.data.platform.getAppMetadata
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairEntryPoint
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairFailure
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStage
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStartResult
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStatus
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadCoordinator
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadRunStatus
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
+import org.kasumi321.ushio.phitracker.data.song.toCatalogRepairFailure
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
@@ -56,17 +63,17 @@ import org.kasumi321.ushio.phitracker.domain.usecase.FetchGameUpdateInfoUseCase
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.update.toUpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
+import org.kasumi321.ushio.phitracker.ui.utils.toCatalogRepairErrorText
 import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.settings_catalog_using_bundled
+import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
 import phitracker.composeapp.generated.resources.api_error_missing_fields
 import phitracker.composeapp.generated.resources.b30_tag_analysis_failed
-import phitracker.composeapp.generated.resources.common_unknown_error
 import phitracker.composeapp.generated.resources.songs_preload_partial_failed
-import phitracker.composeapp.generated.resources.songs_songdata_check_failed
 import phitracker.composeapp.generated.resources.songs_songdata_checking
 import phitracker.composeapp.generated.resources.songs_songdata_downloading
 import phitracker.composeapp.generated.resources.songs_songdata_syncing_illustrations
 import phitracker.composeapp.generated.resources.songs_songdata_up_to_date
-import phitracker.composeapp.generated.resources.songs_songdata_update_failed
 import phitracker.composeapp.generated.resources.songs_songdata_updated
 import phitracker.composeapp.generated.resources.songs_songdata_updated_count
 import phitracker.composeapp.generated.resources.sync_error_session_expired
@@ -122,6 +129,7 @@ class HomeViewModel(
     private val analyzeB30TagsUseCase: AnalyzeB30TagsUseCase = AnalyzeB30TagsUseCase(),
     private val fetchGameUpdateInfoUseCase: FetchGameUpdateInfoUseCase = FetchGameUpdateInfoUseCase(repository),
     private val songDataUpdateCoordinator: SongDataUpdateCoordinator,
+    private val catalogRepairSession: CatalogRepairSession,
     // Koin passes the app-scoped singleton; the default keeps direct test
     // constructions working (they never start this session).
     private val preloadSession: IllustrationPreloadSession =
@@ -131,13 +139,17 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
     private var b30Job: Job? = null
+    private var songDataRefreshJob: Job? = null
     private var tagAnalysisJob: Job? = null
     private var tagAnalysisKey: String? = null
     private var lastAnalysisRecords: List<BestRecord>? = null
+    private var observedSessionToken: String? = null
+    private var accountAccessGeneration = 0L
     private var illustrationPreloadDeclined = false
 
     init {
         loadSongs()
+        observeCatalogRepair()
         observeB30()
         observeUserProfile()
         checkIllustrationState()
@@ -235,16 +247,6 @@ class HomeViewModel(
             }
         }
         viewModelScope.launch {
-            settingsRepository.avatarUri.collect { uri ->
-                updateProfile { it.copy(avatarUri = uri) }
-            }
-        }
-        viewModelScope.launch {
-            settingsRepository.moneyString.collect { money ->
-                updateProfile { it.copy(moneyString = money) }
-            }
-        }
-        viewModelScope.launch {
             settingsRepository.illustrationPreloadDeclined.collect { declined ->
                 illustrationPreloadDeclined = declined
             }
@@ -255,10 +257,13 @@ class HomeViewModel(
                 updateTools { it.copy(syncSnapshots = list) }
             }
         }
-        // Tool tab: load sessionToken
         viewModelScope.launch {
-            val tokenPair = repository.getSessionToken()
-            updateTools { it.copy(sessionToken = tokenPair?.first) }
+            repository.observeSessionToken().collect { tokenPair ->
+                observedSessionToken = tokenPair?.first
+                updateTools {
+                    it.copy(sessionToken = observedSessionToken.takeIf { _uiState.value.profile.hasAccountAccess })
+                }
+            }
         }
         // Observe PhiPlugin API settings
         viewModelScope.launch {
@@ -385,9 +390,83 @@ class HomeViewModel(
         }
     }
 
+    private fun observeCatalogRepair() {
+        viewModelScope.launch {
+            var handledTerminalGeneration = catalogRepairSession.state.value.let {
+                if (it.status == CatalogRepairStatus.Running || it.status == CatalogRepairStatus.Cancelling) {
+                    -1L
+                } else {
+                    it.resultGeneration
+                }
+            }
+            catalogRepairSession.state.collect { repair ->
+                if (repair.resultOwner != CatalogRepairEntryPoint.Home) {
+                    clearSongDataRefresh()
+                    return@collect
+                }
+                when (repair.status) {
+                    CatalogRepairStatus.Running, CatalogRepairStatus.Cancelling -> updateSongs {
+                        val progress = if (repair.total > 0) {
+                            repair.completed.toFloat() / repair.total
+                        } else {
+                            null
+                        }
+                        it.copy(
+                            isSongDataRefreshing = true,
+                            songDataStatusText = when (repair.stage) {
+                                CatalogRepairStage.Checking -> UiText.Res(Res.string.songs_songdata_checking)
+                                CatalogRepairStage.Files -> UiText.Res(
+                                    Res.string.songs_songdata_downloading,
+                                    repair.currentItem,
+                                    repair.completed,
+                                    repair.total
+                                )
+                                CatalogRepairStage.Illustrations -> UiText.Res(
+                                    Res.string.songs_songdata_syncing_illustrations,
+                                    repair.currentItem,
+                                    repair.completed,
+                                    repair.total
+                                )
+                            },
+                            songDataProgressFraction = progress,
+                            songDataMessage = null
+                        )
+                    }
+
+                    CatalogRepairStatus.Succeeded -> if (handledTerminalGeneration != repair.resultGeneration) {
+                        handledTerminalGeneration = repair.resultGeneration
+                        val addedCount = repair.addedSongNames.size
+                        finishSongDataRefresh(
+                            when {
+                                repair.partialIllustrationFailures > 0 -> UiText.Res(
+                                    Res.string.settings_update_partial_illustrations,
+                                    repair.partialIllustrationFailures
+                                )
+                                addedCount > 0 -> UiText.Res(Res.string.songs_songdata_updated_count, addedCount)
+                                else -> UiText.Res(Res.string.songs_songdata_updated)
+                            }
+                        )
+                    }
+
+                    CatalogRepairStatus.Failed -> if (handledTerminalGeneration != repair.resultGeneration) {
+                        handledTerminalGeneration = repair.resultGeneration
+                        finishSongDataRefresh(repair.failure.toCatalogRepairErrorText())
+                    }
+
+                    CatalogRepairStatus.Degraded -> if (handledTerminalGeneration != repair.resultGeneration) {
+                        handledTerminalGeneration = repair.resultGeneration
+                        finishSongDataRefresh(UiText.Res(Res.string.settings_catalog_using_bundled))
+                    }
+
+                    CatalogRepairStatus.Idle -> clearSongDataRefresh()
+                }
+            }
+        }
+    }
+
     fun refreshSongData() {
         if (_uiState.value.songs.isSongDataRefreshing) return
-        viewModelScope.launch {
+        songDataRefreshJob = viewModelScope.launch {
             updateSongs {
                 it.copy(
                     isSongDataRefreshing = true,
@@ -398,57 +477,42 @@ class HomeViewModel(
             }
             val upstreamResult = songDataUpdateCoordinator.checkUpstreamChanged()
             val changed = upstreamResult.getOrElse { error ->
-                finishSongDataRefresh(
-                    UiText.Res(
-                        Res.string.songs_songdata_check_failed,
-                        error.message ?: UiText.Res(Res.string.common_unknown_error)
-                    )
-                )
+                finishSongDataRefresh(error.toCatalogRepairFailure().toCatalogRepairErrorText())
                 return@launch
             }
             if (!changed) {
                 finishSongDataRefresh(UiText.Res(Res.string.songs_songdata_up_to_date))
                 return@launch
             }
-            val result = songDataUpdateCoordinator.update(
-                onFileProgress = { current, count, fileName ->
-                    updateSongs {
-                        it.copy(
-                            songDataStatusText = UiText.Res(Res.string.songs_songdata_downloading, fileName, current, count),
-                            songDataProgressFraction = if (count > 0) current.toFloat() / count else null
-                        )
-                    }
-                },
-                onIllustrationProgress = { progress ->
-                    updateSongs {
-                        it.copy(
-                            songDataStatusText = UiText.Res(Res.string.songs_songdata_syncing_illustrations, progress.currentSongName, progress.completed, progress.total),
-                            songDataProgressFraction = if (progress.total > 0) progress.completed.toFloat() / progress.total else null
-                        )
-                    }
-                }
-            )
-            result.fold(
-                onSuccess = { outcome ->
-                    val addedCount = outcome.addedSongNames.size
-                    finishSongDataRefresh(
-                        if (addedCount > 0) {
-                            UiText.Res(Res.string.songs_songdata_updated_count, addedCount)
-                        } else {
-                            UiText.Res(Res.string.songs_songdata_updated)
-                        }
-                    )
-                },
-                onFailure = { error ->
-                    finishSongDataRefresh(
-                        error.message?.let(UiText::Raw) ?: UiText.Res(Res.string.songs_songdata_update_failed)
-                    )
-                }
+            if (catalogRepairSession.startUpdate(CatalogRepairEntryPoint.Home) ==
+                CatalogRepairStartResult.AlreadyRunning
+            ) {
+                finishSongDataRefresh(CatalogRepairFailure.Busy.toCatalogRepairErrorText())
+            }
+        }
+    }
+
+    fun cancelSongDataRefresh() {
+        songDataRefreshJob?.cancel()
+        songDataRefreshJob = null
+        if (catalogRepairSession.state.value.resultOwner == CatalogRepairEntryPoint.Home) {
+            catalogRepairSession.cancelRunning()
+        }
+        clearSongDataRefresh()
+    }
+
+    private fun clearSongDataRefresh() {
+        updateSongs {
+            it.copy(
+                isSongDataRefreshing = false,
+                songDataStatusText = null,
+                songDataProgressFraction = null
             )
         }
     }
 
     private fun finishSongDataRefresh(message: UiText) {
+        songDataRefreshJob = null
         updateSongs {
             it.copy(
                 isSongDataRefreshing = false,
@@ -477,9 +541,13 @@ class HomeViewModel(
                     // Same slot selection as the B30 export histogram and
                     // the tag analysis: only the 3 phi slots plus the 27
                     // best slots count toward RKS.
-                    val histogram = BuildB30RksHistogramUseCase()(
-                        b30.filter { it.isPhi }.take(3) + b30.filter { !it.isPhi }.take(27)
-                    )
+                    val histogram = if (b30.isEmpty()) {
+                        null
+                    } else {
+                        BuildB30RksHistogramUseCase()(
+                            b30.filter { it.isPhi }.take(3) + b30.filter { !it.isPhi }.take(27)
+                        )
+                    }
                     _uiState.update { state ->
                         state.copy(
                             b30 = state.b30.copy(
@@ -551,16 +619,26 @@ class HomeViewModel(
     private fun observeUserProfile() {
         viewModelScope.launch {
             repository.getUserProfile().collect { profile ->
-                if (profile != null) {
+                if (profile == null) {
+                    accountAccessGeneration++
+                    tagAnalysisJob?.cancel()
+                    tagAnalysisKey = null
+                    lastAnalysisRecords = null
+                    _uiState.update { it.withoutAccountAccess() }
+                } else {
                     _uiState.update { state ->
                         state.copy(
                             profile = state.profile.copy(
-                            nickname = profile.nickname,
-                            challengeModeRank = profile.challengeModeRank
+                                hasAccountAccess = true,
+                                nickname = profile.nickname,
+                                challengeModeRank = profile.challengeModeRank,
+                                moneyString = profile.moneyString,
+                                avatarUri = profile.avatarUri
                             ),
                             b30 = state.b30.copy(
                                 displayRks = if (profile.rks > 0f) profile.rks else state.b30.displayRks
-                            )
+                            ),
+                            tools = state.tools.copy(sessionToken = observedSessionToken)
                         )
                     }
                 }
@@ -693,17 +771,6 @@ class HomeViewModel(
                 val result = sessionCoordinator.refresh()
                 if (result.isSuccess) {
                     val syncResult = result.getOrThrow()
-                    val save = syncResult.save
-                    // Format Data currency
-                    val money = save.gameProgress.money.let { m ->
-                        if (m.isEmpty()) emptyList() else m
-                    }
-                    val units = listOf("KiB", "MiB", "GiB", "TiB", "PiB")
-                    val moneyStr = money.withIndex()
-                        .reversed()
-                        .filter { it.value > 0 }
-                        .joinToString(" ") { "${it.value}${units.getOrElse(it.index) { "" }}" }
-                    settingsRepository.setMoneyString(moneyStr)
 
                     if (syncResult.snapshotCreated) {
                         _uiState.update { state ->
@@ -734,6 +801,7 @@ class HomeViewModel(
                         }
                         AppLogger.event("sync", "refresh_success", mapOf("changedEntries" to "0"))
                     }
+                    updateProfile { it.copy(lastSyncTime = syncResult.committedAt) }
                     // Refresh stats
                     loadStats()
                     if (_uiState.value.tools.apiEnabled && _uiState.value.tools.useApiData) {
@@ -945,7 +1013,7 @@ class HomeViewModel(
     fun setAvatarUri(uri: String?) {
         viewModelScope.launch {
             AppLogger.event("settings", "avatar_changed", mapOf("uriPresent" to (uri != null).toString()))
-            settingsRepository.setAvatarUri(uri)
+            repository.setAvatarUri(uri)
         }
     }
 
@@ -960,9 +1028,11 @@ class HomeViewModel(
             return
         }
 
+        val generation = accountAccessGeneration
         viewModelScope.launch {
             updateTools { it.copy(apiRankByUser = ApiToolResult(isLoading = true)) }
             val result = repository.apiGetRankByUser(platform, platformId, apiUserId)
+            if (generation != accountAccessGeneration) return@launch
             if (result.isFailure) {
                 updateTools {
                     it.copy(
@@ -1015,9 +1085,11 @@ class HomeViewModel(
             updateTools { it.copy(apiRankByPosition = ApiToolResult(message = UiText.Res(Res.string.tools_api_invalid_rank))) }
             return
         }
+        val generation = accountAccessGeneration
         viewModelScope.launch {
             updateTools { it.copy(apiRankByPosition = ApiToolResult(isLoading = true)) }
             val result = repository.apiGetRankByPosition(position)
+            if (generation != accountAccessGeneration) return@launch
             if (result.isFailure) {
                 updateTools {
                     it.copy(
@@ -1078,9 +1150,11 @@ class HomeViewModel(
             updateTools { it.copy(apiRksRankResult = ApiToolResult(message = UiText.Res(Res.string.tools_api_invalid_rks))) }
             return
         }
+        val generation = accountAccessGeneration
         viewModelScope.launch {
             updateTools { it.copy(apiRksRankResult = ApiToolResult(isLoading = true)) }
             val result = repository.apiGetRksAbove(rks)
+            if (generation != accountAccessGeneration) return@launch
             if (result.isFailure) {
                 updateTools {
                     it.copy(
@@ -1145,9 +1219,10 @@ class HomeViewModel(
         val apiUserId = state.apiUserId.trim()
         if (platform.isBlank() || platformId.isBlank() || apiUserId.isBlank()) return
 
+        val generation = accountAccessGeneration
         viewModelScope.launch {
             val result = repository.apiGetSaveHistory(platform, platformId, apiUserId, listOf("rks"))
-            if (result.isFailure) {
+            if (generation != accountAccessGeneration || result.isFailure) {
                 return@launch
             }
 

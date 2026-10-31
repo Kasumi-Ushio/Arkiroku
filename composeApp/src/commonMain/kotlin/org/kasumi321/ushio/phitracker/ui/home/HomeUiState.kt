@@ -19,7 +19,29 @@ data class HomeUiState(
     val sync: SyncUiState = SyncUiState()
 )
 
+internal fun HomeUiState.withoutAccountAccess(): HomeUiState = copy(
+    profile = ProfileUiState(),
+    b30 = b30.copy(
+        b30 = emptyList(),
+        allRecords = emptyList(),
+        displayRks = 0f,
+        histogram = null,
+        tagAnalysis = B30TagAnalysisState()
+    ),
+    tools = tools.copy(
+        syncSnapshots = emptyList(),
+        sessionToken = null,
+        apiRksRank = null,
+        apiTotalUsers = null,
+        apiHistorySnapshots = emptyList(),
+        apiRankByUser = ApiToolResult(),
+        apiRankByPosition = ApiToolResult(),
+        apiRksRankResult = ApiToolResult()
+    )
+)
+
 data class ProfileUiState(
+    val hasAccountAccess: Boolean = false,
     val nickname: String = "",
     val challengeModeRank: Int = 0,
     val avatarUri: String? = null,

@@ -2,8 +2,11 @@ package org.kasumi321.ushio.phitracker.ui.settings
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -19,9 +22,12 @@ import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.logging.CrashReportExporter
 import org.kasumi321.ushio.phitracker.data.logging.LogFileStore
 import org.kasumi321.ushio.phitracker.data.logging.RuntimeLogExporter
+import org.kasumi321.ushio.phitracker.data.common.CatalogDownloadException
 import org.kasumi321.ushio.phitracker.data.platform.IllustrationThumbnailPreloader
 import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairEntryPoint
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
 import org.kasumi321.ushio.phitracker.data.song.SongDataUpdateCoordinator
@@ -39,6 +45,8 @@ import kotlin.test.assertTrue
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.api_error_missing_fields
+import phitracker.composeapp.generated.resources.catalog_update_error_busy_message
+import phitracker.composeapp.generated.resources.catalog_update_error_network_message
 import phitracker.composeapp.generated.resources.settings_api_test_failed
 import phitracker.composeapp.generated.resources.settings_api_test_ok
 import phitracker.composeapp.generated.resources.settings_api_test_partial
@@ -163,8 +171,8 @@ class SettingsMaintenanceViewModelTest {
     }
 
     @Test
-    fun emptyArtworkAndSongFailureRemainOwnedBySettings(): Unit = runTest(dispatcher) {
-        val viewModel = createViewModel(updaterResult = Result.failure(IllegalStateException("offline")))
+    fun songUpdateFailureShowsMappedNetworkTextWithoutRawDetail(): Unit = runTest(dispatcher) {
+        val viewModel = createViewModel(updaterResult = Result.failure(CatalogDownloadException()))
         advanceUntilIdle()
         var result: Result<Unit>? = null
         viewModel.cacheB30StandardArtwork { result = it }
@@ -172,17 +180,157 @@ class SettingsMaintenanceViewModelTest {
         assertTrue(requireNotNull(result).isFailure)
         viewModel.updateSongData()
         advanceUntilIdle()
-        assertEquals(UiText.Raw("offline"), viewModel.uiState.value.updateDataError)
+        assertEquals(
+            UiText.Res(Res.string.catalog_update_error_network_message),
+            viewModel.uiState.value.updateDataError
+        )
         viewModel.dismissUpdateDataError()
         assertEquals(null, viewModel.uiState.value.updateDataError)
     }
 
-    private class FakeCollectibleDataUpdater : CollectibleDataUpdater(
+    @Test
+    fun startupReadyCheckDoesNotPublishManualUpdateResult(): Unit = runTest(dispatcher) {
+        val first = createViewModel()
+        advanceUntilIdle()
+        val session = first.catalogRepairSession
+        session.ensureStartupRepair()
+        viewModelLifecycle.cancelAndJoin()
+        advanceUntilIdle()
+
+        val recreated = createViewModel(catalogRepairSession = session)
+        advanceUntilIdle()
+
+        assertEquals(null, recreated.uiState.value.updateResultSongNames)
+        assertEquals(null, recreated.uiState.value.updateDataError)
+    }
+
+    @Test
+    fun completionWhileAwayIsShownOnceAfterRecreationAndStaysDismissed(): Unit = runTest(dispatcher) {
+        val first = createViewModel()
+        advanceUntilIdle()
+        val session = first.catalogRepairSession
+        first.updateSongData()
+        viewModelLifecycle.cancelAndJoin()
+        advanceUntilIdle()
+
+        val recreated = createViewModel(catalogRepairSession = session)
+        advanceUntilIdle()
+        assertEquals(emptyList(), recreated.uiState.value.updateResultSongNames)
+
+        recreated.dismissUpdateDataResult()
+        viewModelLifecycle.cancelAndJoin()
+        val afterDismiss = createViewModel(catalogRepairSession = session)
+        advanceUntilIdle()
+        assertEquals(null, afterDismiss.uiState.value.updateResultSongNames)
+    }
+
+    @Test
+    fun failureWhileAwayIsLocalizedAndDoesNotReturnAfterDismiss(): Unit = runTest(dispatcher) {
+        val first = createViewModel(updaterResult = Result.failure(CatalogDownloadException()))
+        advanceUntilIdle()
+        val session = first.catalogRepairSession
+        first.updateSongData()
+        viewModelLifecycle.cancelAndJoin()
+        advanceUntilIdle()
+
+        val recreated = createViewModel(catalogRepairSession = session)
+        advanceUntilIdle()
+        assertEquals(
+            UiText.Res(Res.string.catalog_update_error_network_message),
+            recreated.uiState.value.updateDataError
+        )
+
+        recreated.dismissUpdateDataError()
+        viewModelLifecycle.cancelAndJoin()
+        val afterDismiss = createViewModel(catalogRepairSession = session)
+        advanceUntilIdle()
+        assertEquals(null, afterDismiss.uiState.value.updateDataError)
+    }
+
+    @Test
+    fun anotherEntryPointDoesNotPublishSettingsResult(): Unit = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        val session = viewModel.catalogRepairSession
+
+        session.startUpdate(CatalogRepairEntryPoint.Home)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isUpdatingData)
+        assertEquals(null, viewModel.uiState.value.updateResultSongNames)
+        assertEquals(null, viewModel.uiState.value.updateDataError)
+    }
+
+    @Test
+    fun homeRunRejectsSettingsUpdateAndResetWithBusyWithoutClearingOldResult(): Unit = runTest(dispatcher) {
+        var gate: CompletableDeferred<Unit>? = null
+        var publishProgress: ((Int, Int, String) -> Unit)? = null
+        val viewModel = createViewModel(
+            updateGate = { gate },
+            progressCallback = { publishProgress = it }
+        )
+        advanceUntilIdle()
+        viewModel.updateSongData()
+        advanceUntilIdle()
+        assertEquals(emptyList(), viewModel.uiState.value.updateResultSongNames)
+        val session = viewModel.catalogRepairSession
+        val busyText = UiText.Res(Res.string.catalog_update_error_busy_message)
+
+        gate = CompletableDeferred()
+        session.startUpdate(CatalogRepairEntryPoint.Home)
+        viewModel.updateSongData()
+        assertEquals(busyText, viewModel.uiState.value.updateDataBusyMessage)
+        assertEquals(emptyList(), viewModel.uiState.value.updateResultSongNames)
+
+        viewModel.dismissUpdateDataError()
+        viewModel.resetPendingUpdate()
+        assertEquals(busyText, viewModel.uiState.value.updateDataBusyMessage)
+        assertEquals(emptyList(), viewModel.uiState.value.updateResultSongNames)
+        assertEquals(CatalogRepairEntryPoint.Home, session.state.value.resultOwner)
+
+        runCurrent()
+        requireNotNull(publishProgress).invoke(2, 4, "next.csv")
+        runCurrent()
+        assertEquals(busyText, viewModel.uiState.value.updateDataBusyMessage)
+        viewModel.dismissUpdateDataError()
+        requireNotNull(publishProgress).invoke(3, 4, "later.csv")
+        runCurrent()
+        assertEquals(null, viewModel.uiState.value.updateDataBusyMessage)
+
+        viewModel.updateSongData()
+        assertEquals(busyText, viewModel.uiState.value.updateDataBusyMessage)
+        requireNotNull(publishProgress).invoke(4, 4, "last.csv")
+        runCurrent()
+        assertEquals(busyText, viewModel.uiState.value.updateDataBusyMessage)
+
+        requireNotNull(gate).complete(Unit)
+        advanceUntilIdle()
+        assertEquals(null, viewModel.uiState.value.updateDataBusyMessage)
+        assertEquals(null, viewModel.uiState.value.updateResultSongNames)
+        assertEquals(null, viewModel.uiState.value.updateDataError)
+        assertEquals(CatalogRepairEntryPoint.Home, session.state.value.resultOwner)
+    }
+
+    @Test
+    fun resetPendingUpdateRunsThroughSessionAndReportsCompletion(): Unit = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.resetPendingUpdate()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.updateDataError)
+        assertFalse(viewModel.uiState.value.isUpdatingData)
+        assertEquals(emptyList(), viewModel.uiState.value.updateResultSongNames)
+    }
+
+    private class FakeCollectibleDataUpdater(paths: PlatformPaths) : CollectibleDataUpdater(
         HttpClient(MockEngine { error("unused") }),
-        PlatformPaths("/tmp/settings-test", "/tmp/settings-cache"),
+        paths,
         CollectibleDataProvider(TestAssets)
     ) {
         override suspend fun checkUpstreamChanged(): Result<Boolean> = Result.success(false)
+        override suspend fun resetPendingUpdate(): Result<Unit> = Result.success(Unit)
         override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> =
             Result.success(Unit)
     }
@@ -193,27 +341,37 @@ class SettingsMaintenanceViewModelTest {
         artworkCache: StandardArtworkCache = EmptyArtworkCache,
         thumbnailPreloader: IllustrationThumbnailPreloader = object : IllustrationThumbnailPreloader { override suspend fun preload(url: String) = Result.success(Unit) },
         clearCacheUrls: suspend (List<String>) -> Unit = {},
-        prepareLogStore: (LogFileStore) -> Unit = {}
+        prepareLogStore: (LogFileStore) -> Unit = {},
+        catalogRepairSession: CatalogRepairSession? = null,
+        updateGate: () -> CompletableDeferred<Unit>? = { null },
+        progressCallback: ((Int, Int, String) -> Unit) -> Unit = {}
     ): SettingsViewModel {
         val provider = SongDataProvider(TestAssets)
-        val updater = object : SongDataUpdater(HttpClient(MockEngine { error("unused") }), PlatformPaths("/tmp/settings-test", "/tmp/settings-cache"), provider) {
-            override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> = updaterResult
+        val base = "/tmp/settings-maintenance-${kotlin.random.Random.nextInt()}"
+        val paths = PlatformPaths(base, "$base/cache")
+        val updater = object : SongDataUpdater(HttpClient(MockEngine { error("unused") }), paths, provider) {
+            override suspend fun resetPendingUpdate(): Result<Unit> = Result.success(Unit)
+            override suspend fun updateAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> {
+                progressCallback(onProgress)
+                updateGate()?.await()
+                return updaterResult
+            }
         }
-        val root = "/tmp/settings-maintenance-${kotlin.random.Random.nextInt()}"
-        val store = LogFileStore(FileSystem.SYSTEM, "$root/runtime".toPath(), "$root/crash".toPath()).also(prepareLogStore)
+        val store = LogFileStore(FileSystem.SYSTEM, "$base/runtime".toPath(), "$base/crash".toPath()).also(prepareLogStore)
+        val coordinator = SongDataUpdateCoordinator(
+            songDataUpdater = updater,
+            songDataProvider = provider,
+            illustrationProvider = IllustrationProvider(),
+            artworkFileCache = artworkCache,
+            collectibleDataUpdater = FakeCollectibleDataUpdater(paths),
+            thumbnailPreloader = thumbnailPreloader,
+            clearCacheUrls = clearCacheUrls
+        )
         return SettingsViewModel(
-            repository, SessionCoordinatorImpl(repository), FakeSettingsRepository(), CheckForUpdateUseCase(repository), GetB30UseCase(repository), provider,
-            SongDataUpdateCoordinator(
-                songDataUpdater = updater,
-                songDataProvider = provider,
-                illustrationProvider = IllustrationProvider(),
-                artworkFileCache = artworkCache,
-                collectibleDataUpdater = FakeCollectibleDataUpdater(),
-                thumbnailPreloader = thumbnailPreloader,
-                clearCacheUrls = clearCacheUrls
-            ),
+            repository, SessionCoordinatorImpl(repository, org.kasumi321.ushio.phitracker.data.session.SessionStateStore(org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage())), FakeSettingsRepository(), CheckForUpdateUseCase(repository), GetB30UseCase(repository), provider,
+            catalogRepairSession ?: CatalogRepairSession(coordinator, CoroutineScope(SupervisorJob() + dispatcher)),
             IllustrationProvider(), artworkCache, RuntimeLogExporter(store), CrashReportExporter(store), TipsProvider(TestAssets),
-            thumbnailPreloader, clearCacheUrls, {}, {}
+            thumbnailPreloader, clearCacheUrls, {}, {}, { "" }
         ).let(viewModelLifecycle::track)
     }
 }

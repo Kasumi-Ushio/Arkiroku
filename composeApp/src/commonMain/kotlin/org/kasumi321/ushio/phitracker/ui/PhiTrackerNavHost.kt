@@ -27,10 +27,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -60,9 +62,11 @@ import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
 import org.kasumi321.ushio.phitracker.ui.b30.B30ImageScreen
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationGateway
+import org.kasumi321.ushio.phitracker.ui.b30.claimPayload
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectibleDetailScreen
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectibleDetailViewModel
 import org.kasumi321.ushio.phitracker.ui.home.ExpandedHomeScreen
+import org.kasumi321.ushio.phitracker.ui.navigation.LoginBackStackPolicy
 import org.kasumi321.ushio.phitracker.ui.home.CollectiblesChapterState
 import org.kasumi321.ushio.phitracker.ui.home.HomeTabState
 import org.kasumi321.ushio.phitracker.ui.home.HomeViewModel
@@ -143,6 +147,28 @@ internal sealed interface DetailRouteRequest {
 }
 
 /**
+ * One pending delivery drained by the expanded layout's graph-ready effect.
+ * A route queued after a reset supersedes that reset; consumption never happens
+ * during composition, so an abandoned composition cannot lose the request.
+ */
+internal sealed interface DetailPendingAction {
+    data class Navigate(val request: DetailRouteRequest) : DetailPendingAction
+
+    data object Reset : DetailPendingAction
+
+    data object None : DetailPendingAction
+}
+
+@Serializable
+private data class PersistedDetailPaneState(
+    val route: DetailRouteRequest? = null,
+    val reset: Boolean = false
+)
+
+private const val PersistedDetailPaneStatePrefix = "detail-v2:"
+private val detailPaneSaverJson = Json { ignoreUnknownKeys = true }
+
+/**
  * Bridge between the outer NavHost and the detail-pane NavHost of the expanded
  * two-pane layout. [controller] is set while the detail pane is composed and
  * null in the compact single-pane layout, so navigation gateways can route to
@@ -153,16 +179,62 @@ internal sealed interface DetailRouteRequest {
  * hands itself back through the same slot so the two-pane layout can reopen
  * it in the detail pane.
  *
- * The pending route also survives Activity recreation (a foldable's display
- * switch recreates the Activity even with the full `configChanges` set): the
- * [Saver] persists it as JSON, and whichever layout mounts first restores it.
+ * Session replacement cannot rely on clearing the bridge alone: the detail
+ * NavHost is a `rememberNavController` nested in Home's saveable state, so a
+ * Home that stays below Login restores its old detail stack. [pendingReset] is
+ * that explicit reset request: it survives recreation through the [Saver], and
+ * the detail pane pops back to its placeholder after its graph is ready.
+ *
+ * Both the pending route and the reset request survive Activity recreation (a
+ * foldable's display switch recreates the Activity even with the full
+ * `configChanges` set). The saver also accepts the previous route-only JSON so
+ * an upgrade mid-recreation still restores the detail page.
  */
-internal class DetailPaneState(restoredRoute: DetailRouteRequest? = null) {
+internal class DetailPaneState(
+    restoredRoute: DetailRouteRequest? = null,
+    restoredReset: Boolean = false
+) {
     var controller: NavHostController? = null
+        private set
+    var generation: Int by mutableStateOf(0)
+        private set
     private var pendingRoute: DetailRouteRequest? = restoredRoute
+    var pendingReset: Boolean by mutableStateOf(restoredReset)
+        private set
 
-    fun setPendingRoute(request: DetailRouteRequest?) {
+    fun attachController(controller: NavHostController, ownerGeneration: Int = generation) {
+        if (ownerGeneration == generation) this.controller = controller
+    }
+
+    fun releaseController(controller: NavHostController, ownerGeneration: Int = generation) {
+        if (ownerGeneration == generation && this.controller === controller) this.controller = null
+    }
+
+    fun clearForSessionReplacement() {
+        generation++
+        controller = null
+        pendingRoute = null
+        pendingReset = true
+    }
+
+    /**
+     * Asks the detail pane to return to its placeholder. A B30 image hosted in
+     * the pane can outlive its in-memory payload (session replacement clears
+     * the coordinator), and the pane must reset without popping the outer
+     * Home stack; the request is applied once the detail graph is ready.
+     */
+    fun requestReset(ownerGeneration: Int = generation) {
+        if (ownerGeneration != generation) return
+        pendingRoute = null
+        pendingReset = true
+    }
+
+    fun setPendingRoute(request: DetailRouteRequest?, ownerGeneration: Int = generation) {
+        if (ownerGeneration != generation) return
         pendingRoute = request
+        // A route queued after the reset is a newer user intent; it supersedes
+        // the reset, and its navigation pops through the placeholder anyway.
+        if (request != null) pendingReset = false
     }
 
     fun consumePendingRoute(): DetailRouteRequest? {
@@ -172,29 +244,55 @@ internal class DetailPaneState(restoredRoute: DetailRouteRequest? = null) {
     }
 
     /**
-     * Delivery used when the detail graph becomes usable: a route queued while
-     * the graph was not ready is newer than [restored] (the route captured at
-     * composition time), so it wins; otherwise the restored route is used.
+     * Drains both slots for the detail-graph-ready effect. A queued route wins
+     * over a reset (it was set after the reset). The controller's own restored
+     * back stack is left untouched when no action is pending.
      */
-    fun consumePendingRouteOr(restored: DetailRouteRequest?): DetailRouteRequest? =
-        consumePendingRoute() ?: restored
+    fun consumePendingAction(): DetailPendingAction {
+        val route = consumePendingRoute()
+        if (route != null) {
+            pendingReset = false
+            return DetailPendingAction.Navigate(route)
+        }
+        if (pendingReset) return DetailPendingAction.Reset
+        return DetailPendingAction.None
+    }
+
+    /** Marks a reset as applied so the route mirror can resume. */
+    fun completePendingReset(ownerGeneration: Int = generation) {
+        if (ownerGeneration == generation) pendingReset = false
+    }
 
     companion object {
-        private val saverJson = Json { ignoreUnknownKeys = true }
-
         val Saver: Saver<DetailPaneState, Any> = Saver(
             save = { state ->
-                state.pendingRoute?.let { saverJson.encodeToString(it) }
+                val persisted = PersistedDetailPaneState(state.pendingRoute, state.pendingReset)
+                if (persisted.route == null && !persisted.reset) {
+                    null
+                } else {
+                    PersistedDetailPaneStatePrefix + detailPaneSaverJson.encodeToString(persisted)
+                }
             },
-            restore = { saved ->
-                DetailPaneState(
-                    (saved as? String)?.let {
-                        runCatching { saverJson.decodeFromString<DetailRouteRequest>(it) }.getOrNull()
-                    }
-                )
-            }
+            restore = { saved -> restoreDetailPaneState(saved) }
         )
     }
+}
+
+private fun restoreDetailPaneState(saved: Any): DetailPaneState {
+    val encoded = saved as? String ?: return DetailPaneState()
+    if (encoded.startsWith(PersistedDetailPaneStatePrefix)) {
+        val persisted = runCatching {
+            detailPaneSaverJson.decodeFromString<PersistedDetailPaneState>(
+                encoded.removePrefix(PersistedDetailPaneStatePrefix)
+            )
+        }.getOrNull() ?: return DetailPaneState()
+        return DetailPaneState(persisted.route, persisted.reset)
+    }
+    // Previous format: the JSON of a single route request, with no reset flag.
+    val legacyRoute = runCatching {
+        detailPaneSaverJson.decodeFromString<DetailRouteRequest>(encoded)
+    }.getOrNull() ?: return DetailPaneState()
+    return DetailPaneState(legacyRoute)
 }
 
 /**
@@ -249,6 +347,74 @@ internal fun NavHostController.navigateDetailRequest(
             CollectibleDetailRoute(folderKey = request.folderKey, key = request.key),
             builder
         )
+    }
+}
+
+/**
+ * True when the host already shows exactly the page [request] describes,
+ * typed arguments included.
+ *
+ * A nested NavController restores its own back stack while [DetailPaneState]
+ * separately restores the mirrored pending route. Delivering that route with
+ * [navigateDetailTopLevel] would first pop everything above the placeholder —
+ * destroying the restored Settings → About → Licenses flow and the ViewModels
+ * of those entries — and then push the same page again. Skipping the delivery
+ * keeps the restored nested stack intact; only a different route or different
+ * arguments need the top-level replacement.
+ */
+internal fun NavHostController.isShowingDetailRequest(request: DetailRouteRequest): Boolean =
+    currentBackStackEntry?.toDetailRouteRequest() == request
+
+/**
+ * Navigates to a top-level detail destination, replacing the previous one above
+ * the placeholder so the pane's back stack stays shallow.
+ */
+internal fun NavHostController.navigateDetailTopLevel(request: DetailRouteRequest) {
+    navigateDetailRequest(request) {
+        popUpTo(DetailPlaceholderRoute) { inclusive = false }
+        launchSingleTop = true
+    }
+}
+
+/**
+ * Applies one drained [DetailPendingAction] to the detail controller. A reset
+ * pops everything above the placeholder and only then clears the flag, keeping
+ * the route mirror paused until the stale entry is gone. A navigation whose
+ * destination is already restored in place is a no-op (see
+ * [isShowingDetailRequest]); a different route or arguments replaces the stack
+ * above the placeholder.
+ */
+internal fun NavHostController.applyDetailPendingAction(
+    action: DetailPendingAction,
+    detailPaneState: DetailPaneState,
+    ownerGeneration: Int
+) {
+    when (action) {
+        is DetailPendingAction.Navigate ->
+            if (!isShowingDetailRequest(action.request)) navigateDetailTopLevel(action.request)
+        DetailPendingAction.Reset -> {
+            popBackStack(DetailPlaceholderRoute, inclusive = false)
+            detailPaneState.completePendingReset(ownerGeneration)
+        }
+        DetailPendingAction.None -> Unit
+    }
+}
+
+/**
+ * Home/Login boundary shared by the skip and automatic-resume paths: when an
+ * existing Home sits below Login it is popped back to, preserving its
+ * ViewModel and detail pane; only a Login-rooted stack pushes Home and drops
+ * Login. Active login/logout replace the boundary instead
+ * (`LoginBackStackPolicy`) so no guest state survives a session change.
+ */
+internal fun NavHostController.popToHomeOrReplaceLogin(
+    homeRoute: String = Screen.Home.route,
+    loginRoute: String = Screen.Login.route
+) {
+    if (popBackStack(homeRoute, inclusive = false)) return
+    navigate(homeRoute) {
+        popUpTo(loginRoute) { inclusive = true }
+        launchSingleTop = true
     }
 }
 
@@ -335,6 +501,7 @@ fun PhiTrackerNavHost() {
     val navController = rememberNavController()
     val settingsRepository: SettingsRepository = koinInject()
     val repository: PhigrosRepository = koinInject()
+    val sessionCoordinator: org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator = koinInject()
 
     // Decide the start destination once. A rerun requested from Settings wins
     // outright — token holders included — so the wizard can guide them again
@@ -347,7 +514,7 @@ fun PhiTrackerNavHost() {
                 onboardingCompleted = settingsRepository.onboardingCompleted.first(),
                 rerunRequested = settingsRepository.onboardingRerunRequested.first(),
                 preloadDone = settingsRepository.getPreloadDone(),
-                hasToken = repository.getSessionToken() != null
+                hasToken = repository.getSessionToken() != null || sessionCoordinator.hasPendingRecovery()
         )
         if (decision.consumeRerunRequest) settingsRepository.setOnboardingRerunRequested(false)
         if (decision.markOnboardingCompleted) settingsRepository.setOnboardingCompleted(true)
@@ -393,21 +560,41 @@ fun PhiTrackerNavHost() {
                 }
 
                 override fun navigateHomeReplacingLogin() {
+                    detailPaneState.clearForSessionReplacement()
+                    // Stack-aware: replace a guest Home sitting below Login so
+                    // exactly one — logged-in — Home remains (fresh ViewModel,
+                    // back never returns to the stale guest page); when Login
+                    // is the root, pop it inclusive as before.
+                    val replacement = LoginBackStackPolicy.homeReplacingLogin(
+                        backStackRoutes = navController.currentBackStack.value.mapNotNull { it.destination.route },
+                        homeRoute = Screen.Home.route,
+                        loginRoute = Screen.Login.route
+                    )
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(replacement.popUpToRoute) { inclusive = replacement.inclusive }
                     }
                 }
 
+                override fun navigateHomeResumingSession() {
+                    // Same-session resume keeps the existing Home entry (and
+                    // the detail pane it hosts) when a guest Home sits below
+                    // Login; only a Login-rooted stack pushes Home.
+                    navController.popToHomeOrReplaceLogin()
+                }
+
+                override fun clearDetailForSessionReplacement() {
+                    detailPaneState.clearForSessionReplacement()
+                }
+
                 override fun navigateLoginReplacingHome() {
+                    detailPaneState.clearForSessionReplacement()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 }
 
                 override fun navigateHomeSkippingLogin() {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                    }
+                    navController.popToHomeOrReplaceLogin()
                 }
 
                 override fun popCurrent() {
@@ -425,6 +612,7 @@ fun PhiTrackerNavHost() {
                         ?: false
 
                 override fun navigateLoginClearingGraph() {
+                    detailPaneState.clearForSessionReplacement()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
                         launchSingleTop = true
@@ -459,6 +647,7 @@ fun PhiTrackerNavHost() {
                     // The wizard always hands off to Home: logging in now
                     // happens inline in the login step, so there is no
                     // separate Login destination anymore.
+                    detailPaneState.clearForSessionReplacement()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
@@ -483,7 +672,9 @@ fun PhiTrackerNavHost() {
             AppLogger.event("startup", "Login.afterViewModel")
             LoginScreen(
                 onLoginSuccess = b30Navigation::loginSuccess,
+                onSessionResumed = b30Navigation::resumeSession,
                 onSkip = b30Navigation::skipLoginToHome,
+                onResetLocalSession = loginViewModel::resetLocalSession,
                 viewModel = loginViewModel
             )
         }
@@ -526,7 +717,12 @@ fun PhiTrackerNavHost() {
                 // the detail destination needs restoring.
                 LaunchedEffect(Unit) {
                     detailPaneState.consumePendingRoute()?.let {
-                        navController.navigateDetailRequest(it)
+                        // The outer NavHost restores its own stack too; when it
+                        // already shows this exact page, reopening it would
+                        // stack a duplicate entry (and a fresh ViewModel).
+                        if (!navController.isShowingDetailRequest(it)) {
+                            navController.navigateDetailRequest(it)
+                        }
                     }
                 }
                 MainScreen(
@@ -563,6 +759,7 @@ fun PhiTrackerNavHost() {
             host = navController,
             outer = navController,
             b30Navigation = b30Navigation,
+            b30Host = B30Host.OuterGraph,
             reducedMotionEnabled = reducedMotionEnabled,
             settingsRepository = settingsRepository,
             detailPaneState = detailPaneState,
@@ -618,6 +815,26 @@ private fun MigrateSecondaryToDetailOnExpanded(
     }
 }
 
+/** Which NavHost owns the B30 image destination. */
+internal enum class B30Host { DetailPane, OuterGraph }
+
+/**
+ * Recovers a B30 destination whose in-memory payload is gone. The two graphs
+ * need different recovery: the pane only returns to its placeholder (asking
+ * Home or clearing the outer graph would blank the two-pane layout), while the
+ * compact/outer destination keeps the original Home-or-Login fallback.
+ */
+internal fun recoverMissingB30Payload(
+    host: B30Host,
+    detailPaneState: DetailPaneState,
+    b30Navigation: B30NavigationCoordinator
+) {
+    when (host) {
+        B30Host.DetailPane -> detailPaneState.requestReset()
+        B30Host.OuterGraph -> b30Navigation.recoverMissingPayload()
+    }
+}
+
 /**
  * Secondary destinations shared by the outer NavHost (compact layout) and the
  * detail-pane NavHost (expanded two-pane layout). [host] is the controller of
@@ -628,6 +845,11 @@ private fun MigrateSecondaryToDetailOnExpanded(
  * compact flow unchanged while letting the detail pane host them when
  * expanded.
  *
+ * [b30Host] selects the missing-payload recovery for this graph. The B30
+ * destination keeps its payload in the shared coordinator; when a session
+ * replacement clears it while Home survives below Login, the detail copy must
+ * reset its pane instead of popping the outer stack.
+ *
  * [migrateOnExpanded] must be true only on the outer graph: when the window
  * grows back to Expanded while one of these pages sits on it full-screen, the
  * page hands itself back to the detail pane via [detailPaneState] and pops,
@@ -637,6 +859,7 @@ internal fun NavGraphBuilder.secondaryDestinations(
     host: NavHostController,
     outer: NavHostController,
     b30Navigation: B30NavigationCoordinator,
+    b30Host: B30Host,
     reducedMotionEnabled: Boolean,
     settingsRepository: SettingsRepository,
     detailPaneState: DetailPaneState,
@@ -650,12 +873,18 @@ internal fun NavGraphBuilder.secondaryDestinations(
         popExitTransition = { popExitTransition(reducedMotionEnabled) }
     ) { backStackEntry ->
         LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_b30image") }
+        // SavedStateHandle keeps the first owner across recomposition and the
+        // dispose/recreate transition used on iOS. An exiting entry therefore
+        // cannot reclaim (or release) a newer entry's payload.
+        val owned = remember(backStackEntry) {
+            b30Navigation.claimPayload(backStackEntry.savedStateHandle)
+        }
+        val payload = owned.payload
         DisposableEffect(backStackEntry) {
             onDispose {
-                b30Navigation.destinationDisposed()
+                b30Navigation.destinationDisposed(owned.generation)
             }
         }
-        val payload = b30Navigation.payload
         if (payload == null) {
             // Only recover when this entry is actually on top of the back
             // stack: during a pop transition the outgoing destination can
@@ -665,7 +894,7 @@ internal fun NavGraphBuilder.secondaryDestinations(
             val currentEntry by host.currentBackStackEntryAsState()
             if (currentEntry?.id == backStackEntry.id) {
                 LaunchedEffect(backStackEntry) {
-                    b30Navigation.recoverMissingPayload()
+                    recoverMissingB30Payload(b30Host, detailPaneState, b30Navigation)
                 }
             }
             return@composable

@@ -58,14 +58,16 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
+import org.kasumi321.ushio.phitracker.ui.B30Host
 import org.kasumi321.ushio.phitracker.ui.DetailPaneState
+import org.kasumi321.ushio.phitracker.ui.DetailPendingAction
 import org.kasumi321.ushio.phitracker.ui.DetailPlaceholderRoute
 import org.kasumi321.ushio.phitracker.ui.DetailRouteRequest
 import org.kasumi321.ushio.phitracker.ui.Screen
+import org.kasumi321.ushio.phitracker.ui.applyDetailPendingAction
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
-import org.kasumi321.ushio.phitracker.ui.navigateDetailRequest
+import org.kasumi321.ushio.phitracker.ui.navigateDetailTopLevel
 import org.kasumi321.ushio.phitracker.ui.navigation.CollectibleDetailRoute
-import org.kasumi321.ushio.phitracker.ui.navigation.SongDetailRoute
 import org.kasumi321.ushio.phitracker.ui.secondaryDestinations
 import org.kasumi321.ushio.phitracker.ui.toDetailRouteRequest
 import org.kasumi321.ushio.phitracker.ui.utils.rememberSeparatingVerticalHingeBounds
@@ -169,6 +171,12 @@ internal fun ExpandedHomeScreen(
     onNavigateToLogin: () -> Unit
 ) {
     val detailNavController = rememberNavController()
+    // Read as snapshot state: a session replacement bumps the generation even
+    // while Home is still composed under Login (a transition keeps it alive),
+    // so the attach effect must re-run and claim the nested controller for the
+    // new generation instead of leaving it detached for good.
+    val detailGeneration = detailPaneState.generation
+    val pendingReset = detailPaneState.pendingReset
 
     // The detail NavHost installs its graph from an effect, so navigating in
     // the first frames would throw "setGraph() before getGraph()". Gate every
@@ -176,76 +184,70 @@ internal fun ExpandedHomeScreen(
     // DetailPaneState and delivered by the restore effect below.
     var detailGraphReady by remember(detailNavController) { mutableStateOf(false) }
 
-    // Capture the pending route synchronously, before the route-mirror effect
-    // below can report the initial placeholder and erase it. DetailPaneState's
-    // pendingRoute is a plain var (not snapshot state), so consuming it during
-    // composition is safe.
-    val restoredRequest = remember(detailNavController) {
-        detailPaneState.consumePendingRoute()
+    // The route mirror must wait until the graph-ready effect has consumed the
+    // pending action. If this composition dies before that effect, the request
+    // remains in DetailPaneState for the next composition instead of being lost.
+    var restoreCompleted by remember(detailNavController, detailGeneration, pendingReset) {
+        mutableStateOf(false)
     }
 
     // Only expose the controller once its graph exists; callers in
-    // PhiTrackerNavHost fall back to the outer host while this is null.
-    DisposableEffect(detailNavController, detailGraphReady) {
+    // PhiTrackerNavHost fall back to the outer host while this is null. Keyed
+    // by the generation so a session replacement re-attaches the same nested
+    // controller for the new session while Home is still composed.
+    DisposableEffect(detailNavController, detailGraphReady, detailGeneration) {
         if (detailGraphReady) {
-            detailPaneState.controller = detailNavController
+            detailPaneState.attachController(detailNavController, detailGeneration)
         }
-        onDispose { detailPaneState.controller = null }
+        onDispose { detailPaneState.releaseController(detailNavController, detailGeneration) }
     }
 
     // Top-level detail destinations replace each other above the placeholder,
     // keeping the back stack shallow; nested flows (e.g. About -> Licenses)
-    // navigate plainly inside the detail graph and stack normally.
+    // navigate plainly inside the detail graph and stack normally. Typed
+    // destinations go through the same slot so their arguments survive a
+    // hand-off and the not-ready queueing lives in one place.
     fun navigateDetail(request: DetailRouteRequest) {
         if (!detailGraphReady) {
-            detailPaneState.setPendingRoute(request)
+            detailPaneState.setPendingRoute(request, detailGeneration)
             return
         }
-        detailNavController.navigateDetailRequest(request) {
-            popUpTo(DetailPlaceholderRoute) { inclusive = false }
-            launchSingleTop = true
-        }
+        detailNavController.navigateDetailTopLevel(request)
     }
 
     fun navigateSongDetail(songId: String, difficulty: org.kasumi321.ushio.phitracker.domain.model.Difficulty?) {
-        if (!detailGraphReady) {
-            detailPaneState.setPendingRoute(DetailRouteRequest.SongDetail(songId, difficulty?.name))
-            return
-        }
-        detailNavController.navigate(SongDetailRoute.from(songId = songId, difficulty = difficulty)) {
-            popUpTo(DetailPlaceholderRoute) { inclusive = false }
-            launchSingleTop = true
-        }
+        navigateDetail(DetailRouteRequest.SongDetail(songId, difficulty?.name))
     }
 
     fun navigateCollectibleDetail(folderKey: String, key: String) {
-        if (!detailGraphReady) {
-            detailPaneState.setPendingRoute(DetailRouteRequest.Collectible(folderKey, key))
-            return
-        }
-        detailNavController.navigate(CollectibleDetailRoute(folderKey = folderKey, key = key)) {
-            popUpTo(DetailPlaceholderRoute) { inclusive = false }
-            launchSingleTop = true
-        }
+        navigateDetail(DetailRouteRequest.Collectible(folderKey, key))
     }
 
-    // Restore once the graph is installed. The pending route was captured
-    // synchronously above so the mirror effect's initial placeholder report
-    // cannot erase it; a request queued during the not-ready window wins over
-    // that composition-time capture.
-    LaunchedEffect(detailNavController, detailGraphReady) {
+    // Restore/reset only after the graph is installed and attached. Consumption
+    // lives in this effect (never in composition), and the mirror stays paused
+    // until it finishes so it cannot overwrite the request with a placeholder.
+    // The nested controller's own back stack is restored at the same time;
+    // applyDetailPendingAction skips an identical top destination to retain
+    // nested flows and their ViewModels.
+    LaunchedEffect(detailNavController, detailGraphReady, detailGeneration, pendingReset) {
         if (!detailGraphReady) return@LaunchedEffect
-        val request = detailPaneState.consumePendingRouteOr(restoredRequest)
-        if (request != null) {
-            navigateDetail(request)
-        }
+        val action = detailPaneState.consumePendingAction()
+        detailNavController.applyDetailPendingAction(action, detailPaneState, detailGeneration)
+        restoreCompleted = true
     }
 
     // Mirror the detail pane's current destination so the compact layout can
-    // reopen it full-screen when the window shrinks below Expanded.
+    // reopen it full-screen when the window shrinks below Expanded. Stay
+    // paused until restore/reset has been applied: a stale or placeholder
+    // entry must not become the pending route before restoration completes.
     val detailEntry by detailNavController.currentBackStackEntryAsState()
-    LaunchedEffect(detailEntry) {
-        detailPaneState.setPendingRoute(detailEntry?.toDetailRouteRequest())
+    LaunchedEffect(detailEntry, detailGeneration, pendingReset, restoreCompleted) {
+        if (pendingReset || !restoreCompleted) return@LaunchedEffect
+        // Read the live back stack rather than the collected [detailEntry]:
+        // right after a reset the collected value can still be the stale
+        // destination for one frame, which must not leak into compact restore.
+        val currentEntry = detailNavController.currentBackStack.value.lastOrNull()
+        detailPaneState.setPendingRoute(currentEntry?.toDetailRouteRequest(), detailGeneration)
     }
 
     // The collectible item currently shown in the detail pane (if any), used
@@ -387,6 +389,7 @@ internal fun ExpandedHomeScreen(
                     host = detailNavController,
                     outer = outerNavController,
                     b30Navigation = b30Navigation,
+                    b30Host = B30Host.DetailPane,
                     reducedMotionEnabled = reducedMotionEnabled,
                     settingsRepository = settingsRepository,
                     detailPaneState = detailPaneState,
