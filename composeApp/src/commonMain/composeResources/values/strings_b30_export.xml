@@ -15,6 +15,7 @@
     <string name="b30ex_effective_votes">Effective votes: %1$d</string>
     <string name="b30ex_export_settings">Export settings</string>
     <string name="b30ex_generate_failed">Failed to generate B30 image</string>
+    <string name="b30ex_generate_retry">Retry</string>
     <string name="b30ex_generating">Generating B30 image…</string>
     <string name="b30ex_image_title">B30 Image</string>
     <string name="b30ex_random_background">Random background</string>

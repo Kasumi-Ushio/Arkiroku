@@ -15,6 +15,7 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -80,8 +81,15 @@ actual object B30ImageGenerator {
     actual suspend fun generate(exportData: B30ExportData): B30ImageExport = withContext(Dispatchers.Main) {
         try {
             val backgroundBitmap = exportData.backgroundUri?.let { uri ->
-                withContext(Dispatchers.Default) {
-                    loadAndBlurBackground(uri, exportData.backgroundBlurRadius)?.toComposeImageBitmap()
+                withOptionalB30Background {
+                    withContext(Dispatchers.Default) {
+                        runCatching {
+                            loadAndBlurBackground(uri, exportData.backgroundBlurRadius)?.toComposeImageBitmap()
+                        }.onFailure { error ->
+                            if (error is CancellationException) throw error
+                            AppLogger.e("B30ImageGenerator", "Failed to preload/blur background: ${error.message}", error)
+                        }.getOrNull()
+                    }
                 }
             }
             val renderData = if (backgroundBitmap != null) {
@@ -103,6 +111,8 @@ actual object B30ImageGenerator {
                 pngBytes = pngBytes,
                 preview = image.toComposeImageBitmap()
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             AppLogger.e("B30ImageGenerator", "B30 iOS export failed: ${exportDiagnostics(exportData, null)} error=${e.message ?: e::class.simpleName}", e)
             throw e
@@ -287,11 +297,15 @@ actual object B30ImageGenerator {
                     FileSystem.SYSTEM.read(path.toPath()) { readByteArray() }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Throwable) {
             return null
         }
         return try {
             SkiaImage.makeFromEncoded(bytes)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Throwable) {
             null
         }

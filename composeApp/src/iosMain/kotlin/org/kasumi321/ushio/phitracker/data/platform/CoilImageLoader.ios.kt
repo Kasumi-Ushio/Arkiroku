@@ -6,11 +6,12 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.crossfade
 import okio.Path
+import org.kasumi321.ushio.phitracker.data.common.resultOf
 import okio.Path.Companion.toPath
 
 actual fun coilCacheDirectory(context: PlatformContext): Path = "${createPlatformPaths().cacheDir}/coil_cache".toPath()
 
-actual suspend fun preloadIllustrationThumbnail(url: String, size: Int, allowHardware: Boolean): Result<Unit> = runCatching {
+actual suspend fun preloadIllustrationThumbnail(url: String, size: Int, allowHardware: Boolean): Result<Unit> = resultOf {
     // allowHardware has no iOS analogue (Skia software bitmaps); size still governs
     // the Coil memory-cache key, so it must match the on-screen request.
     val context = PlatformContext.INSTANCE

@@ -83,12 +83,14 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.preloadIllustrationThumbnail
@@ -121,6 +123,7 @@ import phitracker.composeapp.generated.resources.b30ex_card_style_poster
 import phitracker.composeapp.generated.resources.b30ex_cd_preview
 import phitracker.composeapp.generated.resources.b30ex_export_settings
 import phitracker.composeapp.generated.resources.b30ex_generate_failed
+import phitracker.composeapp.generated.resources.b30ex_generate_retry
 import phitracker.composeapp.generated.resources.b30ex_generating
 import phitracker.composeapp.generated.resources.b30ex_image_title
 import phitracker.composeapp.generated.resources.b30ex_random_background
@@ -152,9 +155,10 @@ fun B30ImageScreen(
     getStandardIllustrationUrl: (String) -> String = { "" },
     onBack: () -> Unit
 ) {
-    var export by remember { mutableStateOf<B30ImageExport?>(null) }
-    var isGenerating by remember { mutableStateOf(true) }
-    var generationFailed by remember { mutableStateOf(false) }
+    val runState = remember { B30ExportRunState<B30ImageExport>() }
+    val export = runState.result
+    val isGenerating = runState.isGenerating
+    val generationFailed = runState.generationFailed
     var zoomFactor by remember { mutableFloatStateOf(1f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
     var previewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -280,49 +284,36 @@ fun B30ImageScreen(
         )
     }
 
-    LaunchedEffect(exportData) {
-        // Style not loaded yet: stay in the generating state until exportData
-        // is built with the persisted card style.
-        val data = exportData ?: return@LaunchedEffect
-        isGenerating = true
-        generationFailed = false
-        zoomFactor = 1f
-        panOffset = Offset.Zero
-        export = null
-        AppLogger.event(
-            "b30_export",
-            "generate_started",
-            mapOf(
-                "cards" to b30.size.toString(),
-                "background" to backgroundMode::class.simpleName.orEmpty(),
-                "darkTheme" to exportDarkTheme.toString()
-            )
+    LaunchedEffect(exportData, runState.retryToken) {
+        runB30ExportEffect(
+            data = exportData,
+            state = runState,
+            runner = { runB30Export(it) },
+            onStarted = {
+                zoomFactor = 1f
+                panOffset = Offset.Zero
+                AppLogger.event(
+                    "b30_export",
+                    "generate_started",
+                    mapOf(
+                        "cards" to b30.size.toString(),
+                        "background" to backgroundMode::class.simpleName.orEmpty(),
+                        "darkTheme" to exportDarkTheme.toString()
+                    )
+                )
+            },
+            onSuccess = { exp ->
+                AppLogger.event(
+                    "b30_export",
+                    "generate_success",
+                    mapOf("width" to exp.width.toString(), "height" to exp.height.toString())
+                )
+            },
+            onFailure = { throwable ->
+                AppLogger.event("b30_export", "generate_failed", mapOf("error" to (throwable.message ?: "unknown")))
+                AppLogger.e("B30ImageScreen", "B30 image generation failed", throwable)
+            }
         )
-        val result = runCatching {
-            withContext(Dispatchers.Default) {
-                preloadB30ExportImages(data)
-                B30ImageGenerator.generate(data)
-            }
-        }
-        result.exceptionOrNull()?.let { throwable ->
-            if (throwable is CancellationException) {
-                // Relaunched with new inputs (e.g. style switch): the new run
-                // owns the state flags, so don't record a phantom failure.
-                throw throwable
-            }
-            AppLogger.event("b30_export", "generate_failed", mapOf("error" to (throwable.message ?: "unknown")))
-            AppLogger.e("B30ImageScreen", "B30 image generation failed", throwable)
-        }
-        export = result.getOrNull()
-        result.getOrNull()?.let { exp ->
-            AppLogger.event(
-                "b30_export",
-                "generate_success",
-                mapOf("width" to exp.width.toString(), "height" to exp.height.toString())
-            )
-        }
-        generationFailed = result.isFailure
-        isGenerating = false
     }
 
     // Page-level HazeState, independent from the home one: the generated image
@@ -361,10 +352,9 @@ fun B30ImageScreen(
                     ) {
                         Button(
                             onClick = {
-                                val exp = export ?: return@Button
                                 coroutineScope.launch {
                                     val fileName = buildB30ExportFilename(nickname)
-                                    val result = saveB30ImageToPictures(exp.pngBytes, fileName)
+                                    val result = saveB30ImageToPictures(export.pngBytes, fileName)
                                     AppLogger.event(
                                         "b30_export",
                                         if (result.isSuccess) "save_success" else "save_failed",
@@ -383,10 +373,9 @@ fun B30ImageScreen(
 
                         OutlinedButton(
                             onClick = {
-                                val exp = export ?: return@OutlinedButton
                                 coroutineScope.launch {
                                     val fileName = buildB30ExportFilename(nickname)
-                                    val result = shareB30Image(exp.pngBytes, fileName)
+                                    val result = shareB30Image(export.pngBytes, fileName)
                                     AppLogger.event(
                                         "b30_export",
                                         if (result.isSuccess) "share_success" else "share_failed",
@@ -433,7 +422,13 @@ fun B30ImageScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(stringResource(Res.string.b30ex_generate_failed))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(Res.string.b30ex_generate_failed))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { runState.retry() }) {
+                            Text(stringResource(Res.string.b30ex_generate_retry))
+                        }
+                    }
                 }
             } else {
                 export?.let { exp ->
@@ -556,7 +551,37 @@ fun B30ImageScreen(
     }
 }
 
-private suspend fun preloadB30ExportImages(exportData: B30ExportData) {
+internal const val B30_EXPORT_TOTAL_TIMEOUT_MS = 45_000L
+internal const val B30_OPTIONAL_BACKGROUND_TIMEOUT_MS = 10_000L
+
+internal suspend fun <T> withOptionalB30Background(
+    timeoutMs: Long = B30_OPTIONAL_BACKGROUND_TIMEOUT_MS,
+    loader: suspend () -> T?
+): T? {
+    val result = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { loader() }
+    if (result == null) {
+        AppLogger.event("b30_export", "background_fallback", mapOf("reason" to "timeout_or_unavailable"))
+    }
+    return result
+}
+
+internal suspend fun runB30Export(
+    exportData: B30ExportData,
+    timeoutMs: Long = B30_EXPORT_TOTAL_TIMEOUT_MS,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    preload: suspend (B30ExportData) -> Unit = ::preloadB30ExportImages,
+    generate: suspend (B30ExportData) -> B30ImageExport = B30ImageGenerator::generate
+): B30ImageExport = withTimeout(timeoutMs) {
+    withContext(dispatcher) {
+        preload(exportData)
+        generate(exportData)
+    }
+}
+
+internal suspend fun preloadB30ExportImages(
+    exportData: B30ExportData,
+    preload: suspend (url: String, size: Int, allowHardware: Boolean) -> Result<Unit> = ::preloadIllustrationThumbnail
+) {
     // The off-screen capture waits only a short beat after composition, so every
     // illustration must resolve from Coil's memory cache synchronously on the
     // first frame. That only happens when the warmed entry's key matches the
@@ -574,16 +599,14 @@ private suspend fun preloadB30ExportImages(exportData: B30ExportData) {
         .mapNotNull { it?.takeIf(String::isNotBlank) }
         .distinct()
 
-    // Avatar/background are consumed differently: the avatar is pinned to
-    // B30ExportSpec.avatarSizePx so its Coil memory-cache key matches the
-    // export layout's avatar request exactly (an exact hit resolves
-    // synchronously on first composition), while the background is re-decoded
-    // and blurred by the platform generator, so warming it as a software
-    // bitmap merely spares the capture a network round-trip.
+    // The avatar is pinned to B30ExportSpec.avatarSizePx so its Coil
+    // memory-cache key matches the export layout's request exactly. The
+    // optional background is deliberately excluded: the platform generator
+    // decodes it separately with a bounded fallback, so a slow background can
+    // never prevent otherwise-ready score artwork from being exported.
     val avatarUri = exportData.avatarUri?.takeIf(String::isNotBlank)
-    val backgroundUri = exportData.backgroundUri?.takeIf(String::isNotBlank)
 
-    if (cardUris.isEmpty() && avatarUri == null && backgroundUri == null) return
+    if (cardUris.isEmpty() && avatarUri == null) return
 
     coroutineScope {
         val semaphore = Semaphore(6)
@@ -591,31 +614,22 @@ private suspend fun preloadB30ExportImages(exportData: B30ExportData) {
             cardUris.forEach { uri ->
                 add(uri to async {
                     semaphore.withPermit {
-                        preloadIllustrationThumbnail(uri, size = cardThumbnailPx, allowHardware = false)
+                        preload(uri, cardThumbnailPx, false)
                     }
                 })
             }
             if (avatarUri != null) {
                 add(avatarUri to async {
                     semaphore.withPermit {
-                        preloadIllustrationThumbnail(
-                            avatarUri,
-                            size = B30ExportSpec.avatarSizePx,
-                            allowHardware = false
-                        )
-                    }
-                })
-            }
-            if (backgroundUri != null) {
-                add(backgroundUri to async {
-                    semaphore.withPermit {
-                        preloadIllustrationThumbnail(backgroundUri, allowHardware = false)
+                        preload(avatarUri, B30ExportSpec.avatarSizePx, false)
                     }
                 })
             }
         }
         val failures = tasks.mapNotNull { (uri, task) ->
-            task.await().exceptionOrNull()?.also { throwable ->
+            val failure = task.await().exceptionOrNull()
+            if (failure is CancellationException) throw failure
+            failure?.also { throwable ->
                 AppLogger.w(
                     "B30ImageScreen",
                     "B30 export image preload failed: uri=$uri error=${throwable.message ?: throwable::class.simpleName}"
@@ -631,7 +645,7 @@ private suspend fun preloadB30ExportImages(exportData: B30ExportData) {
             mapOf(
                 "cardImages" to cardUris.size.toString(),
                 "avatarImages" to (if (avatarUri != null) 1 else 0).toString(),
-                "backgroundImages" to (if (backgroundUri != null) 1 else 0).toString()
+                "backgroundDeferred" to "true"
             )
         )
     }

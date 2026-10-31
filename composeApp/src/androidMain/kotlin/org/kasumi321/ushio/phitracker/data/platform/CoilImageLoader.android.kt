@@ -7,11 +7,12 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.request.crossfade
 import okio.Path
+import org.kasumi321.ushio.phitracker.data.common.resultOf
 import okio.Path.Companion.toOkioPath
 
 actual fun coilCacheDirectory(context: PlatformContext): Path = context.cacheDir.resolve("coil_cache").toOkioPath()
 
-actual suspend fun preloadIllustrationThumbnail(url: String, size: Int, allowHardware: Boolean): Result<Unit> = runCatching {
+actual suspend fun preloadIllustrationThumbnail(url: String, size: Int, allowHardware: Boolean): Result<Unit> = resultOf {
     val context = requireNotNull(AndroidPlatformContext.applicationContext) { "Android context is not initialized" }
     val request = ImageRequest.Builder(context)
         .data(url)

@@ -15,6 +15,7 @@
     <string name="b30ex_effective_votes">有效票 %1$d</string>
     <string name="b30ex_export_settings">导出设置</string>
     <string name="b30ex_generate_failed">B30 图片生成失败</string>
+    <string name="b30ex_generate_retry">重试</string>
     <string name="b30ex_generating">正在生成 B30 图片…</string>
     <string name="b30ex_image_title">B30 图片</string>
     <string name="b30ex_random_background">随机背景</string>

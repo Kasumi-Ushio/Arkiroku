@@ -18,9 +18,14 @@ import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.kasumi321.ushio.phitracker.data.platform.AndroidPlatformContext
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerTheme
 import org.kasumi321.ushio.phitracker.utils.stackBlur
@@ -50,6 +55,8 @@ actual object B30ImageGenerator {
                     preview = preview
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             AppLogger.e("B30ImageGenerator", "generate failed: ${e.message}", e)
             throw e
@@ -130,8 +137,8 @@ actual object B30ImageGenerator {
             )
         )
 
-        root.addView(container)
         try {
+            root.addView(container)
             waitForLayout(composeView)
             imageLoadTracker.awaitAll()
             // Painter state changes are applied through a recomposition. Wait
@@ -160,7 +167,11 @@ actual object B30ImageGenerator {
             composeView.draw(Canvas(bitmap))
             return bitmap
         } finally {
-            root.removeView(container)
+            if (container.parent === root) {
+                root.removeView(container)
+            } else {
+                composeView.disposeComposition()
+            }
         }
     }
 
@@ -168,63 +179,61 @@ actual object B30ImageGenerator {
         context: android.content.Context,
         uri: String,
         blurRadius: Int
-    ): Bitmap? = withContext(Dispatchers.IO) {
-        var loaded: Bitmap? = null
-        var bounded: Bitmap? = null
-        try {
-            val request = ImageRequest.Builder(context)
-                .data(uri)
-                .allowHardware(false)
-                .size(MAX_BLUR_BITMAP_DIM, MAX_BLUR_BITMAP_DIM)
-                .build()
-            val result = SingletonImageLoader.get(context).execute(request)
-            if (result !is SuccessResult) return@withContext null
+    ): Bitmap? = withOptionalB30Background {
+        withContext(Dispatchers.IO) {
+            var loaded: Bitmap? = null
+            var bounded: Bitmap? = null
+            try {
+                val request = ImageRequest.Builder(context)
+                    .data(uri)
+                    .allowHardware(false)
+                    .size(MAX_BLUR_BITMAP_DIM, MAX_BLUR_BITMAP_DIM)
+                    .build()
+                val result = SingletonImageLoader.get(context).execute(request)
+                if (result !is SuccessResult) return@withContext null
 
-            loaded = (result.image as BitmapImage).bitmap
-            bounded = if (maxOf(loaded.width, loaded.height) > MAX_BLUR_BITMAP_DIM) {
-                val scale = MAX_BLUR_BITMAP_DIM.toFloat() / maxOf(loaded.width, loaded.height)
-                val newW = (loaded.width * scale).toInt().coerceAtLeast(1)
-                val newH = (loaded.height * scale).toInt().coerceAtLeast(1)
-                Bitmap.createScaledBitmap(loaded, newW, newH, true)
-            } else {
-                loaded
+                loaded = (result.image as BitmapImage).bitmap
+                bounded = if (maxOf(loaded.width, loaded.height) > MAX_BLUR_BITMAP_DIM) {
+                    val scale = MAX_BLUR_BITMAP_DIM.toFloat() / maxOf(loaded.width, loaded.height)
+                    val newW = (loaded.width * scale).toInt().coerceAtLeast(1)
+                    val newH = (loaded.height * scale).toInt().coerceAtLeast(1)
+                    Bitmap.createScaledBitmap(loaded, newW, newH, true)
+                } else {
+                    loaded
+                }
+                val blurred = if (blurRadius > 0) stackBlur(bounded, blurRadius) else bounded
+                // Recycle the intermediate downscaled copy only if we created it
+                // and didn't hand it straight back as the unblurred result.
+                // Never recycle the Coil bitmap — it may be managed internally.
+                if (bounded !== loaded && blurred !== bounded) bounded.recycle()
+                blurred
+            } catch (e: CancellationException) {
+                bounded?.let { if (it !== loaded) it.recycle() }
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e("B30ImageGenerator", "Failed to preload/blur background: ${e.message}", e)
+                bounded?.let { if (it !== loaded) it.recycle() }
+                null
             }
-            val blurred = if (blurRadius > 0) stackBlur(bounded, blurRadius) else bounded
-            // Recycle the intermediate downscaled copy only if we created it
-            // and didn't hand it straight back as the unblurred result.
-            // Never recycle the Coil bitmap — it may be managed internally.
-            if (bounded !== loaded && blurred !== bounded) bounded.recycle()
-            blurred
-        } catch (e: Exception) {
-            AppLogger.e("B30ImageGenerator", "Failed to preload/blur background: ${e.message}", e)
-            bounded?.let { if (it !== loaded) it.recycle() }
-            null
         }
     }
 
     /**
      * Suspends until the [target] view's next pre-draw, ensuring the Android
-     * measure/layout pass (and thus Compose's initial composition) has completed.
+     * measure/layout pass (and thus Compose's initial composition) has
+     * completed. Bounded by a timeout: a view detached before drawing (device
+     * backgrounded, Activity recreated) must fail the generation instead of
+     * suspending forever.
      */
     private suspend fun waitForLayout(target: View) {
-        val deferred = CompletableDeferred<Unit>()
-        val obs = target.viewTreeObserver
-        val listener = object : ViewTreeObserver.OnPreDrawListener {
-            override fun onPreDraw(): Boolean {
-                obs.removeOnPreDrawListener(this)
-                deferred.complete(Unit)
-                return true
-            }
-        }
-        obs.addOnPreDrawListener(listener)
-        if (target.width > 0 && target.height > 0) {
-            obs.removeOnPreDrawListener(listener)
-            deferred.complete(Unit)
-        }
-        deferred.await()
+        awaitPreDrawSignal(target, scheduleInvalidate = false, timeoutLabel = "layout")
     }
 
     private suspend fun waitForNextPreDraw(target: View) {
+        awaitPreDrawSignal(target, scheduleInvalidate = true, timeoutLabel = "pre-draw")
+    }
+
+    private suspend fun awaitPreDrawSignal(target: View, scheduleInvalidate: Boolean, timeoutLabel: String) {
         val deferred = CompletableDeferred<Unit>()
         val observer = target.viewTreeObserver
         val listener = object : ViewTreeObserver.OnPreDrawListener {
@@ -235,10 +244,25 @@ actual object B30ImageGenerator {
             }
         }
         observer.addOnPreDrawListener(listener)
-        // The image-success recomposition may already have completed by the
-        // time this listener is registered. Explicitly schedule one draw so
-        // the renderer never waits indefinitely for an otherwise idle view.
-        target.invalidate()
-        deferred.await()
+        if (!scheduleInvalidate && target.width > 0 && target.height > 0) {
+            if (observer.isAlive) observer.removeOnPreDrawListener(listener)
+            deferred.complete(Unit)
+        }
+        if (scheduleInvalidate) {
+            // The image-success recomposition may already have completed by
+            // the time this listener is registered. Explicitly schedule one
+            // draw so the renderer never waits for an otherwise idle view.
+            target.invalidate()
+        }
+        try {
+            withTimeout(VIEW_SIGNAL_TIMEOUT_MS) { deferred.await() }
+        } catch (e: TimeoutCancellationException) {
+            currentCoroutineContext().ensureActive()
+            throw IllegalStateException("B30 export timed out waiting for $timeoutLabel")
+        } finally {
+            if (observer.isAlive) observer.removeOnPreDrawListener(listener)
+        }
     }
+
+    private const val VIEW_SIGNAL_TIMEOUT_MS = 10_000L
 }
