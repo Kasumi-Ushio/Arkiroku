@@ -93,6 +93,7 @@ val dataModule = module {
     single { get<AppDatabase>().syncSnapshotDao() }
     single { get<AppDatabase>().songSyncHistoryDao() }
     single { get<AppDatabase>().currentAccountDao() }
+    single { get<AppDatabase>().legacySyncHistoryDao() }
     single { SessionStateStore(createSessionStateStorage("phi_tracker_session_state")) }
     single<SessionCoordinator> { SessionCoordinatorImpl(get(), get()) }
     // Shared credential store (iOS Keychain / Android EncryptedSharedPreferences):
@@ -132,6 +133,7 @@ val dataModule = module {
             syncSnapshotDao = get(),
             songSyncHistoryDao = get(),
             currentAccountDao = get(),
+            legacySyncHistoryDao = get(),
             tokenManager = get(),
             json = get(),
             songDataProvider = get()

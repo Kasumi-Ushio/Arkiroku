@@ -1,5 +1,6 @@
 package org.kasumi321.ushio.phitracker.domain.session
 
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistoryImportResult
 import org.kasumi321.ushio.phitracker.domain.model.Server
 import org.kasumi321.ushio.phitracker.domain.model.SyncSaveResult
 import org.kasumi321.ushio.phitracker.domain.model.UserProfile
@@ -133,4 +134,10 @@ interface SessionCoordinator {
      * the inherited data simply continues under the new credential.
      */
     suspend fun resetSessionToken(): SessionResetOutcome
+
+    suspend fun importLegacySyncHistory(): Result<LegacySyncHistoryImportResult> =
+        Result.failure(UnsupportedOperationException("legacy history import is not supported"))
+
+    suspend fun discardLegacySyncHistory(): Result<Unit> =
+        Result.failure(UnsupportedOperationException("legacy history discard is not supported"))
 }

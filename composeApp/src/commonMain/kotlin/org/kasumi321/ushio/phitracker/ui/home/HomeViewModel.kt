@@ -51,6 +51,7 @@ import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
 import org.kasumi321.ushio.phitracker.domain.repository.SettingsRepository
 import org.kasumi321.ushio.phitracker.domain.session.SessionCoordinator
 import org.kasumi321.ushio.phitracker.domain.session.SessionNotLoggedInException
+import org.kasumi321.ushio.phitracker.domain.session.SessionResetOutcome
 import org.kasumi321.ushio.phitracker.domain.session.SessionTokenRejectedException
 import org.kasumi321.ushio.phitracker.domain.usecase.GetB30UseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.GetSongLevelBoundsUseCase
@@ -66,6 +67,9 @@ import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import org.kasumi321.ushio.phitracker.ui.utils.toCatalogRepairErrorText
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.settings_catalog_using_bundled
+import phitracker.composeapp.generated.resources.settings_reset_token_result_rejected
+import phitracker.composeapp.generated.resources.settings_reset_token_result_success
+import phitracker.composeapp.generated.resources.settings_reset_token_result_unknown
 import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
 import phitracker.composeapp.generated.resources.api_error_missing_fields
 import phitracker.composeapp.generated.resources.b30_tag_analysis_failed
@@ -98,6 +102,9 @@ import phitracker.composeapp.generated.resources.tools_api_summary_rank_by_posit
 import phitracker.composeapp.generated.resources.tools_api_summary_rank_by_user
 import phitracker.composeapp.generated.resources.tools_api_summary_rks_rank
 import phitracker.composeapp.generated.resources.tools_api_unknown_player
+import phitracker.composeapp.generated.resources.tools_legacy_history_discard_success
+import phitracker.composeapp.generated.resources.tools_legacy_history_import_success
+import phitracker.composeapp.generated.resources.tools_legacy_history_operation_failed
 
 data class ApiToolResult(
     val isLoading: Boolean = false,
@@ -255,6 +262,11 @@ class HomeViewModel(
         viewModelScope.launch {
             repository.observeSyncSnapshots().collect { list ->
                 updateTools { it.copy(syncSnapshots = list) }
+            }
+        }
+        viewModelScope.launch {
+            repository.observeLegacySyncHistorySummary().collect { summary ->
+                updateTools { it.copy(legacySyncHistory = summary) }
             }
         }
         viewModelScope.launch {
@@ -829,6 +841,119 @@ class HomeViewModel(
         }
     }
 
+    fun resetSessionToken() {
+        if (_uiState.value.tools.isResettingSessionToken) return
+        val generation = accountAccessGeneration
+        updateTools {
+            it.copy(isResettingSessionToken = true, sessionTokenResetMessage = null)
+        }
+        viewModelScope.launch {
+            val outcome = sessionCoordinator.resetSessionToken()
+            val accountInvalidated = outcome == SessionResetOutcome.Rejected ||
+                outcome == SessionResetOutcome.NotLoggedIn
+            if (generation != accountAccessGeneration && !accountInvalidated) return@launch
+            val message = when (outcome) {
+                is SessionResetOutcome.Success ->
+                    UiText.Res(Res.string.settings_reset_token_result_success)
+                SessionResetOutcome.OutcomeUnknown ->
+                    UiText.Res(Res.string.settings_reset_token_result_unknown)
+                SessionResetOutcome.Rejected ->
+                    UiText.Res(Res.string.settings_reset_token_result_rejected)
+                SessionResetOutcome.NotLoggedIn -> UiText.Res(Res.string.sync_login_required)
+            }
+            updateTools {
+                it.copy(isResettingSessionToken = false, sessionTokenResetMessage = message)
+            }
+        }
+    }
+
+    fun dismissSessionTokenResetMessage() {
+        updateTools { it.copy(sessionTokenResetMessage = null) }
+    }
+
+    fun importLegacySyncHistory() {
+        val tools = _uiState.value.tools
+        if (tools.legacySyncHistory == null || tools.isImportingLegacyHistory || tools.isDiscardingLegacyHistory) return
+        val generation = accountAccessGeneration
+        updateTools { it.copy(isImportingLegacyHistory = true, legacyHistoryMessage = null) }
+        viewModelScope.launch {
+            try {
+                val result = sessionCoordinator.importLegacySyncHistory()
+                if (generation != accountAccessGeneration) return@launch
+                if (result.isSuccess) {
+                    try {
+                        loadRecentEffectiveSyncHistory(expectedAccountGeneration = generation)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        AppLogger.w("Home", e) { "legacy history imported but home history refresh failed" }
+                    }
+                }
+                if (generation != accountAccessGeneration) return@launch
+                updateTools {
+                    it.copy(
+                        isImportingLegacyHistory = false,
+                        legacyHistoryMessage = if (result.isSuccess) {
+                            val imported = result.getOrThrow()
+                            UiText.Res(
+                                Res.string.tools_legacy_history_import_success,
+                                imported.importedSnapshotCount,
+                                imported.importedEntryCount
+                            )
+                        } else {
+                            UiText.Res(Res.string.tools_legacy_history_operation_failed)
+                        }
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                if (generation != accountAccessGeneration) return@launch
+                updateTools {
+                    it.copy(
+                        isImportingLegacyHistory = false,
+                        legacyHistoryMessage = UiText.Res(Res.string.tools_legacy_history_operation_failed)
+                    )
+                }
+            }
+        }
+    }
+
+    fun discardLegacySyncHistory() {
+        val tools = _uiState.value.tools
+        if (tools.legacySyncHistory == null || tools.isImportingLegacyHistory || tools.isDiscardingLegacyHistory) return
+        val generation = accountAccessGeneration
+        updateTools { it.copy(isDiscardingLegacyHistory = true, legacyHistoryMessage = null) }
+        viewModelScope.launch {
+            try {
+                val result = sessionCoordinator.discardLegacySyncHistory()
+                if (generation != accountAccessGeneration) return@launch
+                updateTools {
+                    it.copy(
+                        isDiscardingLegacyHistory = false,
+                        legacyHistoryMessage = UiText.Res(
+                            if (result.isSuccess) {
+                                Res.string.tools_legacy_history_discard_success
+                            } else {
+                                Res.string.tools_legacy_history_operation_failed
+                            }
+                        )
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                if (generation != accountAccessGeneration) return@launch
+                updateTools {
+                    it.copy(
+                        isDiscardingLegacyHistory = false,
+                        legacyHistoryMessage = UiText.Res(Res.string.tools_legacy_history_operation_failed)
+                    )
+                }
+            }
+        }
+    }
+
     private fun mapRefreshError(throwable: Throwable?): UiText? = when (throwable) {
         is SessionNotLoggedInException -> UiText.Res(Res.string.sync_login_required)
         is SessionTokenRejectedException -> UiText.Res(Res.string.sync_error_session_expired)
@@ -866,7 +991,7 @@ class HomeViewModel(
         }
     }
 
-    private suspend fun loadRecentEffectiveSyncHistory(limit: Int = 3) {
+    private suspend fun loadRecentEffectiveSyncHistory(limit: Int = 3, expectedAccountGeneration: Long? = null) {
         val songs = songDataProvider.getSongs()
         val snapshots = repository.getSyncSnapshotsOnce()
         val effectiveSnapshots = mutableListOf<Pair<SyncSnapshot, List<SongSyncHistoryEntry>>>()
@@ -898,6 +1023,7 @@ class HomeViewModel(
             )
         }
 
+        if (expectedAccountGeneration != null && expectedAccountGeneration != accountAccessGeneration) return
         updateProfile {
             // Home summary uses the first entry of the newest effective sync snapshot,
             // while the history list keeps every entry from the latest three effective snapshots.

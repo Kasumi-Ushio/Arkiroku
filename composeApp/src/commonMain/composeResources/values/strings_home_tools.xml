@@ -13,7 +13,7 @@
     <string name="tools_rks_distribution_title">RKS Distribution</string>
     <string name="tools_rks_distribution_subtitle">See how many players have a higher RKS</string>
     <string name="tools_session_token_title">sessionToken</string>
-    <string name="tools_session_token_subtitle">View and copy your current sessionToken</string>
+    <string name="tools_session_token_subtitle">View, copy, or reset your current sessionToken</string>
     <string name="tools_expand">Expand</string>
     <string name="tools_collapse">Collapse</string>
     <string name="tools_rks_formula">Formula: RKS = ((acc − 55) / 45)² × chart constant</string>
@@ -30,7 +30,7 @@
     <string name="tools_target_rks_label">Target RKS</string>
     <string name="tools_not_queried_yet">Not queried yet</string>
     <string name="tools_login_required">Please log in before using this feature</string>
-    <string name="tools_show_credentials">Show login credentials</string>
+    <string name="tools_show_session_token">Show sessionToken</string>
     <string name="tools_security_notice_title">Security Notice</string>
     <string name="tools_security_notice_message">sessionToken is your account credential. Anyone with this token can read your game save.\n\nDo not share this token with anyone you do not trust.</string>
     <string name="tools_copied_to_clipboard">Copied to clipboard</string>
@@ -57,4 +57,17 @@
     <string name="tools_api_row_target_rks">Target RKS</string>
     <string name="tools_api_row_users_above">Players above this RKS</string>
     <string name="tools_api_unknown_player">Unknown</string>
+    <string name="tools_legacy_history_title">Recover legacy sync history</string>
+    <string name="tools_legacy_history_subtitle">Review history preserved by the database upgrade</string>
+    <string name="tools_legacy_history_summary">%1$d sync snapshots and %2$d changed entries</string>
+    <string name="tools_legacy_history_time_range">Time range: %1$s – %2$s</string>
+    <string name="tools_legacy_history_import">Import to current account</string>
+    <string name="tools_legacy_history_discard">Discard legacy history</string>
+    <string name="tools_legacy_history_import_confirm_title">Import legacy history?</string>
+    <string name="tools_legacy_history_import_confirm_text">The preserved snapshots and entries will be assigned to the current account. This cannot be undone automatically.</string>
+    <string name="tools_legacy_history_discard_confirm_title">Discard legacy history?</string>
+    <string name="tools_legacy_history_discard_confirm_text">Only the preserved legacy history will be deleted. Current scores and sync history are not affected.</string>
+    <string name="tools_legacy_history_import_success">Restored %1$d snapshots and %2$d changed entries.</string>
+    <string name="tools_legacy_history_discard_success">Legacy history discarded.</string>
+    <string name="tools_legacy_history_operation_failed">The operation could not be completed. Your data is unchanged; please try again.</string>
 </resources>

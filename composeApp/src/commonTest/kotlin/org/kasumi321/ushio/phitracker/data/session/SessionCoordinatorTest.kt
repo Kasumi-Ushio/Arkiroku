@@ -16,6 +16,7 @@ import org.kasumi321.ushio.phitracker.domain.model.ChartTagSongData
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagTreeNode
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistoryImportResult
 import org.kasumi321.ushio.phitracker.domain.model.ReleaseInfo
 import org.kasumi321.ushio.phitracker.domain.model.Save
 import org.kasumi321.ushio.phitracker.domain.model.Server
@@ -286,6 +287,56 @@ class SessionCoordinatorTest {
 
         assertTrue(result.isSuccess)
         assertEquals(listOf(SyncOp("token-1", SyncMode.Refresh, expectedOwner = "P1")), repo.syncOps)
+    }
+
+    @Test
+    fun legacyHistoryOperationsUseTheBoundCurrentOwner() = runTest {
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1"
+        )
+        val session = coordinator(repo)
+
+        val imported = session.importLegacySyncHistory()
+        val discarded = session.discardLegacySyncHistory()
+
+        assertEquals(LegacySyncHistoryImportResult(4, 8), imported.getOrThrow())
+        assertTrue(discarded.isSuccess)
+        assertEquals("P1", repo.legacyImportOwner)
+        assertEquals("P1", repo.legacyDiscardOwner)
+        assertTrue(repo.storedTokens.isNotEmpty() || repo.getSessionToken() != null)
+    }
+
+    @Test
+    fun legacyHistoryOperationsRejectMissingBinding() = runTest {
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = null
+        )
+        val session = coordinator(repo)
+
+        assertIs<SessionNotLoggedInException>(session.importLegacySyncHistory().exceptionOrNull())
+        assertIs<SessionNotLoggedInException>(session.discardLegacySyncHistory().exceptionOrNull())
+        assertNull(repo.legacyImportOwner)
+        assertNull(repo.legacyDiscardOwner)
+    }
+
+    @Test
+    fun legacyHistoryOperationsFailClosedDuringPendingRecovery() = runTest {
+        val storage = FakeSecureKeyValueStorage().apply { map["reset_pending"] = "true" }
+        val repo = fake(
+            savedToken = "token-1" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1"
+        )
+        val session = coordinator(repo, storage)
+
+        assertIs<SessionNotLoggedInException>(session.importLegacySyncHistory().exceptionOrNull())
+        assertIs<SessionNotLoggedInException>(session.discardLegacySyncHistory().exceptionOrNull())
+        assertNull(repo.legacyImportOwner)
+        assertNull(repo.legacyDiscardOwner)
     }
 
     // ── logout: cancellation boundary ────────────────────────────────
@@ -1099,6 +1150,8 @@ class SessionCoordinatorTest {
         var resetCalls = 0
         var resetStorageResult: Result<Unit> = Result.success(Unit)
         var commitCompleted = false
+        var legacyImportOwner: String? = null
+        var legacyDiscardOwner: String? = null
 
         override suspend fun validateToken(sessionToken: String, server: Server): Result<UserProfile> {
             ops += Op.Validate
@@ -1202,6 +1255,16 @@ class SessionCoordinatorTest {
         ): Result<String> {
             resetCalls++
             return resetBehavior()
+        }
+
+        override suspend fun importLegacySyncHistory(expectedOwner: String): Result<LegacySyncHistoryImportResult> {
+            legacyImportOwner = expectedOwner
+            return Result.success(LegacySyncHistoryImportResult(4, 8))
+        }
+
+        override suspend fun discardLegacySyncHistory(expectedOwner: String): Result<Unit> {
+            legacyDiscardOwner = expectedOwner
+            return Result.success(Unit)
         }
 
         override suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int> = emptyMap()

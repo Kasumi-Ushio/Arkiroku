@@ -22,7 +22,7 @@ class AppDatabaseMigrationIosTest {
     }
 
     @Test
-    fun productionFactoryMigratesV4ToV5() = runTest {
+    fun productionFactoryMigratesV4ToV6AndQuarantinesHistory() = runTest {
         tearDown()
         seedV4Database()
 
@@ -35,6 +35,8 @@ class AppDatabaseMigrationIosTest {
             assertEquals(1, database.recordDao().getRecordCount("player-v4"))
             assertEquals(0, database.syncSnapshotDao().getAllOnce("player-v4").size)
             assertEquals(0, database.songSyncHistoryDao().getRecent("player-v4", 10).size)
+            assertEquals(1, database.legacySyncHistoryDao().getSnapshots().size)
+            assertEquals(1, database.legacySyncHistoryDao().getEntries().size)
             assertEquals("player-v4", database.currentAccountDao().get()?.playerId)
         } finally {
             database.close()
@@ -42,13 +44,35 @@ class AppDatabaseMigrationIosTest {
     }
 
     @Test
-    fun productionFactoryMigratesV1ToV5() = runTest {
+    fun productionFactoryMigratesV5ToV6WithoutTouchingFormalHistory() = runTest {
+        tearDown()
+        seedV5Database()
+
+        val database = createAppDatabase()
+        try {
+            assertEquals(1, database.recordDao().getRecordCount("player-v4"))
+            assertEquals(1, database.syncSnapshotDao().getAllOnce("player-v4").size)
+            assertEquals(1, database.songSyncHistoryDao().getRecent("player-v4", 10).size)
+            assertEquals(0, database.legacySyncHistoryDao().getSnapshots().size)
+            assertEquals(0, database.legacySyncHistoryDao().getEntries().size)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun productionFactoryMigratesV1ToV6() = runTest {
         assertV3SchemaMigrates(version = 1)
     }
 
     @Test
-    fun productionFactoryMigratesV2ToV5() = runTest {
+    fun productionFactoryMigratesV2ToV6() = runTest {
         assertV3SchemaMigrates(version = 2)
+    }
+
+    @Test
+    fun productionFactoryMigratesV3ToV6() = runTest {
+        assertV3SchemaMigrates(version = 3)
     }
 
     private suspend fun assertV3SchemaMigrates(version: Int) {
@@ -63,6 +87,8 @@ class AppDatabaseMigrationIosTest {
             assertEquals(1, database.recordDao().getRecordCount("player-c"))
             assertEquals(0, database.syncSnapshotDao().getAllOnce("player-c").size)
             assertEquals(0, database.songSyncHistoryDao().getRecent("player-c", 10).size)
+            assertEquals(3L, database.legacySyncHistoryDao().getSnapshots().single().id)
+            assertEquals(9L, database.legacySyncHistoryDao().getEntries().single().id)
             assertEquals("player-c", database.currentAccountDao().get()?.playerId)
         } finally {
             database.close()
@@ -143,6 +169,15 @@ class AppDatabaseMigrationIosTest {
         connection.execSQL("INSERT INTO sync_snapshots VALUES (4, 'player-v4', 4, 15.0, 'V4', 1, NULL, NULL, NULL, NULL)")
         connection.execSQL("INSERT INTO song_sync_history VALUES (9, 'player-v4', 4, 'song-v4.0', 'IN', 950000, 95.0, 1, 4)")
         connection.execSQL("INSERT INTO current_account VALUES ('player-v4')")
+        connection.close()
+    }
+
+    private fun seedV5Database() {
+        seedV4Database()
+        val connection = BundledSQLiteDriver().open(path)
+        connection.execSQL("ALTER TABLE `users` ADD COLUMN `moneyString` TEXT NOT NULL DEFAULT ''")
+        connection.execSQL("ALTER TABLE `users` ADD COLUMN `avatarUri` TEXT DEFAULT NULL")
+        connection.execSQL("PRAGMA user_version = 5")
         connection.close()
     }
 }

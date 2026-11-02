@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -85,6 +84,7 @@ import org.kasumi321.ushio.phitracker.domain.model.CollectibleChapter
 import org.kasumi321.ushio.phitracker.domain.model.CollectibleCovers
 import org.kasumi321.ushio.phitracker.domain.model.CollectibleItem
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.home.IndexSearchField
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.collectible_category_bold
@@ -102,6 +102,7 @@ import phitracker.composeapp.generated.resources.collectibles_filter_title
 import phitracker.composeapp.generated.resources.collectibles_group_item_count
 import phitracker.composeapp.generated.resources.collectibles_part_count
 import phitracker.composeapp.generated.resources.collectibles_poster_count
+import phitracker.composeapp.generated.resources.collectibles_search_placeholder
 import phitracker.composeapp.generated.resources.collectibles_select_chapters_title
 import phitracker.composeapp.generated.resources.collectibles_update_now
 import phitracker.composeapp.generated.resources.songs_action_done
@@ -143,8 +144,8 @@ internal fun useSplitChapterPane(isExpandedPane: Boolean, availableWidth: Dp): B
  *    hoisted drill-down state;
  *  - searching/filtering: the flat chapter-grouped results list, so matches
  *    stay directly visible.
- * Mirrors SongsTab's layout contract (search/filter open from the FAB panel
- * below the floating header) and its update-banner pattern. No Haze here —
+ * Mirrors SongsTab's layout contract (the FAB opens a combined search/filter
+ * sheet) and its update-banner pattern. No Haze here —
  * cards and sheets stay plain per the project glass rules.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
@@ -156,6 +157,7 @@ fun CollectiblesTab(
     onToggleCategory: (CollectibleCategory) -> Unit,
     onClearChapters: () -> Unit,
     onToggleFilterSheet: (Boolean) -> Unit,
+    onSearch: (String) -> Unit,
     onResetFilters: () -> Unit,
     onUpdateNow: () -> Unit,
     getCoverUrl: (String) -> String?,
@@ -407,6 +409,8 @@ fun CollectiblesTab(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             CollectibleFilterSheetContent(
+                query = state.searchQuery,
+                onSearch = onSearch,
                 chapters = state.chapters,
                 selectedChapters = state.selectedChapters,
                 onToggleChapter = onToggleChapter,
@@ -852,6 +856,8 @@ internal fun collectibleCategoryLabel(category: CollectibleCategory): String = w
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CollectibleFilterSheetContent(
+    query: String,
+    onSearch: (String) -> Unit,
     chapters: List<CollectibleChapter>,
     selectedChapters: Set<String>,
     onToggleChapter: (String) -> Unit,
@@ -891,17 +897,29 @@ private fun CollectibleFilterSheetContent(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        IndexSearchField(
+            query = query,
+            placeholder = stringResource(Res.string.collectibles_search_placeholder),
+            onQueryChange = onSearch
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
             stringResource(Res.string.collectibles_filter_category_label),
             style = MaterialTheme.typography.titleMedium
         )
         Spacer(modifier = Modifier.height(6.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(CollectibleCategory.entries) { category ->
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            CollectibleCategory.entries.forEach { category ->
                 FilterChip(
                     selected = category in selectedCategories,
                     onClick = { onToggleCategory(category) },
-                    label = { Text(collectibleCategoryLabel(category)) }
+                    label = { Text(collectibleCategoryLabel(category)) },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

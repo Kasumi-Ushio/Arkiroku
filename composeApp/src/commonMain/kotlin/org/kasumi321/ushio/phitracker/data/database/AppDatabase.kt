@@ -14,9 +14,11 @@ import androidx.sqlite.execSQL
         UserEntity::class,
         SyncSnapshotEntity::class,
         SongSyncHistoryEntity::class,
-        CurrentAccountEntity::class
+        CurrentAccountEntity::class,
+        LegacySyncSnapshotEntity::class,
+        LegacySongSyncHistoryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @ConstructedBy(AppDatabaseConstructor::class)
@@ -26,6 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun syncSnapshotDao(): SyncSnapshotDao
     abstract fun songSyncHistoryDao(): SongSyncHistoryDao
     abstract fun currentAccountDao(): CurrentAccountDao
+    abstract fun legacySyncHistoryDao(): LegacySyncHistoryDao
 
     companion object {
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -64,21 +67,9 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * v3 → v4: scope records / sync snapshots / per-song history to the
-         * account that owns them (ownerPlayerId == TapTap objectId) and add the
-         * single-row `current_account` pointer.
-         *
-         * Attribution of pre-v4 (single-account) rows, by users-table shape:
-         * - users empty: every remaining data row is an orphan left by the old
-         *   clearData() (it never removed snapshots/history) — drop them all.
-         * - exactly one user row: records belong to that playerId; legacy
-         *   snapshots/history are still dropped because earlier logout and
-         *   account-switch paths could leave another account's rows mixed in.
-         * - two or more user rows (artifacts of the old REPLACE-upsert bug):
-         *   records were replaced wholesale on every commit, so they belong to
-         *   the LAST synced account — the users row with the greatest
-         *   lastSyncAt (ties broken by playerId for determinism); stale user
-         *   rows and all un-attributable snapshots/history are dropped.
+         * Records retain the legacy last-synced-account attribution. Historical
+         * rows have no reliable owner, so they move to quarantine instead of
+         * being assigned to an arbitrary account or destroyed.
          */
         val MIGRATION_3_4: Migration = object : Migration(3, 4) {
             override fun migrate(connection: SQLiteConnection) {
@@ -144,6 +135,23 @@ abstract class AppDatabase : RoomDatabase() {
                         `timestamp` INTEGER NOT NULL
                     )
                 """.trimIndent())
+                createLegacyHistoryTables(connection)
+                connection.execSQL("""
+                    INSERT INTO `legacy_sync_snapshots` (
+                        `id`, `timestamp`, `rks`, `nickname`, `dataCount`,
+                        `lastSyncedSongId`, `lastSyncedDifficulty`, `lastSyncedScore`, `lastSyncedAccuracy`
+                    )
+                    SELECT `id`, `timestamp`, `rks`, `nickname`, `dataCount`,
+                        `lastSyncedSongId`, `lastSyncedDifficulty`, `lastSyncedScore`, `lastSyncedAccuracy`
+                    FROM `sync_snapshots`
+                """.trimIndent())
+                connection.execSQL("""
+                    INSERT INTO `legacy_song_sync_history` (
+                        `id`, `snapshotId`, `songId`, `difficulty`, `score`, `accuracy`, `isFullCombo`, `timestamp`
+                    )
+                    SELECT `id`, `snapshotId`, `songId`, `difficulty`, `score`, `accuracy`, `isFullCombo`, `timestamp`
+                    FROM `song_sync_history`
+                """.trimIndent())
                 connection.execSQL("DROP TABLE IF EXISTS `sync_snapshots`")
                 connection.execSQL("ALTER TABLE `sync_snapshots_v4` RENAME TO `sync_snapshots`")
                 connection.execSQL("DROP TABLE IF EXISTS `song_sync_history`")
@@ -172,9 +180,61 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE `users` ADD COLUMN `moneyString` TEXT NOT NULL DEFAULT ''")
                 connection.execSQL("ALTER TABLE `users` ADD COLUMN `avatarUri` TEXT DEFAULT NULL")
+                createLegacyHistoryTables(connection)
+                connection.execSQL("""
+                    INSERT INTO `legacy_sync_snapshots` (
+                        `id`, `timestamp`, `rks`, `nickname`, `dataCount`,
+                        `lastSyncedSongId`, `lastSyncedDifficulty`, `lastSyncedScore`, `lastSyncedAccuracy`
+                    )
+                    SELECT `id`, `timestamp`, `rks`, `nickname`, `dataCount`,
+                        `lastSyncedSongId`, `lastSyncedDifficulty`, `lastSyncedScore`, `lastSyncedAccuracy`
+                    FROM `sync_snapshots`
+                """.trimIndent())
+                connection.execSQL("""
+                    INSERT INTO `legacy_song_sync_history` (
+                        `id`, `snapshotId`, `songId`, `difficulty`, `score`, `accuracy`, `isFullCombo`, `timestamp`
+                    )
+                    SELECT `id`, `snapshotId`, `songId`, `difficulty`, `score`, `accuracy`, `isFullCombo`, `timestamp`
+                    FROM `song_sync_history`
+                """.trimIndent())
                 connection.execSQL("DELETE FROM `sync_snapshots`")
                 connection.execSQL("DELETE FROM `song_sync_history`")
             }
+        }
+
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(connection: SQLiteConnection) {
+                createLegacyHistoryTables(connection)
+            }
+        }
+
+        private fun createLegacyHistoryTables(connection: SQLiteConnection) {
+            connection.execSQL("""
+                CREATE TABLE IF NOT EXISTS `legacy_sync_snapshots` (
+                    `id` INTEGER PRIMARY KEY NOT NULL,
+                    `timestamp` INTEGER NOT NULL,
+                    `rks` REAL NOT NULL,
+                    `nickname` TEXT NOT NULL,
+                    `dataCount` INTEGER NOT NULL,
+                    `lastSyncedSongId` TEXT,
+                    `lastSyncedDifficulty` TEXT,
+                    `lastSyncedScore` INTEGER,
+                    `lastSyncedAccuracy` REAL
+                )
+            """.trimIndent())
+            connection.execSQL("""
+                CREATE TABLE IF NOT EXISTS `legacy_song_sync_history` (
+                    `id` INTEGER PRIMARY KEY NOT NULL,
+                    `snapshotId` INTEGER NOT NULL,
+                    `songId` TEXT NOT NULL,
+                    `difficulty` TEXT NOT NULL,
+                    `score` INTEGER NOT NULL,
+                    `accuracy` REAL NOT NULL,
+                    `isFullCombo` INTEGER NOT NULL,
+                    `timestamp` INTEGER NOT NULL
+                )
+            """.trimIndent())
+            connection.execSQL("CREATE INDEX IF NOT EXISTS `index_legacy_song_sync_history_snapshotId` ON `legacy_song_sync_history` (`snapshotId`)")
         }
     }
 }

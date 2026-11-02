@@ -5,6 +5,7 @@ import org.kasumi321.ushio.phitracker.domain.model.B30TagAnalysis
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistorySummary
 import org.kasumi321.ushio.phitracker.domain.model.SongInfo
 import org.kasumi321.ushio.phitracker.domain.model.SyncSnapshot
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerThemeSettings
@@ -36,7 +37,13 @@ internal fun HomeUiState.withoutAccountAccess(): HomeUiState = copy(
         apiHistorySnapshots = emptyList(),
         apiRankByUser = ApiToolResult(),
         apiRankByPosition = ApiToolResult(),
-        apiRksRankResult = ApiToolResult()
+        apiRksRankResult = ApiToolResult(),
+        legacySyncHistory = null,
+        isImportingLegacyHistory = false,
+        isDiscardingLegacyHistory = false,
+        legacyHistoryMessage = null,
+        isResettingSessionToken = false,
+        sessionTokenResetMessage = null
     )
 )
 
@@ -120,7 +127,13 @@ data class ToolsUiState(
     val apiHistorySnapshots: List<SyncSnapshot> = emptyList(),
     val apiRankByUser: ApiToolResult = ApiToolResult(),
     val apiRankByPosition: ApiToolResult = ApiToolResult(),
-    val apiRksRankResult: ApiToolResult = ApiToolResult()
+    val apiRksRankResult: ApiToolResult = ApiToolResult(),
+    val legacySyncHistory: LegacySyncHistorySummary? = null,
+    val isImportingLegacyHistory: Boolean = false,
+    val isDiscardingLegacyHistory: Boolean = false,
+    val legacyHistoryMessage: UiText? = null,
+    val isResettingSessionToken: Boolean = false,
+    val sessionTokenResetMessage: UiText? = null
 )
 
 data class SyncUiState(

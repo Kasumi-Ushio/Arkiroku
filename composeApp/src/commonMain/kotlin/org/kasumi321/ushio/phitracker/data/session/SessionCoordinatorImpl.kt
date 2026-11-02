@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistoryImportResult
 import org.kasumi321.ushio.phitracker.domain.model.Server
 import org.kasumi321.ushio.phitracker.domain.model.SyncMode
 import org.kasumi321.ushio.phitracker.domain.model.SyncSaveResult
@@ -336,6 +337,55 @@ class SessionCoordinatorImpl(
         }
         AppLogger.event("session", "session_token_reset", mapOf("result" to "success"))
         SessionResetOutcome.Success(owner)
+    }
+
+    override suspend fun importLegacySyncHistory(): Result<LegacySyncHistoryImportResult> =
+        runSessionOperation {
+            try {
+                val owner = requireLegacyHistoryOwner()
+                repository.importLegacySyncHistory(owner).also { result ->
+                    result.getOrNull()?.let { imported ->
+                        AppLogger.event(
+                            "session",
+                            "legacy_history_imported",
+                            mapOf(
+                                "snapshots" to imported.importedSnapshotCount.toString(),
+                                "entries" to imported.importedEntryCount.toString()
+                            )
+                        )
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    override suspend fun discardLegacySyncHistory(): Result<Unit> = runSessionOperation {
+        try {
+            val owner = requireLegacyHistoryOwner()
+            repository.discardLegacySyncHistory(owner).also { result ->
+                if (result.isSuccess) AppLogger.event("session", "legacy_history_discarded")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun requireLegacyHistoryOwner(): String {
+        stateStore.retryUnresolvedLegacyRecovery()
+        if (stateStore.hasUnresolvedLegacyRecovery) throw SessionRecoveryUnresolvedException()
+        if (stateStore.isResetPending || stateStore.isLogoutPending || stateStore.isLoginRequired) {
+            throw SessionNotLoggedInException()
+        }
+        recoverPendingLogin()
+        if (repository.getSessionToken() == null) throw SessionNotLoggedInException()
+        val owner = repository.getCurrentAccountOwner() ?: throw SessionNotLoggedInException()
+        if (repository.getBoundPlayerId() != owner) throw SessionNotLoggedInException()
+        return owner
     }
 
     private suspend fun recoverForResume(): Boolean {

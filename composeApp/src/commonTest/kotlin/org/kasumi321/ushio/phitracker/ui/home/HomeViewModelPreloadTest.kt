@@ -46,6 +46,8 @@ import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagSongData
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagTreeNode
 import org.kasumi321.ushio.phitracker.domain.model.LevelRecord
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistoryImportResult
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistorySummary
 import org.kasumi321.ushio.phitracker.domain.model.Save
 import org.kasumi321.ushio.phitracker.domain.model.Server
 import org.kasumi321.ushio.phitracker.domain.model.SyncMode
@@ -86,6 +88,7 @@ import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.b30_tag_analysis_failed
 import phitracker.composeapp.generated.resources.catalog_update_error_network_message
 import phitracker.composeapp.generated.resources.songs_preload_partial_failed
+import phitracker.composeapp.generated.resources.settings_reset_token_result_unknown
 import phitracker.composeapp.generated.resources.tools_api_query_failed
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -895,6 +898,58 @@ class HomeViewModelPreloadTest {
         assertTrue(viewModel.uiState.value.b30.b30.isNotEmpty())
         assertEquals(1, repository.b30ChartTagRequests.size)
         assertEquals(UiText.Res(Res.string.b30_tag_analysis_failed), viewModel.uiState.value.b30.tagAnalysis.error)
+    }
+
+    @Test
+    fun legacyHistorySummaryAndImportConvergeToolsState(): Unit = runTest(dispatcher) {
+        val summary = LegacySyncHistorySummary(4, 8, 10, 20)
+        val legacySummary = MutableStateFlow<LegacySyncHistorySummary?>(summary)
+        val repository = object : FakePhigrosRepository() {
+            var importCalls = 0
+
+            override fun observeLegacySyncHistorySummary(): Flow<LegacySyncHistorySummary?> = legacySummary
+            override suspend fun getBoundPlayerId(): String = "test-owner"
+            override suspend fun importLegacySyncHistory(expectedOwner: String): Result<LegacySyncHistoryImportResult> {
+                importCalls++
+                legacySummary.value = null
+                return Result.success(LegacySyncHistoryImportResult(4, 8))
+            }
+        }
+        val settings = FakeSettingsRepository(preloadDone = true, autoCheckUpdate = false)
+        val viewModel = createViewModel(settings, repository = repository)
+        advanceUntilIdle()
+
+        assertEquals(summary, viewModel.uiState.value.tools.legacySyncHistory)
+
+        viewModel.importLegacySyncHistory()
+        advanceUntilIdle()
+
+        assertEquals(1, repository.importCalls)
+        assertNull(viewModel.uiState.value.tools.legacySyncHistory)
+        assertFalse(viewModel.uiState.value.tools.isImportingLegacyHistory)
+        assertNotNull(viewModel.uiState.value.tools.legacyHistoryMessage)
+
+        viewModel.importLegacySyncHistory()
+        advanceUntilIdle()
+        assertEquals(1, repository.importCalls)
+    }
+
+    @Test
+    fun sessionTokenResetResultIsShownFromToolsAndCanBeDismissed(): Unit = runTest(dispatcher) {
+        val viewModel = createViewModel(FakeSettingsRepository(preloadDone = true))
+        advanceUntilIdle()
+
+        viewModel.resetSessionToken()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.tools.isResettingSessionToken)
+        assertEquals(
+            UiText.Res(Res.string.settings_reset_token_result_unknown),
+            viewModel.uiState.value.tools.sessionTokenResetMessage
+        )
+
+        viewModel.dismissSessionTokenResetMessage()
+        assertNull(viewModel.uiState.value.tools.sessionTokenResetMessage)
     }
 
     /**

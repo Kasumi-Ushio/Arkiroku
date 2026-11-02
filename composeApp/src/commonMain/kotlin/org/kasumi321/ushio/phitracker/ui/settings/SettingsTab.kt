@@ -152,12 +152,9 @@ import phitracker.composeapp.generated.resources.settings_logout
 import phitracker.composeapp.generated.resources.settings_logout_confirm
 import phitracker.composeapp.generated.resources.settings_logout_dialog_text
 import phitracker.composeapp.generated.resources.settings_reset_pending_update
-import phitracker.composeapp.generated.resources.settings_reset_pending_update_desc
 import phitracker.composeapp.generated.resources.settings_reset_pending_update_dialog_text
-import phitracker.composeapp.generated.resources.settings_reset_token
-import phitracker.composeapp.generated.resources.settings_reset_token_confirm
-import phitracker.composeapp.generated.resources.settings_reset_token_desc
-import phitracker.composeapp.generated.resources.settings_reset_token_dialog_text
+import phitracker.composeapp.generated.resources.settings_catalog_management
+import phitracker.composeapp.generated.resources.settings_catalog_management_desc
 import phitracker.composeapp.generated.resources.settings_no_crash_log
 import phitracker.composeapp.generated.resources.settings_no_crash_log_title
 import phitracker.composeapp.generated.resources.settings_no_runtime_log
@@ -193,7 +190,6 @@ import phitracker.composeapp.generated.resources.settings_update_no_new_songs
 import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
 import phitracker.composeapp.generated.resources.settings_update_preparing
 import phitracker.composeapp.generated.resources.settings_update_song_data
-import phitracker.composeapp.generated.resources.settings_update_song_data_desc
 import phitracker.composeapp.generated.resources.settings_use_api_data
 import phitracker.composeapp.generated.resources.settings_use_api_data_desc
 import phitracker.composeapp.generated.resources.login_reset_local_session
@@ -232,10 +228,6 @@ fun SettingsTab(
         onRedownloadIllustrations: () -> Unit,
         onNavigateToAbout: () -> Unit,
         onLogout: () -> Unit,
-        isResettingSessionToken: Boolean = false,
-        sessionTokenResetMessage: UiText? = null,
-        onResetSessionToken: () -> Unit = {},
-        onDismissSessionTokenResetMessage: () -> Unit = {},
         isResettingLocalSession: Boolean = false,
         localSessionResetMessage: UiText? = null,
         onResetLocalSession: () -> Unit = {},
@@ -310,7 +302,7 @@ fun SettingsTab(
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showLocalSessionResetDialog by remember { mutableStateOf(false) }
-    var showResetTokenDialog by remember { mutableStateOf(false) }
+    var showCatalogManagementDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showRedownloadDialog by remember { mutableStateOf(false) }
     var showApiRiskDialog by remember { mutableStateOf(false) }
@@ -972,10 +964,10 @@ fun SettingsTab(
                 )
 
                 CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_update_song_data)) },
+                        headlineContent = { Text(stringResource(Res.string.settings_catalog_management)) },
                         supportingContent = {
                             Column {
-                                Text(stringResource(Res.string.settings_update_song_data_desc))
+                                Text(stringResource(Res.string.settings_catalog_management_desc))
                                 if (catalogDegraded) {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
@@ -995,19 +987,39 @@ fun SettingsTab(
                         leadingContent = {
                             Icon(Icons.Default.CloudDownload, contentDescription = null)
                         },
-                        modifier = Modifier.clickable { showUpdateDataDialog = true }
-                )
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_reset_pending_update)) },
-                        supportingContent = { Text(stringResource(Res.string.settings_reset_pending_update_desc)) },
-                        leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
-                        modifier = Modifier.clickable { showResetPendingDialog = true }
+                        modifier = Modifier.clickable { showCatalogManagementDialog = true }
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
                 CategoryTitle(stringResource(Res.string.settings_category_diagnostics))
+
+                CenteredListItem(
+                        headlineContent = { Text(stringResource(Res.string.login_reset_local_session)) },
+                        supportingContent = {
+                            Text(stringResource(Res.string.login_reset_local_session_dialog_text))
+                        },
+                        leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                        trailingContent = {
+                            if (isResettingLocalSession) {
+                                CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                )
+                            }
+                        },
+                        modifier = Modifier.clickable(enabled = !isResettingLocalSession) {
+                            showLocalSessionResetDialog = true
+                        }
+                )
+                localSessionResetMessage?.let { message ->
+                    Text(
+                            text = message.asString(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
 
                 CenteredListItem(
                         headlineContent = {
@@ -1203,67 +1215,6 @@ fun SettingsTab(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_reset_token)) },
-                        supportingContent = { Text(stringResource(Res.string.settings_reset_token_desc)) },
-                        leadingContent = { Icon(Icons.Default.VpnKey, contentDescription = null) },
-                        trailingContent = {
-                            if (isResettingSessionToken) {
-                                CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                )
-                            }
-                        },
-                        modifier =
-                                Modifier.clickable(enabled = !isResettingSessionToken) {
-                                    showResetTokenDialog = true
-                                }
-                )
-                sessionTokenResetMessage?.let { message ->
-                    Text(
-                            text = message.asString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier =
-                                    Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp)
-                                            .clickable { onDismissSessionTokenResetMessage() }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.login_reset_local_session)) },
-                        supportingContent = {
-                            Text(stringResource(Res.string.login_reset_local_session_dialog_text))
-                        },
-                        leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
-                        trailingContent = {
-                            if (isResettingLocalSession) {
-                                CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                )
-                            }
-                        },
-                        modifier = Modifier.clickable(enabled = !isResettingLocalSession) {
-                            showLocalSessionResetDialog = true
-                        }
-                )
-                localSessionResetMessage?.let { message ->
-                    Text(
-                            text = message.asString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
                 OutlinedButton(
                         onClick = { showLogoutDialog = true },
                         modifier = Modifier.fillMaxWidth(),
@@ -1276,30 +1227,6 @@ fun SettingsTab(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
-    }
-
-    if (showResetTokenDialog) {
-        AnimatedAlertDialog(
-                onDismissRequest = { showResetTokenDialog = false },
-                icon = { Icon(Icons.Default.VpnKey, contentDescription = null) },
-                title = { Text(stringResource(Res.string.settings_reset_token)) },
-                text = {
-                    Text(stringResource(Res.string.settings_reset_token_dialog_text))
-                },
-                confirmButton = {
-                    TextButton(
-                            onClick = {
-                                showResetTokenDialog = false
-                                onResetSessionToken()
-                            }
-                    ) { Text(stringResource(Res.string.settings_reset_token_confirm)) }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showResetTokenDialog = false }) {
-                        Text(stringResource(Res.string.settings_cancel))
-                    }
-                }
-        )
     }
 
     if (showLocalSessionResetDialog) {
@@ -1540,6 +1467,62 @@ fun SettingsTab(
                 },
                 dismissButton = {
                     TextButton(onClick = { showRedownloadDialog = false }) {
+                        Text(stringResource(Res.string.settings_cancel))
+                    }
+                }
+        )
+    }
+
+    if (showCatalogManagementDialog) {
+        AnimatedAlertDialog(
+                onDismissRequest = { showCatalogManagementDialog = false },
+                title = { Text(stringResource(Res.string.settings_catalog_management)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(Res.string.settings_catalog_management_desc))
+                        Text(
+                                stringResource(
+                                        Res.string.settings_collectible_data_version,
+                                        collectibleDataVersion.ifBlank { "—" }
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (catalogDegraded) {
+                            Text(
+                                    text = stringResource(Res.string.settings_catalog_using_bundled),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        OutlinedButton(
+                                onClick = {
+                                    showCatalogManagementDialog = false
+                                    showUpdateDataDialog = true
+                                },
+                                enabled = !isUpdatingData,
+                                modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(Res.string.settings_update_song_data))
+                        }
+                        OutlinedButton(
+                                onClick = {
+                                    showCatalogManagementDialog = false
+                                    showResetPendingDialog = true
+                                },
+                                enabled = !isUpdatingData,
+                                modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(Res.string.settings_reset_pending_update))
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showCatalogManagementDialog = false }) {
                         Text(stringResource(Res.string.settings_cancel))
                     }
                 }

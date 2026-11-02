@@ -1,14 +1,5 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,13 +73,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,8 +86,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -108,7 +94,6 @@ import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.action_settings
 import phitracker.composeapp.generated.resources.action_sync
 import phitracker.composeapp.generated.resources.collectibles_all_items_count
-import phitracker.composeapp.generated.resources.collectibles_search_placeholder
 import phitracker.composeapp.generated.resources.collectibles_subtab_collectibles
 import phitracker.composeapp.generated.resources.collectibles_subtab_songs
 import phitracker.composeapp.generated.resources.home_tab_index
@@ -125,7 +110,6 @@ import phitracker.composeapp.generated.resources.preload_dialog_title
 import phitracker.composeapp.generated.resources.profile_avatar
 import phitracker.composeapp.generated.resources.profile_set_avatar
 import phitracker.composeapp.generated.resources.songs_all_songs_count
-import phitracker.composeapp.generated.resources.songs_search_placeholder
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.platform.rememberAvatarPicker
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
@@ -625,8 +609,8 @@ fun MainScreen(
 
     // The two Index sub-tabs keep independent list/grid scroll state so
     // switching between them restores each position. The header shrinks while
-    // the active list is scrolled away from the top; search itself lives in
-    // the FAB-opened panel below.
+    // the active list is scrolled away from the top; the FAB opens the
+    // combined search/filter sheet.
     val songsListState = rememberLazyListState()
     val songsGridState = rememberLazyGridState()
     val songsUseGrid = windowSizeClass.isAtLeastMedium()
@@ -894,49 +878,15 @@ fun MainScreen(
                 onRetryTagAnalysis = { viewModel.retryTagAnalysis() }
             )
             HomeTab.Index -> {
-                // The sub-tabs live in the header's slot; the lists consume
-                // the scaffold padding exactly like the other tabs. Search is
-                // a FAB-opened layer inside this content area (the left pane
-                // on the two-pane layout), so it never covers the detail pane.
-                var indexSearchExpanded by rememberSaveable { mutableStateOf(false) }
-                // The panel samples a tab-local source placed on the Index
-                // pager, not the home scaffold's shared HazeState: that source
-                // is an ancestor of this panel, and Haze forbids an effect from
-                // drawing an ancestor source. The pager is a sibling of the
-                // panel, so the panel can sample it safely.
-                val searchHazeState = rememberHazeState()
-                val focusManager = LocalFocusManager.current
                 val indexSubTabName = if (indexShowsCollectibles) "collectibles" else "songs"
-                val indexSearchQuery = if (indexShowsCollectibles) {
-                    collectiblesState.searchQuery
-                } else {
-                    state.songs.searchQuery
-                }
-                // The panel floats above the list rather than occupying layout
-                // space: opening it must not shift the list content, and the
-                // top items being covered while it is open is intentional.
                 val indexContentPadding = PaddingValues(
                     top = contentPadding.calculateTopPadding(),
-                    // Keep the last item clear of the FAB (it is hidden while
-                    // the panel is open; the extra room is harmless then).
                     bottom = contentPadding.calculateBottomPadding() + 72.dp
                 )
-                val closeIndexSearch = {
-                    // Drop focus before removing the field so the IME hides.
-                    focusManager.clearFocus()
-                    indexSearchExpanded = false
-                    AppLogger.event(
-                        "navigation",
-                        "index_search_closed",
-                        mapOf("subtab" to indexSubTabName)
-                    )
-                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = indexPagerState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .hazeSource(state = searchHazeState)
+                        modifier = Modifier.fillMaxSize()
                     ) { page ->
                         when (IndexSubTab.entries[page]) {
                             IndexSubTab.Songs -> {
@@ -952,6 +902,7 @@ fun MainScreen(
                                         onDifficultySelect = { viewModel.filterByDifficulty(it) },
                                         onLevelRangeSelect = { min, max -> viewModel.filterByLevelRange(min, max) },
                                         onToggleFilterSheet = { viewModel.toggleFilterSheet(it) },
+                                        onSearch = viewModel::searchSongs,
                                         onResetFilters = { viewModel.resetFilters() },
                                         onRefreshSongData = { viewModel.refreshSongData() },
                                         getIllustrationUrl = { viewModel.getLowIllustrationUrl(it) },
@@ -976,6 +927,7 @@ fun MainScreen(
                                         onToggleCategory = { collectiblesViewModel.toggleCategory(it) },
                                         onClearChapters = { collectiblesViewModel.resetFilters() },
                                         onToggleFilterSheet = { collectiblesViewModel.toggleFilterSheet(it) },
+                                        onSearch = collectiblesViewModel::search,
                                         onResetFilters = { collectiblesViewModel.resetFilters() },
                                         onUpdateNow = { viewModel.refreshSongData() },
                                         getCoverUrl = collectiblesViewModel::getCoverUrl,
@@ -1053,89 +1005,33 @@ fun MainScreen(
                         )
                     }
 
-                    AnimatedVisibility(
-                        visible = indexSearchExpanded,
-                        enter = if (reducedMotionEnabled) {
-                            EnterTransition.None
+                    IndexSearchFab(
+                        activeFilterCount = (if (indexShowsCollectibles) {
+                            collectiblesActiveFilterCount +
+                                if (collectiblesState.searchQuery.isNotBlank()) 1 else 0
                         } else {
-                            fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-                                scaleIn(
-                                    initialScale = 0.85f,
-                                    transformOrigin = TransformOrigin(0.5f, 0.5f),
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
-                        },
-                        exit = if (reducedMotionEnabled) {
-                            ExitTransition.None
-                        } else {
-                            fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) +
-                                scaleOut(
-                                    targetScale = 0.85f,
-                                    transformOrigin = TransformOrigin(0.5f, 0.5f),
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
+                            songsActiveFilterCount + if (state.songs.searchQuery.isNotBlank()) 1 else 0
+                        }),
+                        onClick = {
+                            if (indexShowsCollectibles) {
+                                collectiblesViewModel.toggleFilterSheet(true)
+                            } else {
+                                viewModel.toggleFilterSheet(true)
+                            }
+                            AppLogger.event(
+                                "navigation",
+                                "index_search_opened",
+                                mapOf("subtab" to indexSubTabName)
+                            )
                         },
                         modifier = Modifier
-                            .align(Alignment.TopCenter)
+                            .align(Alignment.BottomEnd)
                             .padding(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = contentPadding.calculateTopPadding() + 8.dp
+                                end = 16.dp,
+                                bottom = contentPadding.calculateBottomPadding() + 16.dp
                             )
-                    ) {
-                        IndexSearchPanel(
-                            hazeState = searchHazeState,
-                            query = indexSearchQuery,
-                            placeholder = if (indexShowsCollectibles) {
-                                stringResource(Res.string.collectibles_search_placeholder)
-                            } else {
-                                stringResource(Res.string.songs_search_placeholder)
-                            },
-                            activeFilterCount = if (indexShowsCollectibles) {
-                                collectiblesActiveFilterCount
-                            } else {
-                                songsActiveFilterCount
-                            },
-                            onQueryChange = {
-                                if (indexShowsCollectibles) {
-                                    collectiblesViewModel.search(it)
-                                } else {
-                                    viewModel.searchSongs(it)
-                                }
-                            },
-                            onOpenFilter = {
-                                if (indexShowsCollectibles) {
-                                    collectiblesViewModel.toggleFilterSheet(true)
-                                } else {
-                                    viewModel.toggleFilterSheet(true)
-                                }
-                            },
-                            onClose = closeIndexSearch
-                        )
-                    }
-                    if (!indexSearchExpanded) {
-                        IndexSearchFab(
-                            active = indexSearchQuery.isNotEmpty(),
-                            onClick = {
-                                indexSearchExpanded = true
-                                AppLogger.event(
-                                    "navigation",
-                                    "index_search_opened",
-                                    mapOf("subtab" to indexSubTabName)
-                                )
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(
-                                    end = 16.dp,
-                                    bottom = contentPadding.calculateBottomPadding() + 16.dp
-                                )
-                        )
-                    }
+                    )
                 }
-                // Composed after the pager/chapter BackHandler so an open
-                // search panel consumes back first.
-                BackHandler(enabled = indexSearchExpanded) { closeIndexSearch() }
             }
             HomeTab.Tools -> ToolsTab(
                 state = state.tools,
@@ -1145,6 +1041,10 @@ fun MainScreen(
                 onFetchRankByUser = { viewModel.fetchApiRankByUser() },
                 onFetchRankByPosition = { viewModel.fetchApiRankByPosition(it) },
                 onFetchRksRank = { viewModel.fetchApiRksRankForValue(it) },
+                onResetSessionToken = viewModel::resetSessionToken,
+                onDismissSessionTokenResetMessage = viewModel::dismissSessionTokenResetMessage,
+                onImportLegacyHistory = viewModel::importLegacySyncHistory,
+                onDiscardLegacyHistory = viewModel::discardLegacySyncHistory,
                 contentPadding = contentPadding,
                 scrollState = toolsScrollState
             )

@@ -9,7 +9,7 @@
     <string name="collectibles_part_count">%1$d parts</string>
     <string name="collectibles_data_update_available">Index data update available</string>
     <string name="collectibles_update_now">Update now</string>
-    <string name="collectibles_filter_title">Filter Collectibles</string>
+    <string name="collectibles_filter_title">Search Collectibles</string>
     <string name="collectibles_filter_category_label">Category</string>
     <string name="collectibles_filter_chapter_label">Chapter</string>
     <string name="collectibles_chapters_selected_count">%1$d selected</string>

@@ -29,6 +29,8 @@ import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
 import org.kasumi321.ushio.phitracker.data.database.CurrentAccountEntity
+import org.kasumi321.ushio.phitracker.data.database.LegacySongSyncHistoryEntity
+import org.kasumi321.ushio.phitracker.data.database.LegacySyncSnapshotEntity
 import org.kasumi321.ushio.phitracker.data.database.RecordEntity
 import org.kasumi321.ushio.phitracker.data.database.UserEntity
 import org.kasumi321.ushio.phitracker.data.parser.AesDecryptor
@@ -405,14 +407,22 @@ class PhigrosRepositoryImplApiDetailTest {
         database.recordDao().insertAll(
             listOf(RecordEntity("account-a", "song-a.0", "IN", 950000, 95f, true, 1L))
         )
+        database.legacySyncHistoryDao().insertSnapshots(
+            listOf(LegacySyncSnapshotEntity(7, 100, 15f, "Legacy", 1, null, null, null, null))
+        )
+        database.legacySyncHistoryDao().insertEntries(
+            listOf(LegacySongSyncHistoryEntity(9, 7, "song-a.0", "IN", 950000, 95f, true, 100))
+        )
         database.currentAccountDao().setCurrent(CurrentAccountEntity("account-a"))
 
         assertNull(repository.getUserProfile().first())
         assertNull(repository.getCachedSave().first())
+        assertNull(repository.observeLegacySyncHistorySummary().first())
         assertEquals(emptyMap(), repository.getClearCountsByDifficulty())
 
         repository.saveSessionToken("new-token", Server.CN)
         assertNull(repository.getUserProfile().first())
+        assertNull(repository.observeLegacySyncHistorySummary().first())
         repository.saveBoundPlayerId("account-a")
 
         val profile = repository.getUserProfile().first()
@@ -421,10 +431,15 @@ class PhigrosRepositoryImplApiDetailTest {
         assertEquals(1, repository.getClearCountsByDifficulty().values.sum())
         assertEquals("new-token", repository.observeSessionToken().first()?.first)
         assertEquals(1, repository.getCachedSave().first()?.gameRecord?.size)
+        val legacySummary = repository.observeLegacySyncHistorySummary().first()
+        assertEquals(1, legacySummary?.snapshotCount)
+        assertEquals(1, legacySummary?.entryCount)
+        assertEquals(100, legacySummary?.oldestTimestamp)
 
         repository.clearTokenSync()
         assertNull(repository.getUserProfile().first())
         assertNull(repository.observeSessionToken().first())
+        assertNull(repository.observeLegacySyncHistorySummary().first())
     }
 
     private fun repository(
@@ -456,6 +471,7 @@ class PhigrosRepositoryImplApiDetailTest {
             syncSnapshotDao = database.syncSnapshotDao(),
             songSyncHistoryDao = database.songSyncHistoryDao(),
             currentAccountDao = database.currentAccountDao(),
+            legacySyncHistoryDao = database.legacySyncHistoryDao(),
             tokenManager = tokenManager,
             json = json,
             songDataProvider = SongDataProvider(assetReader = EmptySongAssets)

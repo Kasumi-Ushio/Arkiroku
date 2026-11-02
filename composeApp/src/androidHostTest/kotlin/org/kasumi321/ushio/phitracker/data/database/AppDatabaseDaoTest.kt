@@ -371,7 +371,7 @@ class AppDatabaseDaoTest {
     // ── migrations ────────────────────────────────────────────────────
 
     @Test
-    fun migrationFromV1ToV5AttributesSingleUserDataToThatAccount(): Unit = runTest {
+    fun migrationFromV1ToV6AttributesSingleUserDataToThatAccount(): Unit = runTest {
         val dbName = "migration_v1_to_v5_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         context.deleteDatabase(dbName)
@@ -428,8 +428,8 @@ class AppDatabaseDaoTest {
     }
 
     @Test
-    fun migrationFromV2ToV5KeepsRecordsAndDropsUnattributableSnapshots(): Unit = runTest {
-        val dbName = "migration_v2_to_v5_test.db"
+    fun migrationFromV2ToV6KeepsRecordsAndQuarantinesUnattributableSnapshots(): Unit = runTest {
+        val dbName = "migration_v2_to_v6_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         context.deleteDatabase(dbName)
         context.getDatabasePath(dbName).parentFile?.mkdirs()
@@ -475,7 +475,7 @@ class AppDatabaseDaoTest {
     }
 
     @Test
-    fun migrationFromV3SingleUserKeepsRecordsAndDropsUnattributableHistory(): Unit = runTest {
+    fun migrationFromV3SingleUserQuarantinesUnattributableHistory(): Unit = runTest {
         val dbName = "migration_v3_single_user_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         seedRawV3Database(dbName) {
@@ -493,6 +493,8 @@ class AppDatabaseDaoTest {
         assertNull(user?.avatarUri)
         assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player1").size)
         assertEquals(0, roomDb.songSyncHistoryDao().getRecent("player1", 10).size)
+        assertEquals(3L, roomDb.legacySyncHistoryDao().getSnapshots().single().id)
+        assertEquals(9L, roomDb.legacySyncHistoryDao().getEntries().single().id)
         assertEquals("player1", roomDb.currentAccountDao().get()?.playerId)
 
         roomDb.close()
@@ -515,6 +517,8 @@ class AppDatabaseDaoTest {
         assertEquals(listOf("song-c.0"), roomDb.recordDao().getAllRecordsOnce("player-c").map { it.songId })
         assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player-c").size)
         assertEquals(0, roomDb.songSyncHistoryDao().getRecent("player-c", 10).size)
+        assertEquals("Previous", roomDb.legacySyncHistoryDao().getSnapshots().single().nickname)
+        assertEquals(1, roomDb.legacySyncHistoryDao().getEntries().size)
         assertEquals("player-c", roomDb.currentAccountDao().get()?.playerId)
 
         roomDb.close()
@@ -522,11 +526,7 @@ class AppDatabaseDaoTest {
     }
 
     @Test
-    fun migrationFromV3DoubleUserKeepsLastSyncedAccountAndDropsMixedHistory(): Unit = runTest {
-        // Two user rows are artifacts of the old REPLACE-upsert bug. Records
-        // belong to the LAST synced account (B, greatest lastSyncAt); the
-        // snapshots/history span both accounts and cannot be attributed, so
-        // they are dropped rather than assigned to the wrong account.
+    fun migrationFromV3DoubleUserKeepsLastSyncedAccountAndQuarantinesMixedHistory(): Unit = runTest {
         val dbName = "migration_v3_double_user_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         seedRawV3Database(dbName) {
@@ -542,8 +542,10 @@ class AppDatabaseDaoTest {
         assertEquals(0, roomDb.recordDao().getRecordCount("player-a"))
         assertEquals("Bee", roomDb.userDao().getUserOnce("player-b")?.nickname)
         assertNull(roomDb.userDao().getUserOnce("player-a"), "stale user rows are removed")
-        assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player-b").size, "mixed snapshots are dropped")
-        assertEquals(0, roomDb.songSyncHistoryDao().getRecent("player-b", 10).size, "mixed history is dropped")
+        assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player-b").size)
+        assertEquals(0, roomDb.songSyncHistoryDao().getRecent("player-b", 10).size)
+        assertEquals(1, roomDb.legacySyncHistoryDao().getSnapshots().size)
+        assertEquals(1, roomDb.legacySyncHistoryDao().getEntries().size)
         assertEquals("player-b", roomDb.currentAccountDao().get()?.playerId)
 
         roomDb.close()
@@ -551,9 +553,7 @@ class AppDatabaseDaoTest {
     }
 
     @Test
-    fun migrationFromV3EmptyUsersDropsOrphanedData(): Unit = runTest {
-        // Rows without any user row are orphans of the old clearData() gap
-        // (it cleared records/users but never snapshots/history).
+    fun migrationFromV3EmptyUsersDropsOrphanedRecordsButQuarantinesHistory(): Unit = runTest {
         val dbName = "migration_v3_empty_user_test.db"
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         seedRawV3Database(dbName) {
@@ -566,6 +566,8 @@ class AppDatabaseDaoTest {
         assertEquals(0, roomDb.recordDao().getRecordCount("player1"))
         assertEquals(0, roomDb.syncSnapshotDao().getAllOnce("player1").size)
         assertEquals(0, roomDb.songSyncHistoryDao().getRecent("player1", 10).size)
+        assertEquals(1, roomDb.legacySyncHistoryDao().getSnapshots().size)
+        assertEquals(1, roomDb.legacySyncHistoryDao().getEntries().size)
         assertNull(roomDb.currentAccountDao().get())
 
         roomDb.close()
@@ -640,7 +642,8 @@ class AppDatabaseDaoTest {
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
-                AppDatabase.MIGRATION_4_5
+                AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6
             )
             .setQueryCoroutineContext(Dispatchers.Default)
             .build()

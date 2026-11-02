@@ -9,7 +9,7 @@
     <string name="collectibles_part_count">%1$d 部分</string>
     <string name="collectibles_data_update_available">圖鑑資訊有更新</string>
     <string name="collectibles_update_now">立即更新</string>
-    <string name="collectibles_filter_title">篩選收藏品</string>
+    <string name="collectibles_filter_title">搜尋收藏品</string>
     <string name="collectibles_filter_category_label">類別</string>
     <string name="collectibles_filter_chapter_label">章節</string>
     <string name="collectibles_chapters_selected_count">已選 %1$d 個</string>

@@ -3,9 +3,12 @@ package org.kasumi321.ushio.phitracker.ui.home
 import org.kasumi321.ushio.phitracker.domain.model.B30RksHistogram
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistorySummary
+import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import org.kasumi321.ushio.phitracker.domain.model.SyncSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -42,7 +45,13 @@ class HomeUiStateTest {
                 apiHistorySnapshots = listOf(snapshot),
                 apiRankByUser = ApiToolResult(message = null),
                 apiRankByPosition = ApiToolResult(message = null),
-                apiRksRankResult = ApiToolResult(message = null)
+                apiRksRankResult = ApiToolResult(message = null),
+                legacySyncHistory = LegacySyncHistorySummary(4, 8, 10, 20),
+                isImportingLegacyHistory = true,
+                isDiscardingLegacyHistory = true,
+                legacyHistoryMessage = UiText.Raw("pending"),
+                isResettingSessionToken = true,
+                sessionTokenResetMessage = UiText.Raw("reset pending")
             )
         )
 
@@ -62,5 +71,11 @@ class HomeUiStateTest {
         assertEquals(ApiToolResult(), cleared.tools.apiRankByUser)
         assertEquals(ApiToolResult(), cleared.tools.apiRankByPosition)
         assertEquals(ApiToolResult(), cleared.tools.apiRksRankResult)
+        assertNull(cleared.tools.legacySyncHistory)
+        assertFalse(cleared.tools.isImportingLegacyHistory)
+        assertFalse(cleared.tools.isDiscardingLegacyHistory)
+        assertNull(cleared.tools.legacyHistoryMessage)
+        assertFalse(cleared.tools.isResettingSessionToken)
+        assertNull(cleared.tools.sessionTokenResetMessage)
     }
 }

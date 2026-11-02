@@ -70,6 +70,9 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.action_go_login
+import phitracker.composeapp.generated.resources.settings_reset_token
+import phitracker.composeapp.generated.resources.settings_reset_token_confirm
+import phitracker.composeapp.generated.resources.settings_reset_token_dialog_text
 import phitracker.composeapp.generated.resources.tools_accuracy_label
 import phitracker.composeapp.generated.resources.tools_chart_constant_label
 import phitracker.composeapp.generated.resources.tools_close
@@ -81,6 +84,17 @@ import phitracker.composeapp.generated.resources.tools_history_empty
 import phitracker.composeapp.generated.resources.tools_history_need_two
 import phitracker.composeapp.generated.resources.tools_history_range
 import phitracker.composeapp.generated.resources.tools_history_sync_count
+import phitracker.composeapp.generated.resources.common_cancel
+import phitracker.composeapp.generated.resources.tools_legacy_history_discard
+import phitracker.composeapp.generated.resources.tools_legacy_history_discard_confirm_text
+import phitracker.composeapp.generated.resources.tools_legacy_history_discard_confirm_title
+import phitracker.composeapp.generated.resources.tools_legacy_history_import
+import phitracker.composeapp.generated.resources.tools_legacy_history_import_confirm_text
+import phitracker.composeapp.generated.resources.tools_legacy_history_import_confirm_title
+import phitracker.composeapp.generated.resources.tools_legacy_history_subtitle
+import phitracker.composeapp.generated.resources.tools_legacy_history_summary
+import phitracker.composeapp.generated.resources.tools_legacy_history_time_range
+import phitracker.composeapp.generated.resources.tools_legacy_history_title
 import phitracker.composeapp.generated.resources.tools_login_required
 import phitracker.composeapp.generated.resources.tools_my_rank_subtitle
 import phitracker.composeapp.generated.resources.tools_my_rank_title
@@ -102,7 +116,7 @@ import phitracker.composeapp.generated.resources.tools_security_notice_message
 import phitracker.composeapp.generated.resources.tools_security_notice_title
 import phitracker.composeapp.generated.resources.tools_session_token_subtitle
 import phitracker.composeapp.generated.resources.tools_session_token_title
-import phitracker.composeapp.generated.resources.tools_show_credentials
+import phitracker.composeapp.generated.resources.tools_show_session_token
 import phitracker.composeapp.generated.resources.tools_suggest_subtitle
 import phitracker.composeapp.generated.resources.tools_suggest_title
 import phitracker.composeapp.generated.resources.tools_target_rks_label
@@ -110,7 +124,9 @@ import phitracker.composeapp.generated.resources.tools_view_suggestions
 import org.kasumi321.ushio.phitracker.data.platform.copyToClipboard
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import org.kasumi321.ushio.phitracker.ui.utils.asString
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistorySummary
 import org.kasumi321.ushio.phitracker.domain.model.SyncSnapshot
 import org.kasumi321.ushio.phitracker.domain.usecase.RksCalculator
 
@@ -123,6 +139,10 @@ fun ToolsTab(
         onFetchRankByUser: () -> Unit,
         onFetchRankByPosition: (Int) -> Unit,
         onFetchRksRank: (Float) -> Unit,
+        onResetSessionToken: () -> Unit = {},
+        onDismissSessionTokenResetMessage: () -> Unit = {},
+        onImportLegacyHistory: () -> Unit = {},
+        onDiscardLegacyHistory: () -> Unit = {},
         onNavigateToLogin: () -> Unit = {},
         contentPadding: PaddingValues = PaddingValues(),
         scrollState: ScrollState = rememberScrollState(),
@@ -135,6 +155,8 @@ fun ToolsTab(
     val apiRankByUser = state.apiRankByUser
     val apiRankByPosition = state.apiRankByPosition
     val apiRksRankResult = state.apiRksRankResult
+    var showLegacyImportDialog by rememberSaveable { mutableStateOf(false) }
+    var showLegacyDiscardDialog by rememberSaveable { mutableStateOf(false) }
 
     // Full-bleed scroll: content scrolls behind the floating glass bars, with
     // spacers keeping the first and last cards clear of them
@@ -169,6 +191,30 @@ fun ToolsTab(
                         subtitle = stringResource(Res.string.tools_rks_history_subtitle),
                         icon = Icons.AutoMirrored.Filled.ShowChart
                 ) { RksHistoryChartContent(syncSnapshots) }
+
+                state.legacySyncHistory?.let { summary ->
+                    CollapsibleToolCard(
+                        title = stringResource(Res.string.tools_legacy_history_title),
+                        subtitle = stringResource(Res.string.tools_legacy_history_subtitle),
+                        icon = Icons.AutoMirrored.Filled.ShowChart
+                    ) {
+                        LegacySyncHistoryContent(
+                            summary = summary,
+                            isImporting = state.isImportingLegacyHistory,
+                            isDiscarding = state.isDiscardingLegacyHistory,
+                            onImport = { showLegacyImportDialog = true },
+                            onDiscard = { showLegacyDiscardDialog = true }
+                        )
+                    }
+                }
+                state.legacyHistoryMessage?.let { message ->
+                    Text(
+                        text = message.asString(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
 
                 if (apiEnabled && useApiData) {
                     CollapsibleToolCard(
@@ -205,11 +251,125 @@ fun ToolsTab(
                         title = stringResource(Res.string.tools_session_token_title),
                         subtitle = stringResource(Res.string.tools_session_token_subtitle),
                         icon = Icons.Default.ContentCopy
-                ) { SessionTokenContent(sessionToken, onNavigateToLogin) }
+                ) {
+                    SessionTokenContent(
+                        sessionToken = sessionToken,
+                        isResetting = state.isResettingSessionToken,
+                        resetMessage = state.sessionTokenResetMessage,
+                        onReset = onResetSessionToken,
+                        onDismissResetMessage = onDismissSessionTokenResetMessage,
+                        onNavigateToLogin = onNavigateToLogin
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Spacer(modifier = Modifier.height(contentPadding.calculateBottomPadding()))
             }
+    }
+
+    if (state.legacySyncHistory != null && showLegacyImportDialog) {
+        AnimatedAlertDialog(
+            onDismissRequest = {
+                if (!state.isImportingLegacyHistory) showLegacyImportDialog = false
+            },
+            title = { Text(stringResource(Res.string.tools_legacy_history_import_confirm_title)) },
+            text = { Text(stringResource(Res.string.tools_legacy_history_import_confirm_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLegacyImportDialog = false
+                        onImportLegacyHistory()
+                    }
+                ) { Text(stringResource(Res.string.tools_legacy_history_import)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLegacyImportDialog = false }) {
+                    Text(stringResource(Res.string.common_cancel))
+                }
+            }
+        )
+    }
+
+    if (state.legacySyncHistory != null && showLegacyDiscardDialog) {
+        AnimatedAlertDialog(
+            onDismissRequest = {
+                if (!state.isDiscardingLegacyHistory) showLegacyDiscardDialog = false
+            },
+            icon = {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = { Text(stringResource(Res.string.tools_legacy_history_discard_confirm_title)) },
+            text = { Text(stringResource(Res.string.tools_legacy_history_discard_confirm_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLegacyDiscardDialog = false
+                        onDiscardLegacyHistory()
+                    }
+                ) { Text(stringResource(Res.string.tools_legacy_history_discard)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLegacyDiscardDialog = false }) {
+                    Text(stringResource(Res.string.common_cancel))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun LegacySyncHistoryContent(
+    summary: LegacySyncHistorySummary,
+    isImporting: Boolean,
+    isDiscarding: Boolean,
+    onImport: () -> Unit,
+    onDiscard: () -> Unit
+) {
+    val busy = isImporting || isDiscarding
+    Text(
+        text = stringResource(
+            Res.string.tools_legacy_history_summary,
+            summary.snapshotCount,
+            summary.entryCount
+        ),
+        style = MaterialTheme.typography.bodyMedium
+    )
+    if (summary.oldestTimestamp != null && summary.newestTimestamp != null) {
+        Text(
+            text = stringResource(
+                Res.string.tools_legacy_history_time_range,
+                epochMillisToShortDateString(summary.oldestTimestamp),
+                epochMillisToShortDateString(summary.newestTimestamp)
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    Button(
+        onClick = onImport,
+        enabled = !busy,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (isImporting) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        } else {
+            Text(stringResource(Res.string.tools_legacy_history_import))
+        }
+    }
+    OutlinedButton(
+        onClick = onDiscard,
+        enabled = !busy,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (isDiscarding) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        } else {
+            Text(stringResource(Res.string.tools_legacy_history_discard))
+        }
     }
 }
 
@@ -633,8 +793,17 @@ private fun RankInfoRow(label: String, value: String) {
 }
 
 @Composable
-private fun SessionTokenContent(sessionToken: String?, onNavigateToLogin: () -> Unit = {}) {
+private fun SessionTokenContent(
+    sessionToken: String?,
+    isResetting: Boolean,
+    resetMessage: UiText?,
+    showResetEntry: Boolean = false,
+    onReset: () -> Unit,
+    onDismissResetMessage: () -> Unit,
+    onNavigateToLogin: () -> Unit
+) {
     var showTokenDialog by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
     val copiedToClipboardMessage = stringResource(Res.string.tools_copied_to_clipboard)
 
     if (sessionToken == null) {
@@ -651,8 +820,57 @@ private fun SessionTokenContent(sessionToken: String?, onNavigateToLogin: () -> 
         OutlinedButton(onClick = { showTokenDialog = true }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Key, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(Res.string.tools_show_credentials))
+            Text(stringResource(Res.string.tools_show_session_token))
         }
+        if (showResetEntry) {
+            OutlinedButton(
+                onClick = { showResetDialog = true },
+                enabled = !isResetting,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isResetting) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Key, contentDescription = null)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(Res.string.settings_reset_token))
+            }
+        }
+    }
+
+    resetMessage?.let { message ->
+        Text(
+            text = message.asString(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onDismissResetMessage)
+        )
+    }
+
+    if (showResetDialog && sessionToken != null) {
+        AnimatedAlertDialog(
+            onDismissRequest = { if (!isResetting) showResetDialog = false },
+            icon = { Icon(Icons.Default.Key, contentDescription = null) },
+            title = { Text(stringResource(Res.string.settings_reset_token)) },
+            text = { Text(stringResource(Res.string.settings_reset_token_dialog_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetDialog = false
+                        onReset()
+                    }
+                ) { Text(stringResource(Res.string.settings_reset_token_confirm)) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetDialog = false },
+                    enabled = !isResetting
+                ) { Text(stringResource(Res.string.common_cancel)) }
+            }
+        )
     }
 
     if (showTokenDialog && sessionToken != null) {

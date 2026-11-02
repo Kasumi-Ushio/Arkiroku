@@ -13,7 +13,7 @@
     <string name="tools_rks_distribution_title">RKS 分布</string>
     <string name="tools_rks_distribution_subtitle">看看有多少人的 RKS 比它高</string>
     <string name="tools_session_token_title">sessionToken</string>
-    <string name="tools_session_token_subtitle">查看并复制当前 sessionToken</string>
+    <string name="tools_session_token_subtitle">查看、复制或重置当前 sessionToken</string>
     <string name="tools_expand">展开</string>
     <string name="tools_collapse">折叠</string>
     <string name="tools_rks_formula">计算公式：RKS = ((acc − 55) / 45)² × 定数</string>
@@ -30,7 +30,7 @@
     <string name="tools_target_rks_label">目标 RKS</string>
     <string name="tools_not_queried_yet">尚未查询</string>
     <string name="tools_login_required">请先登录后再使用此功能</string>
-    <string name="tools_show_credentials">显示登录凭据</string>
+    <string name="tools_show_session_token">显示 sessionToken</string>
     <string name="tools_security_notice_title">安全提示</string>
     <string name="tools_security_notice_message">sessionToken 是您的账号凭证，拥有此 Token 的人可以读取您的游戏存档。\n\n请勿将此 Token 分享给任何不信任的人。</string>
     <string name="tools_copied_to_clipboard">已复制到剪贴板</string>
@@ -57,4 +57,17 @@
     <string name="tools_api_row_target_rks">目标 RKS</string>
     <string name="tools_api_row_users_above">大于该 RKS 用户数</string>
     <string name="tools_api_unknown_player">未知</string>
+    <string name="tools_legacy_history_title">恢复旧版同步历史</string>
+    <string name="tools_legacy_history_subtitle">查看数据库升级时保留的历史记录</string>
+    <string name="tools_legacy_history_summary">%1$d 个同步快照，%2$d 条变更记录</string>
+    <string name="tools_legacy_history_time_range">时间范围：%1$s – %2$s</string>
+    <string name="tools_legacy_history_import">导入到当前账号</string>
+    <string name="tools_legacy_history_discard">丢弃旧版历史</string>
+    <string name="tools_legacy_history_import_confirm_title">导入旧版历史？</string>
+    <string name="tools_legacy_history_import_confirm_text">保留的快照和变更记录将归属当前账号，此操作无法自动撤销。</string>
+    <string name="tools_legacy_history_discard_confirm_title">丢弃旧版历史？</string>
+    <string name="tools_legacy_history_discard_confirm_text">仅删除保留的旧版历史，当前成绩和同步历史不受影响。</string>
+    <string name="tools_legacy_history_import_success">已恢复 %1$d 个快照和 %2$d 条变更记录。</string>
+    <string name="tools_legacy_history_discard_success">旧版历史已丢弃。</string>
+    <string name="tools_legacy_history_operation_failed">操作未完成，数据未发生变化，请重试。</string>
 </resources>

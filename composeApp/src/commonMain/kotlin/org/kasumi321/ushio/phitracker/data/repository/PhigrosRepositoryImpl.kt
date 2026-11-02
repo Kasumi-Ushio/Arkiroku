@@ -29,6 +29,8 @@ import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
 import org.kasumi321.ushio.phitracker.data.database.AccountDataClearer
 import org.kasumi321.ushio.phitracker.data.database.CurrentAccountDao
+import org.kasumi321.ushio.phitracker.data.database.LegacySyncHistoryDao
+import org.kasumi321.ushio.phitracker.data.database.LegacySyncHistoryWriter
 import org.kasumi321.ushio.phitracker.data.database.RecordDao
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
 import org.kasumi321.ushio.phitracker.data.database.SongSyncHistoryDao
@@ -60,6 +62,8 @@ import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagSongData
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagTreeNode
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistoryImportResult
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistorySummary
 import org.kasumi321.ushio.phitracker.domain.repository.PhigrosRepository
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
@@ -78,12 +82,21 @@ class PhigrosRepositoryImpl(
     private val syncSnapshotDao: SyncSnapshotDao,
     private val songSyncHistoryDao: SongSyncHistoryDao,
     private val currentAccountDao: CurrentAccountDao,
+    legacySyncHistoryDao: LegacySyncHistoryDao,
     private val tokenManager: TokenManager,
     private val json: Json,
     private val songDataProvider: SongDataProvider,
 ) : PhigrosRepository {
     private val syncWriter = SyncWriter(database, recordDao, userDao, syncSnapshotDao, songSyncHistoryDao, currentAccountDao)
     private val accountDataClearer = AccountDataClearer(database, recordDao, userDao, syncSnapshotDao, songSyncHistoryDao, currentAccountDao)
+    private val legacySyncHistoryWriter = LegacySyncHistoryWriter(
+        database,
+        legacySyncHistoryDao,
+        syncSnapshotDao,
+        songSyncHistoryDao,
+        currentAccountDao
+    )
+    private val legacySyncHistoryDao = legacySyncHistoryDao
     private val syncSnapshotProjector = SyncSnapshotProjector()
     private val apiDetailMutex = Mutex()
     private val apiDetailCache = mutableMapOf<ApiDetailCacheKey, SongApiDetail>()
@@ -307,6 +320,42 @@ class PhigrosRepositoryImpl(
     override suspend fun getSyncSnapshotsOnce(): List<SyncSnapshot> {
         val owner = currentDisplayOwner() ?: return emptyList()
         return syncSnapshotDao.getAllOnce(owner).map { it.toDomain() }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeLegacySyncHistorySummary(): Flow<LegacySyncHistorySummary?> =
+        displayOwnerFlow().flatMapLatest { owner ->
+            if (owner == null) {
+                flowOf(null)
+            } else {
+                combine(
+                    legacySyncHistoryDao.observeSnapshotStats(),
+                    legacySyncHistoryDao.observeEntryCount()
+                ) { stats, entryCount ->
+                    LegacySyncHistorySummary(
+                        snapshotCount = stats.snapshotCount,
+                        entryCount = entryCount,
+                        oldestTimestamp = stats.oldestTimestamp,
+                        newestTimestamp = stats.newestTimestamp
+                    ).takeIf { it.snapshotCount > 0 || it.entryCount > 0 }
+                }
+            }
+        }
+
+    override suspend fun importLegacySyncHistory(expectedOwner: String): Result<LegacySyncHistoryImportResult> = try {
+        Result.success(legacySyncHistoryWriter.import(expectedOwner))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure<LegacySyncHistoryImportResult>(e).logFailure("importLegacySyncHistory")
+    }
+
+    override suspend fun discardLegacySyncHistory(expectedOwner: String): Result<Unit> = try {
+        Result.success(legacySyncHistoryWriter.discard(expectedOwner))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure<Unit>(e).logFailure("discardLegacySyncHistory")
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

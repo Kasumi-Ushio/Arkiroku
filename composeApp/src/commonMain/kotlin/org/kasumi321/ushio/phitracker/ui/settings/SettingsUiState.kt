@@ -55,9 +55,6 @@ data class SettingsUiState(
     val hasRuntimeLogs: Boolean = false,
     val hasCrashLogs: Boolean = false,
     val crashNotificationGuideShown: Boolean = false,
-    // sessionToken reset (account security): in-flight flag + last result text.
-    val isResettingSessionToken: Boolean = false,
-    val sessionTokenResetMessage: UiText? = null,
     val isResettingLocalSession: Boolean = false,
     val localSessionResetMessage: UiText? = null,
     val tip: String = ""

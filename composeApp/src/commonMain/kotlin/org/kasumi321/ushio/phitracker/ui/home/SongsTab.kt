@@ -84,6 +84,7 @@ import phitracker.composeapp.generated.resources.songs_difficulty_all
 import phitracker.composeapp.generated.resources.songs_difficulty_label
 import phitracker.composeapp.generated.resources.songs_filter_title
 import phitracker.composeapp.generated.resources.songs_level_range_label
+import phitracker.composeapp.generated.resources.songs_search_placeholder
 import phitracker.composeapp.generated.resources.songs_select_chapters_title
 import phitracker.composeapp.generated.resources.songs_update_now
 import kotlin.math.roundToInt
@@ -102,6 +103,7 @@ fun SongsTab(
     onDifficultySelect: (Difficulty?) -> Unit,
     onLevelRangeSelect: (Int, Int) -> Unit,
     onToggleFilterSheet: (Boolean) -> Unit,
+    onSearch: (String) -> Unit,
     onResetFilters: () -> Unit,
     onRefreshSongData: () -> Unit,
     getIllustrationUrl: (String) -> String?,
@@ -122,8 +124,8 @@ fun SongsTab(
     val levelMaxBound = state.levelMaxBound
     val showFilterSheet = state.showFilterSheet
 
-    // Title, tip and sub-tabs live in the floating IndexHeader; search/filter
-    // open from the FAB panel below it. The list scrolls behind the header,
+    // Title, tip and sub-tabs live in the floating IndexHeader; the FAB opens
+    // the combined search/filter sheet. The list scrolls behind the header,
     // padded so the first and last songs stay clear.
     val listContentPadding = PaddingValues(
         start = 16.dp,
@@ -194,6 +196,8 @@ fun SongsTab(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             FilterBottomSheetContent(
+                query = state.searchQuery,
+                onSearch = onSearch,
                 availableChapters = availableChapters,
                 selectedChapters = selectedChapters,
                 onToggleChapter = onToggleChapter,
@@ -284,6 +288,8 @@ fun SongDataRefreshProgressCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterBottomSheetContent(
+    query: String,
+    onSearch: (String) -> Unit,
     availableChapters: List<String>,
     selectedChapters: Set<String>,
     onToggleChapter: (String) -> Unit,
@@ -323,6 +329,14 @@ private fun FilterBottomSheetContent(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
+
+        IndexSearchField(
+            query = query,
+            placeholder = stringResource(Res.string.songs_search_placeholder),
+            onQueryChange = onSearch
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(stringResource(Res.string.songs_difficulty_label), style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(6.dp))

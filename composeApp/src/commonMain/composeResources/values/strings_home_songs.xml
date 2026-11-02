@@ -2,13 +2,11 @@
 <resources>
     <string name="songs_all_songs_count">All Songs (%1$d)</string>
     <string name="songs_search_placeholder">Search by song name, composer, or alias…</string>
-    <string name="songs_cd_expand_search">Expand search</string>
     <string name="songs_cd_clear_search">Clear search</string>
-    <string name="songs_cd_filter">Filter</string>
-    <string name="index_search_close">Close search</string>
+    <string name="songs_cd_filter">Search and filter</string>
     <string name="songs_data_update_available">Index data update available</string>
     <string name="songs_update_now">Update now</string>
-    <string name="songs_filter_title">Filter Songs</string>
+    <string name="songs_filter_title">Search Songs</string>
     <string name="songs_action_reset">Reset</string>
     <string name="songs_action_done">Done</string>
     <string name="songs_difficulty_label">Difficulty</string>

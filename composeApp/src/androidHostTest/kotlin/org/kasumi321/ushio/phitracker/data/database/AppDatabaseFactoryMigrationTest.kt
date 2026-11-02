@@ -33,7 +33,7 @@ class AppDatabaseFactoryMigrationTest {
     }
 
     @Test
-    fun productionFactoryMigratesV3ThroughV5() = runTest {
+    fun productionFactoryMigratesV3ThroughV6AndQuarantinesHistory() = runTest {
         seedV3Database()
         seedV3AccountRows()
 
@@ -46,6 +46,8 @@ class AppDatabaseFactoryMigrationTest {
             assertEquals(listOf("song-c.0"), database.recordDao().getAllRecordsOnce("player-c").map { it.songId })
             assertEquals(0, database.syncSnapshotDao().getAllOnce("player-c").size)
             assertEquals(0, database.songSyncHistoryDao().getRecent("player-c", 10).size)
+            assertEquals(3L, database.legacySyncHistoryDao().getSnapshots().single().id)
+            assertEquals(9L, database.legacySyncHistoryDao().getEntries().single().id)
             assertEquals("player-c", database.currentAccountDao().get()?.playerId)
         } finally {
             database.close()
@@ -53,7 +55,7 @@ class AppDatabaseFactoryMigrationTest {
     }
 
     @Test
-    fun productionFactoryMigratesV1ThroughV5() = runTest {
+    fun productionFactoryMigratesV1ThroughV6() = runTest {
         seedV3Database()
         seedV3AccountRows()
         setDatabaseVersion(1)
@@ -63,6 +65,8 @@ class AppDatabaseFactoryMigrationTest {
             assertEquals("Current", database.userDao().getUserOnce("player-c")?.nickname)
             assertEquals(1, database.recordDao().getRecordCount("player-c"))
             assertEquals(0, database.syncSnapshotDao().getAllOnce("player-c").size)
+            assertEquals(1, database.legacySyncHistoryDao().getSnapshots().size)
+            assertEquals(1, database.legacySyncHistoryDao().getEntries().size)
             assertEquals("player-c", database.currentAccountDao().get()?.playerId)
         } finally {
             database.close()
@@ -70,7 +74,7 @@ class AppDatabaseFactoryMigrationTest {
     }
 
     @Test
-    fun productionFactoryMigratesV2ThroughV5() = runTest {
+    fun productionFactoryMigratesV2ThroughV6() = runTest {
         seedV3Database()
         seedV3AccountRows()
         setDatabaseVersion(2)
@@ -80,6 +84,8 @@ class AppDatabaseFactoryMigrationTest {
             assertEquals("Current", database.userDao().getUserOnce("player-c")?.nickname)
             assertEquals(1, database.recordDao().getRecordCount("player-c"))
             assertEquals(0, database.syncSnapshotDao().getAllOnce("player-c").size)
+            assertEquals(1, database.legacySyncHistoryDao().getSnapshots().size)
+            assertEquals(1, database.legacySyncHistoryDao().getEntries().size)
             assertEquals("player-c", database.currentAccountDao().get()?.playerId)
         } finally {
             database.close()
@@ -87,7 +93,7 @@ class AppDatabaseFactoryMigrationTest {
     }
 
     @Test
-    fun productionFactoryMigratesV4AndClearsAmbiguousHistory() = runTest {
+    fun productionFactoryMigratesV4AndQuarantinesAmbiguousHistory() = runTest {
         seedV4Database()
 
         val database = createAppDatabase(androidx.sqlite.driver.AndroidSQLiteDriver())
@@ -98,6 +104,25 @@ class AppDatabaseFactoryMigrationTest {
             assertEquals(1, database.recordDao().getRecordCount("player-v4"))
             assertEquals(0, database.syncSnapshotDao().getAllOnce("player-v4").size)
             assertEquals(0, database.songSyncHistoryDao().getRecent("player-v4", 10).size)
+            assertEquals(4L, database.legacySyncHistoryDao().getSnapshots().single().id)
+            assertEquals(9L, database.legacySyncHistoryDao().getEntries().single().id)
+            assertEquals("player-v4", database.currentAccountDao().get()?.playerId)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun productionFactoryMigratesV5WithoutTouchingFormalHistory() = runTest {
+        seedV5Database()
+
+        val database = createAppDatabase(androidx.sqlite.driver.AndroidSQLiteDriver())
+        try {
+            assertEquals(1, database.recordDao().getRecordCount("player-v4"))
+            assertEquals(1, database.syncSnapshotDao().getAllOnce("player-v4").size)
+            assertEquals(1, database.songSyncHistoryDao().getRecent("player-v4", 10).size)
+            assertEquals(0, database.legacySyncHistoryDao().getSnapshots().size)
+            assertEquals(0, database.legacySyncHistoryDao().getEntries().size)
             assertEquals("player-v4", database.currentAccountDao().get()?.playerId)
         } finally {
             database.close()
@@ -217,6 +242,15 @@ class AppDatabaseFactoryMigrationTest {
         raw.execSQL("INSERT INTO sync_snapshots VALUES (4, 'player-v4', 4, 15.0, 'V4', 1, NULL, NULL, NULL, NULL)")
         raw.execSQL("INSERT INTO song_sync_history VALUES (9, 'player-v4', 4, 'song-v4.0', 'IN', 950000, 95.0, 1, 4)")
         raw.execSQL("INSERT INTO current_account VALUES ('player-v4')")
+        raw.close()
+    }
+
+    private fun seedV5Database() {
+        seedV4Database()
+        val raw = SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(databaseName), null)
+        raw.execSQL("ALTER TABLE `users` ADD COLUMN `moneyString` TEXT NOT NULL DEFAULT ''")
+        raw.execSQL("ALTER TABLE `users` ADD COLUMN `avatarUri` TEXT DEFAULT NULL")
+        raw.version = 5
         raw.close()
     }
 }

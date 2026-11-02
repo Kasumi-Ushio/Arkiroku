@@ -99,7 +99,7 @@
     <string name="settings_reset_token">重置 sessionToken</string>
     <string name="settings_reset_token_desc">撤銷目前的 sessionToken 並重新產生</string>
     <string name="settings_reset_token_confirm">重置</string>
-    <string name="settings_reset_token_dialog_text">確定要重置您的 sessionToken 嗎？已儲存的所有資料將保留，請僅在您懷疑您的 sessionToken 遭到洩露或您認為目前 sessionToken 的持有方不可信任時重置。/n重置 sessionToken 後，請重新登入 Phigros。</string>
+    <string name="settings_reset_token_dialog_text">確定要重置您的 sessionToken 嗎？已儲存的所有資料將保留，請僅在您懷疑您的 sessionToken 遭到洩露或您認為目前 sessionToken 的持有方不可信任時重置。\n重置 sessionToken 後，請重新登入 Phigros。</string>
     <string name="settings_reset_token_result_success">sessionToken 已重置，請重新登入 Phigros</string>
     <string name="settings_reset_token_result_unknown">重置結果未知，可能是網路發生問題，目前 sessionToken 可能已失效，請嘗試重新登入</string>
     <string name="settings_reset_token_result_rejected">目前 sessionToken 已被拒絕，請重新登入</string>
@@ -145,10 +145,11 @@
     <string name="catalog_update_error_unknown_message">圖鑑更新被中斷。請重新更新。</string>
     <string name="settings_update_new_songs">本次更新新增 %1$d 首曲目：\n</string>
     <string name="settings_update_no_new_songs">本次更新無新增曲目。</string>
+    <string name="settings_catalog_management">圖鑑資訊管理</string>
+    <string name="settings_catalog_management_desc">更新圖鑑資訊或重設未完成的更新</string>
     <string name="settings_update_song_data">更新圖鑑資訊</string>
     <string name="settings_update_song_data_desc">下載最新的 Phigros 曲目與收藏品圖鑑資訊</string>
     <string name="settings_reset_pending_update">重設未完成的更新</string>
-    <string name="settings_reset_pending_update_desc">清除更新備份並重新下載圖鑑資訊</string>
     <string name="settings_reset_pending_update_dialog_text">確定清除未完成更新的備份與暫存檔案，並重新下載完整曲目與收藏品圖鑑資訊嗎？</string>
     <string name="settings_reset_pending_update_done">已重設未完成的更新，並完成圖鑑資訊下載</string>
     <string name="settings_use_api_data">使用查分 API 資料</string>

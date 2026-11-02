@@ -99,7 +99,7 @@
     <string name="settings_reset_token">Reset sessionToken</string>
     <string name="settings_reset_token_desc">Revoke the current sessionToken and generate a new one</string>
     <string name="settings_reset_token_confirm">Reset</string>
-    <string name="settings_reset_token_dialog_text">Reset your sessionToken? All saved data will be kept. Reset only if you suspect your sessionToken has been exposed or you no longer trust its current holder./nAfter resetting your sessionToken, log in to Phigros again.</string>
+    <string name="settings_reset_token_dialog_text">Reset your sessionToken? All saved data will be kept. Reset only if you suspect your sessionToken has been exposed or you no longer trust its current holder.\nAfter resetting your sessionToken, log in to Phigros again.</string>
     <string name="settings_reset_token_result_success">sessionToken has been reset. Please log in to Phigros again.</string>
     <string name="settings_reset_token_result_unknown">The reset result is unknown, possibly due to a network problem. The current sessionToken may be invalid; please try logging in again.</string>
     <string name="settings_reset_token_result_rejected">The current sessionToken was rejected. Please log in again.</string>
@@ -145,10 +145,11 @@
     <string name="catalog_update_error_unknown_message">The index update was interrupted. Try updating again.</string>
     <string name="settings_update_new_songs">Added %1$d new songs in this update:\n</string>
     <string name="settings_update_no_new_songs">No new songs in this update.</string>
+    <string name="settings_catalog_management">Index Data Management</string>
+    <string name="settings_catalog_management_desc">Update index data or reset an unfinished update</string>
     <string name="settings_update_song_data">Update index data</string>
     <string name="settings_update_song_data_desc">Download the latest Phigros song and collectible index</string>
     <string name="settings_reset_pending_update">Reset unfinished update</string>
-    <string name="settings_reset_pending_update_desc">Discard update backups and download the catalog again</string>
     <string name="settings_reset_pending_update_dialog_text">Discard the unfinished update's backup and staging files, then download the complete song and collectible catalog again?</string>
     <string name="settings_reset_pending_update_done">Unfinished update state was reset and the index was downloaded successfully.</string>
     <string name="settings_use_api_data">Use score lookup API data</string>

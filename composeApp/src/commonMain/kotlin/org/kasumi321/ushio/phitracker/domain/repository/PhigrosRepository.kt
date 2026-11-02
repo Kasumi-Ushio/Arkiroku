@@ -3,6 +3,7 @@ package org.kasumi321.ushio.phitracker.domain.repository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.json.JsonObject
 import org.kasumi321.ushio.phitracker.domain.model.Save
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
@@ -20,6 +21,8 @@ import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagSongData
 import org.kasumi321.ushio.phitracker.domain.model.ChartTagTreeNode
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistoryImportResult
+import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistorySummary
 
 interface PhigrosRepository {
     suspend fun validateToken(sessionToken: String, server: Server): Result<UserProfile>
@@ -88,6 +91,14 @@ interface PhigrosRepository {
         server: Server,
         userObjectId: String
     ): Result<String> = Result.failure(UnsupportedOperationException("resetSessionToken not implemented"))
+
+    fun observeLegacySyncHistorySummary(): Flow<LegacySyncHistorySummary?> = flowOf(null)
+
+    suspend fun importLegacySyncHistory(expectedOwner: String): Result<LegacySyncHistoryImportResult> =
+        Result.failure(UnsupportedOperationException("legacy history import is not supported"))
+
+    suspend fun discardLegacySyncHistory(expectedOwner: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("legacy history discard is not supported"))
 
     suspend fun getClearCountsByDifficulty(): Map<Difficulty, Int>
     suspend fun getTotalFullComboCount(): Int
