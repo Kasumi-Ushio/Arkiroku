@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -137,7 +136,7 @@ internal fun IndexSearchFab(
             }
         ) {
             Icon(
-                Icons.Filled.FilterList,
+                Icons.Filled.Search,
                 contentDescription = stringResource(Res.string.songs_cd_filter)
             )
         }

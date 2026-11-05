@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -61,6 +62,7 @@ import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
 import org.kasumi321.ushio.phitracker.ui.b30.B30RksHistogramChart
 import org.kasumi321.ushio.phitracker.ui.b30.setImageRequestAllowHardware
+import org.kasumi321.ushio.phitracker.ui.components.ColoredTag
 import org.kasumi321.ushio.phitracker.ui.components.phiFontFamily
 import org.kasumi321.ushio.phitracker.ui.glass.rememberExpansionArrowRotation
 import org.kasumi321.ushio.phitracker.ui.theme.DifficultyColors
@@ -468,9 +470,10 @@ fun ProfileHeaderCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = displayRks.formatFour(),
@@ -510,9 +513,10 @@ fun StatsTableCard(
                 .padding(horizontal = contentHorizontalPadding, vertical = contentVerticalPadding),
             verticalArrangement = Arrangement.spacedBy(rowSpacing, Alignment.CenterVertically)
         ) {
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 DifficultyStatItem("EZ", clearCounts["EZ"] ?: 0, DifficultyColors.EZ)
                 DifficultyStatItem("HD", clearCounts["HD"] ?: 0, DifficultyColors.HD)
@@ -520,9 +524,10 @@ fun StatsTableCard(
                 DifficultyStatItem("AT", clearCounts["AT"] ?: 0, DifficultyColors.AT)
             }
 
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 BadgeStatItem("FC", fcCount, FcColor, Color.White)
                 BadgeStatItem("\u03C6", phiCount, PhiColor, PhiTextColor, fontFamily = phiFontFamily)
@@ -557,25 +562,19 @@ private fun BadgeStatItem(
     textColor: Color,
     fontFamily: FontFamily? = null
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(bgColor)
-                .padding(horizontal = 8.dp, vertical = 2.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                fontFamily = fontFamily,
-                color = textColor,
-                fontSize = 13.sp
-            )
-        }
+        ColoredTag(
+            text = label,
+            backgroundColor = bgColor,
+            textColor = textColor,
+            fontSize = 13.sp,
+            fontFamily = fontFamily,
+            horizontalPadding = 8.dp
+        )
         Text(
             text = "$count",
             style = MaterialTheme.typography.titleMedium,

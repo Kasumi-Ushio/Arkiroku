@@ -1,12 +1,12 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +43,7 @@ import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.ui.b30.B30ImageSpec
 import org.kasumi321.ushio.phitracker.ui.b30.setImageRequestAllowHardware
+import org.kasumi321.ushio.phitracker.ui.components.DifficultyTag
 import org.kasumi321.ushio.phitracker.ui.components.ScoreRating
 import org.kasumi321.ushio.phitracker.ui.components.ScoreRatingTag
 import org.kasumi321.ushio.phitracker.ui.theme.DifficultyColors
@@ -105,7 +106,6 @@ fun ScoreCardContent(
     marqueeSongTitle: Boolean = false,
     footer: (@Composable ColumnScope.() -> Unit)? = null
 ) {
-    val diffColor = DifficultyColors.forDifficulty(record.difficulty)
     val rating = remember(record.score, record.isFullCombo) {
         ScoreRating.fromScore(record.score, record.isFullCombo)
     }
@@ -233,24 +233,15 @@ fun ScoreCardContent(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(diffColor)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = ccText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.surface,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = tagFontSize
-                        )
-                    }
+                    DifficultyTag(
+                        difficulty = record.difficulty,
+                        text = ccText,
+                        fontSize = tagFontSize
+                    )
 
                     ScoreRatingTag(rating = rating, fontSize = tagFontSize)
                 }

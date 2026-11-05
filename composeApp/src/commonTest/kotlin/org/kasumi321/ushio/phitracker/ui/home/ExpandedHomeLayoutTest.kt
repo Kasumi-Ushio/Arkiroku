@@ -14,19 +14,27 @@ class ExpandedHomeLayoutTest {
 
     @Test
     fun clampListPaneWidthEnforcesLowerBound() {
-        assertEquals(320.dp, clampListPaneWidth(200.dp, totalWidth = 1365.dp))
+        assertEquals(455.dp, clampListPaneWidth(200.dp, totalWidth = 1365.dp))
     }
 
     @Test
     fun clampListPaneWidthKeepsDetailPaneMinimum() {
-        assertEquals(965.dp, clampListPaneWidth(2000.dp, totalWidth = 1365.dp))
+        assertEquals(910.dp, clampListPaneWidth(2000.dp, totalWidth = 1365.dp))
     }
 
     @Test
-    fun clampListPaneWidthCollapsesToLowerBoundWhenWindowTooNarrow() {
-        // totalWidth below 720dp cannot honor both bounds; the list pane
-        // minimum wins so the rail stays usable.
-        assertEquals(320.dp, clampListPaneWidth(500.dp, totalWidth = 600.dp))
+    fun clampListPaneWidthCollapsesToUpperBoundWhenWindowTooNarrow() {
+        assertEquals(400.dp, clampListPaneWidth(500.dp, totalWidth = 600.dp))
+    }
+
+    @Test
+    fun clampListPaneWidthAccountsForReservedSpace() {
+        assertEquals(894.dp, clampListPaneWidth(2000.dp, totalWidth = 1365.dp, reservedWidth = 16.dp))
+    }
+
+    @Test
+    fun clampListPaneWidthAddsLeadingContentToMinimum() {
+        assertEquals(535.dp, clampListPaneWidth(100.dp, totalWidth = 1365.dp, leadingContentWidth = 80.dp))
     }
 
     @Test

@@ -1,6 +1,9 @@
 package org.kasumi321.ushio.phitracker.ui.collectible
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -10,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,6 +43,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -58,6 +65,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,7 +75,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -78,6 +88,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.CollectibleCategory
 import org.kasumi321.ushio.phitracker.domain.model.CollectibleChapter
@@ -86,6 +97,7 @@ import org.kasumi321.ushio.phitracker.domain.model.CollectibleItem
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
 import org.kasumi321.ushio.phitracker.ui.home.IndexSearchField
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
+import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.collectible_category_bold
 import phitracker.composeapp.generated.resources.collectible_category_key
@@ -121,6 +133,17 @@ private val POSTER_GRID_MIN_COLUMN_WIDTH = 180.dp
 /** Poster aspect: the source art is wide (16:9-ish), so crop only a little. */
 private val POSTER_ASPECT_RATIO = 16f / 10f
 
+internal const val STACK_LIST_MIN_FRACTION = 1f / 3f
+internal const val STACK_LIST_MAX_FRACTION = 2f / 3f
+internal const val STACK_LIST_DEFAULT_FRACTION = 0.55f
+
+internal fun clampStackedFraction(fraction: Float): Float =
+    if (fraction.isFinite()) {
+        fraction.coerceIn(STACK_LIST_MIN_FRACTION, STACK_LIST_MAX_FRACTION)
+    } else {
+        STACK_LIST_DEFAULT_FRACTION
+    }
+
 /**
  * Minimum width needed to split the expanded left pane into a poster column
  * and a chapter list. 45% of this is exactly the poster grid's minimum column
@@ -138,9 +161,10 @@ internal fun useSplitChapterPane(isExpandedPane: Boolean, availableWidth: Dp): B
  *  - idle (no search query, no active filters): a poster grid with one card
  *    per chapter; tapping a poster opens the chapter's item list in place
  *    when [drilledChapterKey] is provided. In the expanded left pane with
- *    enough width ([splitChapterPane]) the poster grid stays visible and the
- *    drilled list occupies a second column; otherwise the list replaces the
- *    grid. [onChapterClick] only reports the intent; the caller updates the
+ *    enough width ([splitChapterPane]) the drilled list stacks over the right
+ *    side of the unchanged poster grid, then expands left when an item opens;
+ *    otherwise the list replaces the grid. [onChapterClick] only reports the
+ *    intent; the caller updates the
  *    hoisted drill-down state;
  *  - searching/filtering: the flat chapter-grouped results list, so matches
  *    stay directly visible.
@@ -168,6 +192,9 @@ fun CollectiblesTab(
     splitChapterPane: Boolean = false,
     onBackFromChapter: () -> Unit = {},
     selectedItem: Pair<String, String>? = null,
+    stackProgress: State<Float>,
+    stackedFraction: Float,
+    onStackedFractionChange: (Float) -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
     listState: LazyListState = rememberLazyListState(),
     useGrid: Boolean = false,
@@ -219,20 +246,43 @@ fun CollectiblesTab(
         bottom = contentPadding.calculateBottomPadding() + 8.dp
     )
     when {
-        // Expanded left pane: keep the poster wall visible and put the
-        // drilled chapter list beside it. The split only exists where a
-        // detail pane keeps the reading page off this surface; narrower panes
-        // fall back to the in-place drill-down.
-        !browsingActive && splitChapterPane && drilledChapterKey != null -> {
-            BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-                if (useSplitChapterPane(splitChapterPane, maxWidth)) {
-                    val splitPadding = PaddingValues(
-                        start = 8.dp,
-                        end = 8.dp,
-                        top = listContentPadding.calculateTopPadding(),
-                        bottom = listContentPadding.calculateBottomPadding()
-                    )
-                    Row(modifier = Modifier.fillMaxSize()) {
+        !browsingActive -> BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+            if (useSplitChapterPane(splitChapterPane, maxWidth)) {
+                StackedChapterPane(
+                    state = state,
+                    updateAvailable = updateAvailable,
+                    onUpdateNow = onUpdateNow,
+                    chapterItemCounts = chapterItemCounts,
+                    getPosterUrl = getPosterUrl,
+                    onChapterClick = onChapterClick,
+                    gridState = gridState,
+                    drilledChapterKey = drilledChapterKey,
+                    contentPadding = listContentPadding,
+                    selectedItem = selectedItem,
+                    stackProgress = stackProgress,
+                    stackedFraction = stackedFraction,
+                    onStackedFractionChange = onStackedFractionChange,
+                    onItemClick = onItemClick,
+                    onBackFromChapter = onBackFromChapter,
+                    getChapterListState = getChapterListState,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                AnimatedContent(
+                    targetState = drilledChapterKey,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        if (targetState != null) {
+                            slideInHorizontally { width -> width / 10 } + fadeIn() togetherWith
+                                slideOutHorizontally { width -> -width / 10 } + fadeOut()
+                        } else {
+                            slideInHorizontally { width -> -width / 10 } + fadeIn() togetherWith
+                                slideOutHorizontally { width -> width / 10 } + fadeOut()
+                        }
+                    },
+                    label = "collectiblesChapterDrill"
+                ) { chapterKey ->
+                    if (chapterKey == null) {
                         ChapterPosterGrid(
                             state = state,
                             updateAvailable = updateAvailable,
@@ -240,95 +290,26 @@ fun CollectiblesTab(
                             chapterItemCounts = chapterItemCounts,
                             getPosterUrl = getPosterUrl,
                             onChapterClick = onChapterClick,
-                            contentPadding = splitPadding,
+                            contentPadding = listContentPadding,
                             gridState = gridState,
-                            selectedChapterKey = drilledChapterKey,
-                            modifier = Modifier.weight(0.45f)
+                            modifier = Modifier.fillMaxSize()
                         )
-                        VerticalDivider(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .padding(top = listContentPadding.calculateTopPadding()),
-                            thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
+                    } else {
                         DrilledChapterContent(
-                            folderKey = drilledChapterKey,
+                            folderKey = chapterKey,
                             state = state,
-                            updateAvailable = false,
+                            updateAvailable = updateAvailable,
                             onUpdateNow = onUpdateNow,
                             getPosterUrl = getPosterUrl,
                             selectedItem = selectedItem,
                             onItemClick = onItemClick,
                             onBackFromChapter = onBackFromChapter,
-                            contentPadding = splitPadding,
+                            contentPadding = listContentPadding,
                             getChapterListState = getChapterListState,
-                            modifier = Modifier.weight(0.55f)
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
-                } else {
-                    DrilledChapterContent(
-                        folderKey = drilledChapterKey,
-                        state = state,
-                        updateAvailable = updateAvailable,
-                        onUpdateNow = onUpdateNow,
-                        getPosterUrl = getPosterUrl,
-                        selectedItem = selectedItem,
-                        onItemClick = onItemClick,
-                        onBackFromChapter = onBackFromChapter,
-                        contentPadding = listContentPadding,
-                        getChapterListState = getChapterListState,
-                        modifier = Modifier.fillMaxSize()
-                    )
                 }
-            }
-        }
-        // Level 1+2 (two-pane layouts): chapter posters are the idle view;
-        // tapping one drills the chapter's item list into this pane in place
-        // while the reading page stays in the detail pane. On compact
-        // layouts [drilledChapterKey] is always null and posters navigate to
-        // the full-screen chapter route instead.
-        !browsingActive -> AnimatedContent(
-            targetState = drilledChapterKey,
-            transitionSpec = {
-                // Same motion language as the navigation transitions:
-                // drilling down slides forward, back slides in reverse.
-                if (targetState != null) {
-                    slideInHorizontally { width -> width / 10 } + fadeIn() togetherWith
-                        slideOutHorizontally { width -> -width / 10 } + fadeOut()
-                } else {
-                    slideInHorizontally { width -> -width / 10 } + fadeIn() togetherWith
-                        slideOutHorizontally { width -> width / 10 } + fadeOut()
-                }
-            },
-            label = "collectiblesChapterDrill"
-        ) { chapterKey ->
-            if (chapterKey == null) {
-                ChapterPosterGrid(
-                    state = state,
-                    updateAvailable = updateAvailable,
-                    onUpdateNow = onUpdateNow,
-                    chapterItemCounts = chapterItemCounts,
-                    getPosterUrl = getPosterUrl,
-                    onChapterClick = onChapterClick,
-                    contentPadding = listContentPadding,
-                    gridState = gridState,
-                    modifier = modifier
-                )
-            } else {
-                DrilledChapterContent(
-                    folderKey = chapterKey,
-                    state = state,
-                    updateAvailable = updateAvailable,
-                    onUpdateNow = onUpdateNow,
-                    getPosterUrl = getPosterUrl,
-                    selectedItem = selectedItem,
-                    onItemClick = onItemClick,
-                    onBackFromChapter = onBackFromChapter,
-                    contentPadding = listContentPadding,
-                    getChapterListState = getChapterListState,
-                    modifier = modifier
-                )
             }
         }
         useGrid -> LazyVerticalGrid(
@@ -421,6 +402,169 @@ fun CollectiblesTab(
                 onClose = { onToggleFilterSheet(false) }
             )
         }
+    }
+}
+
+@Composable
+private fun StackedChapterPane(
+    state: CollectiblesUiState,
+    updateAvailable: Boolean,
+    onUpdateNow: () -> Unit,
+    chapterItemCounts: Map<String, Int>,
+    getPosterUrl: (String) -> String?,
+    onChapterClick: (CollectibleChapter) -> Unit,
+    gridState: LazyGridState,
+    drilledChapterKey: String?,
+    contentPadding: PaddingValues,
+    selectedItem: Pair<String, String>?,
+    stackProgress: State<Float>,
+    stackedFraction: Float,
+    onStackedFractionChange: (Float) -> Unit,
+    onItemClick: (CollectibleItem) -> Unit,
+    onBackFromChapter: () -> Unit,
+    getChapterListState: (String) -> LazyListState,
+    modifier: Modifier = Modifier
+) {
+    val reducedMotion = rememberReducedMotionEnabled()
+    val chapterOpen = drilledChapterKey != null
+    var retainedChapterKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(drilledChapterKey) {
+        if (drilledChapterKey != null) retainedChapterKey = drilledChapterKey
+    }
+    val contentChapterKey = drilledChapterKey ?: retainedChapterKey
+    val splitPadding = PaddingValues(
+        start = 8.dp,
+        end = 8.dp,
+        top = contentPadding.calculateTopPadding(),
+        bottom = contentPadding.calculateBottomPadding()
+    )
+
+    BoxWithConstraints(modifier = modifier) {
+        val fullWidthPx = constraints.maxWidth
+        val resizeState = rememberDraggableState { delta ->
+            onStackedFractionChange(stackedFraction - delta / fullWidthPx)
+        }
+        ChapterPosterGrid(
+            state = state,
+            updateAvailable = updateAvailable,
+            onUpdateNow = onUpdateNow,
+            chapterItemCounts = chapterItemCounts,
+            getPosterUrl = getPosterUrl,
+            onChapterClick = onChapterClick,
+            contentPadding = splitPadding,
+            gridState = gridState,
+            selectedChapterKey = drilledChapterKey,
+            modifier = Modifier.fillMaxSize()
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .stackedListWidth(stackProgress, stackedFraction)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {}
+                ),
+            shadowElevation = if (selectedItem == null) 12.dp else 0.dp
+        ) {
+            Box(modifier = Modifier.fillMaxSize().clipToBounds()) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = chapterOpen,
+                    modifier = Modifier.fillMaxSize(),
+                    enter = if (reducedMotion) {
+                        EnterTransition.None
+                    } else {
+                        fadeIn(animationSpec = tween(180)) + slideInHorizontally { width -> width / 4 }
+                    },
+                    exit = if (reducedMotion) {
+                        ExitTransition.None
+                    } else {
+                        fadeOut(animationSpec = tween(120)) + slideOutHorizontally { width -> width / 4 }
+                    },
+                    label = "collectibleStackChapterList"
+                ) {
+                    contentChapterKey?.let { chapterKey ->
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            VerticalDivider(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(top = contentPadding.calculateTopPadding()),
+                                thickness = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                            AnimatedContent(
+                                targetState = chapterKey,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                transitionSpec = {
+                                    if (reducedMotion) {
+                                        EnterTransition.None togetherWith ExitTransition.None
+                                    } else {
+                                        slideInHorizontally { width -> width / 10 } + fadeIn() togetherWith
+                                            slideOutHorizontally { width -> -width / 10 } + fadeOut()
+                                    }
+                                },
+                                label = "collectibleStackChapterContent"
+                            ) { currentChapterKey ->
+                                DrilledChapterContent(
+                                    folderKey = currentChapterKey,
+                                    state = state,
+                                    updateAvailable = false,
+                                    onUpdateNow = onUpdateNow,
+                                    getPosterUrl = getPosterUrl,
+                                    selectedItem = selectedItem,
+                                    onItemClick = onItemClick,
+                                    onBackFromChapter = onBackFromChapter,
+                                    contentPadding = splitPadding,
+                                    getChapterListState = getChapterListState,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    }
+                }
+                if (chapterOpen && selectedItem == null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .fillMaxHeight()
+                            .width(24.dp)
+                            .draggable(
+                                state = resizeState,
+                                orientation = Orientation.Horizontal
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun Modifier.stackedListWidth(progress: State<Float>, stackedFraction: Float) = layout { measurable, constraints ->
+    val widthFraction = stackedListWidthFraction(progress.value, stackedFraction)
+    val width = (constraints.maxWidth * widthFraction).roundToInt()
+    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    layout(width, placeable.height) { placeable.place(0, 0) }
+}
+
+internal fun stackedListWidthFraction(progress: Float, stackedFraction: Float): Float {
+    val currentProgress = progress.coerceIn(0f, 2f)
+    val settledFraction = clampStackedFraction(stackedFraction)
+    return if (currentProgress <= 1f) {
+        currentProgress * settledFraction
+    } else {
+        settledFraction + (currentProgress - 1f) * (1f - settledFraction)
     }
 }
 
@@ -577,8 +721,8 @@ private fun ChapterPosterGrid(
 /**
  * Chapter drill-down (level 2): the chapter's item list with a compact header
  * (thumb + name + ordinal + count + back-to-posters affordance). On the
- * expanded layout it is the second column of the split pane; on compact or
- * narrow panes it replaces the poster grid in place. The back handler
+ * expanded layout it stacks over the poster grid and expands left when an
+ * item opens; on compact or narrow panes it replaces the poster grid. The back handler
  * closes the drill-down; it is disabled while an item is shown in the detail
  * pane so the pane's own back handling pops that first.
  */
@@ -910,16 +1054,16 @@ private fun CollectibleFilterSheetContent(
             style = MaterialTheme.typography.titleMedium
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             CollectibleCategory.entries.forEach { category ->
                 FilterChip(
                     selected = category in selectedCategories,
                     onClick = { onToggleCategory(category) },
-                    label = { Text(collectibleCategoryLabel(category)) },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text(collectibleCategoryLabel(category)) }
                 )
             }
         }

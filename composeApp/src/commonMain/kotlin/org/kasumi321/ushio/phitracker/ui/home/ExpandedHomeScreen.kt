@@ -74,14 +74,14 @@ import org.kasumi321.ushio.phitracker.ui.utils.rememberSeparatingVerticalHingeBo
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.detail_pane_placeholder
 
-/** Narrowest the list pane may be dragged to. */
-private val MinListPaneWidth = 320.dp
-
-/** Width the detail pane always keeps, capping how wide the list pane grows. */
-private val MinDetailPaneWidth = 400.dp
+private const val MIN_PANE_WIDTH_FRACTION = 1f / 3f
+private const val MAX_PANE_WIDTH_FRACTION = 2f / 3f
 
 /** Touch target width of the draggable divider between the two panes. */
 private val DividerHandleWidth = 16.dp
+
+/** Width of the primary navigation rail inside the list pane. */
+private val PrimaryContentRailWidth = 80.dp
 
 /** Default list pane width: a phone-like 9:16 (width:height) portrait pane. */
 internal fun defaultListPaneWidth(height: Dp): Dp = height * 9 / 16
@@ -96,9 +96,17 @@ internal fun preferredListPaneWidth(userWidthDp: Float, hingeLeft: Dp?, height: 
     else -> defaultListPaneWidth(height)
 }
 
-/** Keeps the list pane inside [MinListPaneWidth, totalWidth - [MinDetailPaneWidth]]. */
-internal fun clampListPaneWidth(width: Dp, totalWidth: Dp): Dp =
-    width.coerceIn(MinListPaneWidth, (totalWidth - MinDetailPaneWidth).coerceAtLeast(MinListPaneWidth))
+/** Keeps both panes within one and two thirds, reserving divider and hinge space. */
+internal fun clampListPaneWidth(
+    width: Dp,
+    totalWidth: Dp,
+    reservedWidth: Dp = 0.dp,
+    leadingContentWidth: Dp = 0.dp
+): Dp {
+    val minWidth = leadingContentWidth + totalWidth * MIN_PANE_WIDTH_FRACTION
+    val maxWidth = (totalWidth * MAX_PANE_WIDTH_FRACTION - reservedWidth).coerceAtLeast(minWidth)
+    return width.coerceIn(minWidth, maxWidth)
+}
 
 /**
  * Animated list pane width: full incoming width at progress 0 (detail pane
@@ -295,10 +303,14 @@ internal fun ExpandedHomeScreen(
         // clear of it. A user's drag still wins over the hinge-aligned default.
         val hingeBounds = rememberSeparatingVerticalHingeBounds()
         val hingeLeft = hingeBounds?.let { with(density) { it.left.toDp() } }
-        val hingeGapPx = hingeBounds?.let { (it.right - it.left).roundToInt() } ?: 0
+        val hingeGapWidth = hingeBounds?.let { with(density) { (it.right - it.left).toDp() } } ?: 0.dp
+        val hingeGapPx = with(density) { hingeGapWidth.roundToPx() }
+        val reservedWidth = DividerHandleWidth + hingeGapWidth
         val listPaneWidth = clampListPaneWidth(
             width = preferredListPaneWidth(userWidthDp, hingeLeft, maxHeight),
-            totalWidth = totalWidth
+            totalWidth = totalWidth,
+            reservedWidth = reservedWidth,
+            leadingContentWidth = PrimaryContentRailWidth
         )
         val fullWidthPx = constraints.maxWidth
         val listPaneWidthPx = with(density) { listPaneWidth.roundToPx() }
@@ -355,7 +367,9 @@ internal fun ExpandedHomeScreen(
                             val base = if (userWidthDp.isNaN()) listPaneWidth else userWidthDp.dp
                             userWidthDp = clampListPaneWidth(
                                 width = base + with(density) { delta.toDp() },
-                                totalWidth = totalWidth
+                                totalWidth = totalWidth,
+                                reservedWidth = reservedWidth,
+                                leadingContentWidth = PrimaryContentRailWidth
                             ).value
                         },
                         orientation = Orientation.Horizontal

@@ -801,14 +801,17 @@ private fun DifficultyContent(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                itemVerticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     text = record.score.formatScore(),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
                                 ScoreRatingTag(
                                     rating = ScoreRating.fromScore(record.score, record.isFullCombo),
                                     fontSize = 10.sp
@@ -1059,14 +1062,17 @@ private fun SyncHistoryCard(entry: SongSyncHistoryEntry) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = entry.score.formatScore(),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
                     ScoreRatingTag(
                         rating = ScoreRating.fromScore(entry.score, entry.isFullCombo),
                         fontSize = 10.sp

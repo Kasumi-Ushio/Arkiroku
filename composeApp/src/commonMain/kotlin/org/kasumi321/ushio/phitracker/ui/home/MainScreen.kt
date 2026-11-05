@@ -1,5 +1,8 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -61,9 +64,11 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -116,6 +121,8 @@ import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportPayload
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesTab
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesViewModel
+import org.kasumi321.ushio.phitracker.ui.collectible.STACK_LIST_DEFAULT_FRACTION
+import org.kasumi321.ushio.phitracker.ui.collectible.clampStackedFraction
 import org.kasumi321.ushio.phitracker.ui.collectible.isBrowsingActive
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
 import org.kasumi321.ushio.phitracker.ui.components.ElasticPagerPrimaryIndicator
@@ -202,8 +209,14 @@ class IndexSubTabState(initial: IndexSubTab = IndexSubTab.Songs) {
  * [HomeTabState]) so it survives the compact/expanded layout swap,
  * configuration changes and process death.
  */
-class CollectiblesChapterState(initialFolderKey: String? = null) {
+class CollectiblesChapterState(
+    initialFolderKey: String? = null,
+    initialStackedFraction: Float = STACK_LIST_DEFAULT_FRACTION
+) {
     var folderKey by mutableStateOf(initialFolderKey)
+        private set
+
+    var stackedFraction by mutableFloatStateOf(clampStackedFraction(initialStackedFraction))
         private set
 
     fun open(folderKey: String) {
@@ -214,10 +227,31 @@ class CollectiblesChapterState(initialFolderKey: String? = null) {
         folderKey = null
     }
 
+    fun updateStackedFraction(fraction: Float) {
+        stackedFraction = clampStackedFraction(fraction)
+    }
+
     companion object {
         val Saver = Saver<CollectiblesChapterState, Any>(
-            save = { it.folderKey },
-            restore = { saved -> CollectiblesChapterState(saved as? String) }
+            save = { state ->
+                if (state.folderKey == null && state.stackedFraction == STACK_LIST_DEFAULT_FRACTION) {
+                    null
+                } else {
+                    "v2|${state.stackedFraction}|${state.folderKey.orEmpty()}"
+                }
+            },
+            restore = { saved ->
+                when (saved) {
+                    is String if (saved.startsWith("v2|")) -> {
+                        val parts = saved.removePrefix("v2|").split("|", limit = 2)
+                        val fraction = parts.firstOrNull()?.toFloatOrNull() ?: STACK_LIST_DEFAULT_FRACTION
+                        val folderKey = parts.getOrNull(1).orEmpty().ifBlank { null }
+                        CollectiblesChapterState(folderKey, fraction)
+                    }
+                    is String -> CollectiblesChapterState(saved)
+                    else -> CollectiblesChapterState()
+                }
+            }
         )
     }
 }
@@ -449,6 +483,15 @@ fun MainScreen(
     val selectedTab = tabState.selected
     val tip = remember(selectedTab) { viewModel.getRandomTip() }
     val reducedMotionEnabled = rememberReducedMotionEnabled()
+    val stackedProgress = animateFloatAsState(
+        targetValue = when {
+            !isInExpandedPane || collectiblesChapterState.folderKey == null -> 0f
+            selectedCollectibleItem == null -> 1f
+            else -> 2f
+        },
+        animationSpec = if (reducedMotionEnabled) snap() else tween(320),
+        label = "collectibleStackProgress"
+    )
     val windowSizeClass = rememberWindowSizeClass()
     val navMode = if (windowSizeClass.isAtLeastMedium()) HomeNavMode.Rail else HomeNavMode.BottomBar
 
@@ -943,10 +986,13 @@ fun MainScreen(
                                             collectiblesChapterState.close()
                                         },
                                         selectedItem = if (isInExpandedPane) selectedCollectibleItem else null,
+                                        stackProgress = stackedProgress,
+                                        stackedFraction = collectiblesChapterState.stackedFraction,
+                                        onStackedFractionChange = collectiblesChapterState::updateStackedFraction,
                                         onChapterClick = { chapter ->
                                             // Level 2 drills down in place on compact; on
-                                            // expanded it splits the left pane. Tapping the
-                                            // already-open poster collapses the split.
+                                            // expanded the chapter list stacks over the posters.
+                                            // Tapping the open poster dismisses the list.
                                             val alreadyOpen = collectiblesChapterState.folderKey == chapter.folderKey
                                             if (alreadyOpen) {
                                                 AppLogger.event(

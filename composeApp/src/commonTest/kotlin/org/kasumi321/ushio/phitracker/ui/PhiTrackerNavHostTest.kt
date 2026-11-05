@@ -19,6 +19,7 @@ import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationCoordinator
 import org.kasumi321.ushio.phitracker.ui.navigation.LoginBackStackPolicy
 import org.kasumi321.ushio.phitracker.ui.b30.B30NavigationGateway
 import org.kasumi321.ushio.phitracker.ui.b30.claimPayload
+import org.kasumi321.ushio.phitracker.ui.collectible.STACK_LIST_DEFAULT_FRACTION
 import org.kasumi321.ushio.phitracker.ui.home.CollectiblesChapterState
 import org.kasumi321.ushio.phitracker.ui.home.HomeTab
 import org.kasumi321.ushio.phitracker.ui.home.HomeTabState
@@ -496,6 +497,42 @@ class PhiTrackerNavHostTest {
 
         restored?.close()
         assertEquals(null, restored?.folderKey)
+    }
+
+    @Test
+    fun collectiblesChapterStateSaverRestoresCustomStackedFraction() {
+        val state = CollectiblesChapterState()
+        state.updateStackedFraction(0.42f)
+        state.open("冰封世界")
+
+        val saved = with(CollectiblesChapterState.Saver) {
+            with(SaverScope { true }) { save(state) }
+        }
+        val restored = assertNotNull(CollectiblesChapterState.Saver.restore(checkNotNull(saved)))
+
+        assertEquals("冰封世界", restored.folderKey)
+        assertEquals(0.42f, restored.stackedFraction, 0.0001f)
+
+        restored.close()
+        val savedWithoutChapter = with(CollectiblesChapterState.Saver) {
+            with(SaverScope { true }) { save(restored) }
+        }
+        val restoredWithoutChapter = assertNotNull(CollectiblesChapterState.Saver.restore(checkNotNull(savedWithoutChapter)))
+
+        assertNull(restoredWithoutChapter.folderKey)
+        assertEquals(0.42f, restoredWithoutChapter.stackedFraction, 0.0001f)
+    }
+
+    @Test
+    fun collectiblesChapterStateSaverUsesDefaultsForInvalidFraction() {
+        val restored = CollectiblesChapterState.Saver.restore("v2|not-a-number|冰封世界")
+
+        assertEquals("冰封世界", restored?.folderKey)
+        assertEquals(STACK_LIST_DEFAULT_FRACTION, restored?.stackedFraction)
+        assertEquals(
+            STACK_LIST_DEFAULT_FRACTION,
+            CollectiblesChapterState.Saver.restore("冰封世界")?.stackedFraction
+        )
     }
 
     @Test

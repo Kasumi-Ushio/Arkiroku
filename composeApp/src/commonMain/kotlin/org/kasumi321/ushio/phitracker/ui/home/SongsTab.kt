@@ -1,10 +1,8 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -68,6 +66,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.SongInfo
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.components.DifficultyTag
 import org.kasumi321.ushio.phitracker.ui.theme.DifficultyColors
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
 import org.kasumi321.ushio.phitracker.ui.utils.chapterDisplayNameLocalized
@@ -549,20 +548,11 @@ fun SongItem(
                     for (diff in orderedDiffs) {
                         val cc = song.difficulties[diff] ?: continue
                         val ccText = remember(cc) { "${DifficultyColors.labelFor(diff)} ${cc.formatLevel()}" }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(DifficultyColors.forDifficulty(diff))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = ccText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.surface,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            )
-                        }
+                        DifficultyTag(
+                            difficulty = diff,
+                            text = ccText,
+                            fontSize = 10.sp
+                        )
                     }
                 }
             }
