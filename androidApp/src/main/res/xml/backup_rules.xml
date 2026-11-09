@@ -36,4 +36,16 @@
     <exclude
         domain="file"
         path="collectible_data_quarantine/" />
+    <exclude
+        domain="file"
+        path="avatar_data/" />
+    <exclude
+        domain="file"
+        path="avatar_data_backup/" />
+    <exclude
+        domain="file"
+        path="avatar_data_quarantine/" />
+    <exclude
+        domain="file"
+        path="avatar_pool/" />
 </full-backup-content>

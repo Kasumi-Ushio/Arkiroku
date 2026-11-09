@@ -47,6 +47,8 @@ interface PhigrosRepository {
     fun getUserProfile(): Flow<UserProfile?>
     suspend fun setAvatarUri(uri: String?): Result<Unit> =
         Result.failure(UnsupportedOperationException("account avatar is not supported"))
+    suspend fun setGameAvatar(avatarId: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("built-in account avatar is not supported"))
     suspend fun saveSessionToken(token: String, server: Server)
     suspend fun getSessionToken(): Pair<String, Server>?
     fun observeSessionToken(): Flow<Pair<String, Server>?> = flow { emit(getSessionToken()) }

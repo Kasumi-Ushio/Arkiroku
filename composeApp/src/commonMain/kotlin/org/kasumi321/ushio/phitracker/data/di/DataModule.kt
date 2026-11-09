@@ -12,6 +12,11 @@ import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
 import org.kasumi321.ushio.phitracker.data.api.TapTapQrLoginApi
 import org.kasumi321.ushio.phitracker.data.TipsProvider
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogProvider
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogSession
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarDataUpdateCoordinator
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarDataUpdater
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarImageStore
 import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
 import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
@@ -120,6 +125,11 @@ val dataModule = module {
     single { createPlatformPaths() }
     single<StandardArtworkCache> { ArtworkFileCache(get(), get()) }
     single { SongDataProvider(paths = get()) }
+    single { AvatarCatalogProvider(paths = get()) }
+    single { AvatarImageStore(get(), get()) }
+    single { AvatarDataUpdater(get(), get(), get()) }
+    single { AvatarDataUpdateCoordinator(get(), get(), get()) }
+    single { AvatarCatalogSession(get()) }
     single<PhigrosRepository> {
         PhigrosRepositoryImpl(
             apiClient = get(),
@@ -136,7 +146,9 @@ val dataModule = module {
             legacySyncHistoryDao = get(),
             tokenManager = get(),
             json = get(),
-            songDataProvider = get()
+            songDataProvider = get(),
+            avatarCatalogProvider = get(),
+            avatarImageStore = get()
         )
     }
     single { IllustrationProvider() }

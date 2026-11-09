@@ -27,6 +27,8 @@ import org.kasumi321.ushio.phitracker.data.api.toDomain
 import org.kasumi321.ushio.phitracker.data.api.PhiPluginApi
 import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogProvider
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarImageStore
 import org.kasumi321.ushio.phitracker.data.database.AccountDataClearer
 import org.kasumi321.ushio.phitracker.data.database.CurrentAccountDao
 import org.kasumi321.ushio.phitracker.data.database.LegacySyncHistoryDao
@@ -86,6 +88,8 @@ class PhigrosRepositoryImpl(
     private val tokenManager: TokenManager,
     private val json: Json,
     private val songDataProvider: SongDataProvider,
+    private val avatarCatalogProvider: AvatarCatalogProvider,
+    private val avatarImageStore: AvatarImageStore,
 ) : PhigrosRepository {
     private val syncWriter = SyncWriter(database, recordDao, userDao, syncSnapshotDao, songSyncHistoryDao, currentAccountDao)
     private val accountDataClearer = AccountDataClearer(database, recordDao, userDao, syncSnapshotDao, songSyncHistoryDao, currentAccountDao)
@@ -232,6 +236,34 @@ class PhigrosRepositoryImpl(
     override suspend fun setAvatarUri(uri: String?): Result<Unit> = runCatching {
         val owner = currentDisplayOwner() ?: error("没有可设置头像的当前账号")
         check(userDao.updateAvatarUri(owner, uri) == 1) { "当前账号资料不存在" }
+    }
+
+    override suspend fun setGameAvatar(avatarId: String): Result<Unit> {
+        val owner = currentDisplayOwner()
+            ?: return Result.failure(IllegalStateException("没有可设置头像的当前账号"))
+        val avatar = avatarCatalogProvider.findById(avatarId)
+            ?: return Result.failure(IllegalArgumentException("头像不存在或已下架"))
+        val existingUser = userDao.getUserOnce(owner)
+            ?: return Result.failure(IllegalStateException("当前账号资料不存在"))
+        val oldUri = existingUser.avatarUri
+        var newUri: String? = null
+        var updated = false
+        try {
+            val createdUri = avatarImageStore.createAccountAvatar(avatar, owner)
+            newUri = createdUri
+            check(userDao.updateAvatarUri(owner, createdUri) == 1) { "当前账号资料不存在" }
+            updated = true
+            if (oldUri != createdUri) runCatching { avatarImageStore.deleteManagedAccountAvatar(oldUri) }
+            return Result.success(Unit)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            return Result.failure(error)
+        } finally {
+            if (!updated && newUri != oldUri) {
+                newUri?.let { uri -> runCatching { avatarImageStore.deleteManagedAccountAvatar(uri) } }
+            }
+        }
     }
 
     override suspend fun saveSessionToken(token: String, server: Server) {

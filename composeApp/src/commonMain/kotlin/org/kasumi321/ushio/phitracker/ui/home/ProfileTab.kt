@@ -56,7 +56,6 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import org.jetbrains.compose.resources.stringResource
-import org.kasumi321.ushio.phitracker.data.platform.rememberAvatarPicker
 import org.kasumi321.ushio.phitracker.domain.model.B30RksHistogram
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
@@ -119,7 +118,7 @@ fun ProfileTab(
     displayRks: Float,
     isLoggedIn: Boolean = true,
     onNavigateToLogin: () -> Unit = {},
-    onAvatarSelected: (String) -> Unit,
+    onAvatarClick: () -> Unit,
     onSongClick: (String, Difficulty?) -> Unit,
     getIllustrationUrl: (String) -> String?,
     histogram: B30RksHistogram? = null,
@@ -142,10 +141,8 @@ fun ProfileTab(
     val phiCount = state.phiCount
     val avatarUri = state.avatarUri
     val lastSyncTime = state.lastSyncTime
+    val lastSyncedRecord = state.lastSyncedRecord
     val recentSyncedRecords = state.recentSyncedRecords
-    val launchPicker = rememberAvatarPicker { uri ->
-        uri?.let { onAvatarSelected(it) }
-    }
 
     // Full-bleed scroll: content scrolls behind the floating glass bars, with
     // spacers keeping the first and last items clear of them
@@ -206,7 +203,7 @@ fun ProfileTab(
                 challengeModeRank = challengeModeRank,
                 moneyString = moneyString,
                 avatarUri = avatarUri,
-                onAvatarClick = { launchPicker() },
+                onAvatarClick = onAvatarClick,
                 modifier = Modifier.fillMaxWidth()
             )
 

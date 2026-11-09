@@ -11,7 +11,7 @@
     <string name="privacy_section_1_intro">本應用程式在執行過程中可能涉及以下資料：</string>
     <string name="privacy_section_1_item_1">1. TapTap 帳號憑證：當您選擇透過 TapTap 掃碼登入時，本應用程式會取得 TapTap 授權的 sessionToken，用於從 Phigros 雲端伺服器讀取您的遊戲存檔資料。</string>
     <string name="privacy_section_1_item_2">2. Phigros 遊戲存檔：包括您的遊戲暱稱、課題模式評級、遊玩紀錄（成績、準確率、Full Combo 狀態等）和 RKS 數值。</string>
-    <string name="privacy_section_1_item_3">3. 本機設定偏好：包括您選擇的主題模式、自訂頭像的本機 URI、B30 溢出顯示設定等。</string>
+    <string name="privacy_section_1_item_3">3. 本機設定偏好：包括您選擇的主題模式、自訂或遊戲內建頭像的本機 URI、B30 溢出顯示設定等。</string>
     <string name="privacy_section_1_item_4">4. 執行日誌（僅 Debug 版本）：Debug 版本提供匯出執行日誌功能。該日誌用於排除故障，可能包含網路請求相關技術資訊（在特定情況下可能出現帳號憑證欄位，如 sessionToken）。請僅在您信任的管道中分享日誌，並在公開前自行檢查和去識別化。</string>
     <string name="privacy_section_1_item_5">5. Phi-Plugin「灤鳩」聯合查分 API 請求憑證（可選）：當您選擇在設定頁面中開啟「啟用查分 API」功能時，本應用程式將根據您填寫的「平台名稱」、「平台 ID」、「API 使用者 ID」和「API Token」向該 API 發送請求，以取得對應的查分資料。</string>
 
@@ -19,7 +19,7 @@
     <string name="privacy_section_2_intro">您的資料僅用於以下目的：</string>
     <string name="privacy_section_2_item_1">• 讀取並顯示您的 Phigros 遊戲存檔與成績分析（B30、RKS 計算等）。</string>
     <string name="privacy_section_2_item_2">• 儲存您的個人化設定，以便在下次啟動時還原。</string>
-    <string name="privacy_section_2_item_3">• 快取曲繪資源，減少網路流量消耗。</string>
+    <string name="privacy_section_2_item_3">• 快取曲繪與頭像資源，減少網路流量消耗。</string>
     <string name="privacy_section_2_item_4">• 根據您開啟查分 API 功能後填寫的平台名稱、平台 ID、API 使用者 ID 和 API Token，向該 API 發送請求，以取得對應的查分資料。</string>
 
     <string name="privacy_section_3_title">三、資料的儲存與安全</string>

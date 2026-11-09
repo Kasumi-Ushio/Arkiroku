@@ -126,6 +126,7 @@ class StagedFileSetUpdate(
     private val fileNames: List<String>,
     private val remoteName: (String) -> String = { it },
     private val invalidateCache: suspend () -> Unit,
+    private val validateStaged: suspend (stagingDir: Path) -> Unit = {},
     private val commitAttempt: (fileName: String, move: () -> Unit) -> Unit = { _, move -> move() },
 ) {
     /** Persisted under [persistentDir] so clearing the cache cannot erase the repair obligation. */
@@ -273,6 +274,7 @@ class StagedFileSetUpdate(
                     onProgress(index, fileNames.size, fileName)
                     downloadTo(stagingDir / fileName, "$baseUrl${remoteName(fileName)}")
                 }
+                validateStaged(stagingDir)
 
                 val existedBefore = fileNames.filter { fs.exists(persistentDir / it) }
                 fs.deleteRecursivelyBestEffort(backupDir)

@@ -116,9 +116,15 @@ import phitracker.composeapp.generated.resources.profile_avatar
 import phitracker.composeapp.generated.resources.profile_set_avatar
 import phitracker.composeapp.generated.resources.songs_all_songs_count
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogProvider
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogSession
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogRunStatus
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarImageStore
 import org.kasumi321.ushio.phitracker.data.platform.rememberAvatarPicker
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
+import org.kasumi321.ushio.phitracker.domain.model.GameAvatar
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportPayload
+import org.kasumi321.ushio.phitracker.ui.home.avatar.AvatarPickerSheet
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesTab
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesViewModel
 import org.kasumi321.ushio.phitracker.ui.collectible.STACK_LIST_DEFAULT_FRACTION
@@ -139,6 +145,7 @@ import org.kasumi321.ushio.phitracker.ui.utils.isAtLeastMedium
 import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import org.kasumi321.ushio.phitracker.ui.utils.rememberWindowSizeClass
 import org.kasumi321.ushio.phitracker.ui.utils.resolve
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 private const val B30_TAG_ANALYSIS_SETTLE_TIMEOUT_MS = 10_000L
@@ -502,7 +509,47 @@ fun MainScreen(
         BottomNavItem(HomeTab.Tools, stringResource(Res.string.home_tab_tools), Icons.Filled.Build, Icons.Outlined.Build)
     )
 
-    val launchAvatarPicker = rememberAvatarPicker { uri -> uri?.let(viewModel::setAvatarUri) }
+    val avatarCatalogSession = koinInject<AvatarCatalogSession>()
+    val avatarCatalogProvider = koinInject<AvatarCatalogProvider>()
+    val avatarImageStore = koinInject<AvatarImageStore>()
+    val avatarCatalogState by avatarCatalogSession.state.collectAsState()
+    var avatarEntries by remember { mutableStateOf(emptyList<GameAvatar>()) }
+    var showAvatarPicker by rememberSaveable { mutableStateOf(false) }
+    var customAvatarPending by remember { mutableStateOf(false) }
+    val launchAvatarPicker = rememberAvatarPicker { uri ->
+        if (uri == null) customAvatarPending = false else viewModel.setAvatarUri(uri)
+    }
+
+    LaunchedEffect(showAvatarPicker) {
+        if (showAvatarPicker) avatarCatalogSession.ensureReady()
+    }
+    LaunchedEffect(
+        showAvatarPicker,
+        avatarCatalogState.status,
+        avatarCatalogState.usingBundledFallback
+    ) {
+        if (
+            showAvatarPicker && (
+                avatarCatalogState.status == AvatarCatalogRunStatus.Ready ||
+                    avatarCatalogState.status == AvatarCatalogRunStatus.ReconcilingImages ||
+                    avatarCatalogState.status == AvatarCatalogRunStatus.PartiallySucceeded
+                )
+        ) {
+            avatarEntries = runCatching { avatarCatalogProvider.getAvatars() }.getOrDefault(emptyList())
+        }
+    }
+    LaunchedEffect(state.profile.gameAvatarSelectionSucceeded) {
+        if (state.profile.gameAvatarSelectionSucceeded) {
+            if (showAvatarPicker) showAvatarPicker = false
+            viewModel.consumeGameAvatarSelectionSuccess()
+        }
+    }
+    LaunchedEffect(state.profile.avatarUri) {
+        if (showAvatarPicker && customAvatarPending && state.profile.avatarUri != null) {
+            showAvatarPicker = false
+            customAvatarPending = false
+        }
+    }
 
     LaunchedEffect(selectedTab) {
         val tabName = when (selectedTab) {
@@ -835,7 +882,7 @@ fun MainScreen(
                     avatarUri = state.profile.avatarUri,
                     onAvatarClick = {
                         if (state.profile.avatarUri == null) {
-                            launchAvatarPicker()
+                            showAvatarPicker = true
                         } else {
                             tabState.select(HomeTab.Profile)
                         }
@@ -880,7 +927,7 @@ fun MainScreen(
                         displayRks = state.b30.displayRks,
                         isLoggedIn = state.profile.hasAccountAccess,
                         onNavigateToLogin = onNavigateToLogin,
-                        onAvatarSelected = { viewModel.setAvatarUri(it) },
+                        onAvatarClick = { showAvatarPicker = true },
                         onSongClick = { songId, difficulty ->
                             if (difficulty != null) {
                                 onNavigateToSongDetailWithDifficulty(songId, difficulty)
@@ -1095,6 +1142,34 @@ fun MainScreen(
                 scrollState = toolsScrollState
             )
         }
+    }
+
+    if (showAvatarPicker) {
+        AvatarPickerSheet(
+            avatars = avatarEntries,
+            catalogState = avatarCatalogState,
+            accountAvailable = state.profile.hasAccountAccess,
+            selectionInProgress = state.profile.isSelectingGameAvatar,
+            selectionError = state.profile.avatarSelectionError,
+            onDismiss = {
+                showAvatarPicker = false
+                customAvatarPending = false
+                viewModel.dismissGameAvatarError()
+            },
+            onCustomAvatar = {
+                customAvatarPending = true
+                launchAvatarPicker()
+            },
+            onSelect = {
+                customAvatarPending = false
+                viewModel.setGameAvatar(it.id)
+            },
+            onCheckForUpdates = avatarCatalogSession::checkForUpdates,
+            onUpdate = avatarCatalogSession::update,
+            onUseBundledFallback = avatarCatalogSession::useBundledFallback,
+            onDismissResult = avatarCatalogSession::dismissResult,
+            previewUri = avatarImageStore::previewUri
+        )
     }
 }
 

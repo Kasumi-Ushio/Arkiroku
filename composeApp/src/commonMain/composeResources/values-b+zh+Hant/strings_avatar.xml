@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="avatar_picker_title">選擇頭像</string>
+    <string name="avatar_custom_image">使用自訂圖片</string>
+    <string name="avatar_check_updates">檢查更新</string>
+    <string name="avatar_update_catalog">更新頭像</string>
+    <string name="avatar_account_required">登入後即可選擇遊戲內建頭像。</string>
+    <string name="avatar_selection_in_progress">正在套用頭像…</string>
+    <string name="avatar_selection_failed">內建頭像選擇失敗，請重試。</string>
+    <string name="avatar_catalog_empty">暫無可用內建頭像。</string>
+    <string name="avatar_catalog_checking">正在檢查頭像目錄…</string>
+    <string name="avatar_catalog_updating">正在更新頭像目錄…</string>
+    <string name="avatar_catalog_reconciling_images">正在下載頭像圖片…</string>
+    <string name="avatar_catalog_progress">%1$d / %2$d</string>
+    <string name="avatar_catalog_current">目前：%1$s</string>
+    <string name="avatar_catalog_partial_success">頭像更新僅部分完成。</string>
+    <string name="avatar_catalog_failed_downloads">有 %1$d 張頭像圖片下載失敗。</string>
+    <string name="avatar_failure_network">網路錯誤導致頭像更新中斷，請檢查連線後重試。</string>
+    <string name="avatar_failure_storage">無法儲存頭像檔案，請檢查可用儲存空間後重試。</string>
+    <string name="avatar_failure_scene">頭像資料無效，或與目前應用程式版本不相容。</string>
+    <string name="avatar_failure_busy">另一項頭像操作正在進行，請稍後重試。</string>
+    <string name="avatar_failure_unknown">頭像更新失敗，請重試。</string>
+    <string name="avatar_using_bundled_fallback">正在使用應用程式內建的頭像目錄。</string>
+    <string name="avatar_use_bundled_fallback">使用內建頭像</string>
+    <string name="avatar_dismiss_result">關閉</string>
+</resources>

@@ -27,6 +27,8 @@ import org.junit.runner.RunWith
 import org.kasumi321.ushio.phitracker.data.api.PhiPluginApi
 import org.kasumi321.ushio.phitracker.data.api.TapTapApiClient
 import org.kasumi321.ushio.phitracker.data.api.TapTapGameApi
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogProvider
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarImageStore
 import org.kasumi321.ushio.phitracker.data.database.AppDatabase
 import org.kasumi321.ushio.phitracker.data.database.CurrentAccountEntity
 import org.kasumi321.ushio.phitracker.data.database.LegacySongSyncHistoryEntity
@@ -36,6 +38,7 @@ import org.kasumi321.ushio.phitracker.data.database.UserEntity
 import org.kasumi321.ushio.phitracker.data.parser.AesDecryptor
 import org.kasumi321.ushio.phitracker.data.parser.SaveParser
 import org.kasumi321.ushio.phitracker.data.platform.SecureKeyValueStorage
+import org.kasumi321.ushio.phitracker.data.platform.BinaryAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.StorageWriteResult
 import org.kasumi321.ushio.phitracker.data.platform.TextAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.TokenManager
@@ -43,6 +46,7 @@ import org.kasumi321.ushio.phitracker.domain.usecase.GetChartTagsUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.ProposeSongAliasUseCase
 import org.kasumi321.ushio.phitracker.domain.usecase.VoteChartTagsUseCase
 import org.kasumi321.ushio.phitracker.data.platform.NoOpStandardArtworkCache
+import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.song.IllustrationProvider
 import org.kasumi321.ushio.phitracker.data.song.IllustrationUriResolver
 import org.kasumi321.ushio.phitracker.data.song.SongDataProvider
@@ -55,10 +59,12 @@ import org.kasumi321.ushio.phitracker.ui.song.SongDetailViewModel
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
+import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -442,9 +448,67 @@ class PhigrosRepositoryImplApiDetailTest {
         assertNull(repository.observeLegacySyncHistorySummary().first())
     }
 
+    @Test
+    fun builtInAvatarSelectionPersistsLocalCopiesAndRequiresAccountAccess() = runTest {
+        val catalog = "Glaciaxion\tGlaciaxion\nCipher : /2&//<|0\tCipher1\n"
+        val provider = AvatarCatalogProvider(
+            assetReader = object : TextAssetReader {
+                override fun readText(name: String): String {
+                    assertEquals(AvatarCatalogProvider.CATALOG_FILE, name)
+                    return catalog
+                }
+            }
+        )
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val paths = PlatformPaths(context.filesDir.absolutePath, context.cacheDir.absolutePath)
+        val png = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )
+        val imageStore = AvatarImageStore(
+            httpClient = HttpClient(MockEngine { error("Bundled avatar must not use network") }),
+            paths = paths,
+            assetReader = object : BinaryAssetReader {
+                override fun readBytes(name: String): ByteArray {
+                    assertTrue(name == "avatar.Glaciaxion.png" || name == "avatar.Cipher1.png")
+                    return png
+                }
+            }
+        )
+        val tokenManager = TokenManager(FakeStorage())
+        val repository = repository(
+            requests = mutableListOf(),
+            tokenManager = tokenManager,
+            avatarCatalogProvider = provider,
+            avatarImageStore = imageStore
+        )
+        database.userDao().insertOrUpdate(
+            UserEntity("account-a", "Alice", "", "", "", 15f, 1, 3, "CN", 1L, "", null)
+        )
+        database.currentAccountDao().setCurrent(CurrentAccountEntity("account-a"))
+        repository.saveSessionToken("token", Server.CN)
+        repository.saveBoundPlayerId("account-a")
+
+        assertTrue(repository.setGameAvatar("Glaciaxion").isSuccess)
+        val firstUri = repository.getUserProfile().first()?.avatarUri.orEmpty()
+        assertTrue(firstUri.isNotEmpty())
+        assertTrue(File(firstUri).isFile)
+
+        assertTrue(repository.setGameAvatar("Cipher : /2&//<|0").isSuccess)
+        val secondUri = repository.getUserProfile().first()?.avatarUri.orEmpty()
+        assertTrue(secondUri.isNotEmpty() && secondUri != firstUri)
+        assertFalse(File(firstUri).exists())
+        assertTrue(File(secondUri).isFile)
+
+        repository.clearTokenSync()
+        assertTrue(repository.setGameAvatar("Glaciaxion").isFailure)
+        assertTrue(File(secondUri).isFile)
+    }
+
     private fun repository(
         requests: MutableList<CapturedRequest>,
         tokenManager: TokenManager = TokenManager(FakeStorage()),
+        avatarCatalogProvider: AvatarCatalogProvider = AvatarCatalogProvider(assetReader = EmptySongAssets),
+        avatarImageStore: AvatarImageStore? = null,
         response: suspend (CapturedRequest) -> String = { request -> responseFor(request.path) }
     ): PhigrosRepositoryImpl {
         val json = Json { ignoreUnknownKeys = true }
@@ -474,7 +538,15 @@ class PhigrosRepositoryImplApiDetailTest {
             legacySyncHistoryDao = database.legacySyncHistoryDao(),
             tokenManager = tokenManager,
             json = json,
-            songDataProvider = SongDataProvider(assetReader = EmptySongAssets)
+            songDataProvider = SongDataProvider(assetReader = EmptySongAssets),
+            avatarCatalogProvider = avatarCatalogProvider,
+            avatarImageStore = avatarImageStore ?: AvatarImageStore(
+                httpClient = client,
+                paths = PlatformPaths(
+                    filesDir = ApplicationProvider.getApplicationContext<android.content.Context>().filesDir.absolutePath,
+                    cacheDir = ApplicationProvider.getApplicationContext<android.content.Context>().cacheDir.absolutePath
+                )
+            )
         )
     }
 

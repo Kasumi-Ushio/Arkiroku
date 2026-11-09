@@ -126,6 +126,7 @@ class StagedFileSetUpdateTest {
         client: HttpClient = downloadClient(),
         invalidateCalls: MutableList<Int>? = null,
         commitAttempt: (fileName: String, move: () -> Unit) -> Unit = { _, move -> move() },
+        validateStaged: suspend (Path) -> Unit = {},
         legacyBackupDir: Path? = null
     ): StagedFileSetUpdate = StagedFileSetUpdate(
         fs = fileSystem,
@@ -137,6 +138,7 @@ class StagedFileSetUpdateTest {
         legacyBackupDir = legacyBackupDir,
         fileNames = fileNames,
         invalidateCache = { invalidateCalls?.add(1) ?: Unit },
+        validateStaged = validateStaged,
         commitAttempt = commitAttempt
     )
 
@@ -263,6 +265,30 @@ class StagedFileSetUpdateTest {
         }
         assertFalse(fs.exists(backupDir), "a fully committed backup is consumed")
         assertFalse(fs.exists(stagingDir))
+    }
+
+    @Test
+    fun stagingValidationFailureLeavesPersistentDataUntouched() = runTest {
+        writePersistent(fileNames.associateWith { "old-$it" })
+        val invalidations = mutableListOf<Int>()
+        var validatedFiles: List<String> = emptyList()
+
+        val result = stagedUpdate(
+            invalidateCalls = invalidations,
+            validateStaged = { staged ->
+                validatedFiles = fileNames.map { name ->
+                    fs.read(staged / name) { readUtf8() }
+                }
+                error("invalid staged catalog")
+            }
+        ).updateAll()
+
+        assertTrue(result.isFailure)
+        assertEquals(fileNames.map { "new-$it" }, validatedFiles)
+        assertPersistent(fileNames.associateWith { "old-$it" })
+        assertFalse(fs.exists(backupDir))
+        assertFalse(fs.exists(stagingDir))
+        assertTrue(invalidations.isEmpty())
     }
 
     @Test

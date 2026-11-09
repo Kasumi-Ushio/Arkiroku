@@ -66,6 +66,7 @@ import org.kasumi321.ushio.phitracker.ui.update.toUpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import org.kasumi321.ushio.phitracker.ui.utils.toCatalogRepairErrorText
 import phitracker.composeapp.generated.resources.Res
+import phitracker.composeapp.generated.resources.avatar_selection_failed
 import phitracker.composeapp.generated.resources.settings_catalog_using_bundled
 import phitracker.composeapp.generated.resources.settings_reset_token_result_rejected
 import phitracker.composeapp.generated.resources.settings_reset_token_result_success
@@ -1139,8 +1140,43 @@ class HomeViewModel(
     fun setAvatarUri(uri: String?) {
         viewModelScope.launch {
             AppLogger.event("settings", "avatar_changed", mapOf("uriPresent" to (uri != null).toString()))
-            repository.setAvatarUri(uri)
+            val result = repository.setAvatarUri(uri)
+            updateProfile {
+                it.copy(
+                    avatarSelectionError = if (result.isFailure) UiText.Res(Res.string.avatar_selection_failed) else null
+                )
+            }
         }
+    }
+
+    fun setGameAvatar(avatarId: String) {
+        if (_uiState.value.profile.isSelectingGameAvatar) return
+        updateProfile {
+            it.copy(
+                isSelectingGameAvatar = true,
+                avatarSelectionError = null,
+                gameAvatarSelectionSucceeded = false
+            )
+        }
+        viewModelScope.launch {
+            AppLogger.event("settings", "game_avatar_selected")
+            val result = repository.setGameAvatar(avatarId)
+            updateProfile {
+                it.copy(
+                    isSelectingGameAvatar = false,
+                    avatarSelectionError = if (result.isFailure) UiText.Res(Res.string.avatar_selection_failed) else null,
+                    gameAvatarSelectionSucceeded = result.isSuccess
+                )
+            }
+        }
+    }
+
+    fun consumeGameAvatarSelectionSuccess() {
+        updateProfile { it.copy(gameAvatarSelectionSucceeded = false) }
+    }
+
+    fun dismissGameAvatarError() {
+        updateProfile { it.copy(avatarSelectionError = null) }
     }
 
     fun fetchApiRankByUser() {

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="avatar_picker_title">Choose an avatar</string>
+    <string name="avatar_custom_image">Use a custom image</string>
+    <string name="avatar_check_updates">Check for updates</string>
+    <string name="avatar_update_catalog">Update avatars</string>
+    <string name="avatar_account_required">Log in to choose a built-in game avatar.</string>
+    <string name="avatar_selection_in_progress">Applying avatar…</string>
+    <string name="avatar_selection_failed">Could not select the built-in avatar. Please try again.</string>
+    <string name="avatar_catalog_empty">No built-in avatars are available.</string>
+    <string name="avatar_catalog_checking">Checking the avatar catalog…</string>
+    <string name="avatar_catalog_updating">Updating the avatar catalog…</string>
+    <string name="avatar_catalog_reconciling_images">Downloading avatar images…</string>
+    <string name="avatar_catalog_progress">%1$d of %2$d</string>
+    <string name="avatar_catalog_current">Current: %1$s</string>
+    <string name="avatar_catalog_partial_success">The avatar update only partially completed.</string>
+    <string name="avatar_catalog_failed_downloads">%1$d avatar images could not be downloaded.</string>
+    <string name="avatar_failure_network">A network error interrupted the avatar update. Check your connection and try again.</string>
+    <string name="avatar_failure_storage">The avatar files could not be saved. Check available storage and try again.</string>
+    <string name="avatar_failure_scene">The avatar data is invalid or incompatible with this version of the app.</string>
+    <string name="avatar_failure_busy">Another avatar operation is already in progress. Please wait and try again.</string>
+    <string name="avatar_failure_unknown">The avatar update failed. Please try again.</string>
+    <string name="avatar_using_bundled_fallback">Using the avatar catalog bundled with the app.</string>
+    <string name="avatar_use_bundled_fallback">Use bundled avatars</string>
+    <string name="avatar_dismiss_result">Dismiss</string>
+</resources>

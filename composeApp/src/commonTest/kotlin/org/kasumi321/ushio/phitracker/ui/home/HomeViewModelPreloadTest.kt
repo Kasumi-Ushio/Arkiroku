@@ -488,6 +488,49 @@ class HomeViewModelPreloadTest {
     }
 
     @Test
+    fun gameAvatarSelectionReportsResultAndRejectsGuest(): Unit = runTest(dispatcher) {
+        val profiles = MutableStateFlow<UserProfile?>(null)
+        val repository = object : FakePhigrosRepository() {
+            override fun getUserProfile(): Flow<UserProfile?> = profiles
+            override suspend fun setGameAvatar(avatarId: String): Result<Unit> {
+                val current = profiles.value ?: return Result.failure(IllegalStateException("guest"))
+                if (avatarId == "missing") return Result.failure(IllegalArgumentException("missing"))
+                profiles.value = current.copy(avatarUri = "builtin:$avatarId")
+                return Result.success(Unit)
+            }
+        }
+        val viewModel = createViewModel(FakeSettingsRepository(preloadDone = true, autoCheckUpdate = false), repository = repository)
+        profiles.value = UserProfile(
+            playerId = "owner", nickname = "owner", avatar = "", selfIntro = "", background = "",
+            rks = 15f, challengeModeRank = 1, gameVersion = 3, updatedAt = ""
+        )
+        advanceUntilIdle()
+
+        viewModel.setGameAvatar("Glaciaxion")
+        advanceUntilIdle()
+        assertEquals("builtin:Glaciaxion", viewModel.uiState.value.profile.avatarUri)
+        assertFalse(viewModel.uiState.value.profile.isSelectingGameAvatar)
+        assertNull(viewModel.uiState.value.profile.avatarSelectionError)
+        assertTrue(viewModel.uiState.value.profile.gameAvatarSelectionSucceeded)
+        viewModel.consumeGameAvatarSelectionSuccess()
+        assertFalse(viewModel.uiState.value.profile.gameAvatarSelectionSucceeded)
+
+        viewModel.setGameAvatar("missing")
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.profile.avatarSelectionError)
+        assertEquals("builtin:Glaciaxion", viewModel.uiState.value.profile.avatarUri)
+
+        viewModel.dismissGameAvatarError()
+        assertNull(viewModel.uiState.value.profile.avatarSelectionError)
+        profiles.value = null
+        advanceUntilIdle()
+        viewModel.setGameAvatar("Glaciaxion")
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.profile.avatarSelectionError)
+        assertNull(viewModel.uiState.value.profile.avatarUri)
+    }
+
+    @Test
     fun rejectedSessionClearsHomeProjectionsAndSameAccountCanRebuildThem(): Unit = runTest(dispatcher) {
         val profiles = MutableStateFlow<UserProfile?>(null)
         val tokens = MutableStateFlow<Pair<String, Server>?>("secret" to Server.CN)
