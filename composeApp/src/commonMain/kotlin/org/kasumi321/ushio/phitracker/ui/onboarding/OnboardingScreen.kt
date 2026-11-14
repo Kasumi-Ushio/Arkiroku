@@ -2,6 +2,9 @@ package org.kasumi321.ushio.phitracker.ui.onboarding
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +35,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toPath
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,8 +61,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Path
+import androidx.graphics.shapes.Morph
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -86,6 +96,7 @@ import org.kasumi321.ushio.phitracker.ui.settings.SettingsConstants
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerTheme
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerThemeSettings
 import org.kasumi321.ushio.phitracker.ui.utils.asString
+import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import org.koin.compose.viewmodel.koinViewModel
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.b30ex_card_style
@@ -1322,12 +1333,7 @@ private fun CompletionStep() {
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                modifier = Modifier.size(72.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+            CompletionMorphIcon()
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = stringResource(Res.string.onboarding_step_done_title),
@@ -1344,6 +1350,41 @@ private fun CompletionStep() {
             )
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CompletionMorphIcon() {
+    val reducedMotion = rememberReducedMotionEnabled()
+    val morph = remember { Morph(MaterialShapes.Circle, MaterialShapes.Sunny) }
+    val path = remember { Path() }
+    val containerColor = MaterialTheme.colorScheme.primaryContainer
+    val progress by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "onboardingCompletionMorph"
+    )
+
+    Box(modifier = Modifier.size(96.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(96.dp)) {
+            morph.toPath(progress, path)
+            path.transform(Matrix().apply { scale(x = size.width, y = size.height) })
+            val bounds = path.getBounds()
+            path.translate(
+                Offset(
+                    x = size.width / 2f - bounds.center.x,
+                    y = size.height / 2f - bounds.center.y
+                )
+            )
+            drawPath(path, color = containerColor)
+        }
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier.size(72.dp),
+            tint = MaterialTheme.colorScheme.onPrimaryContainer
+        )
     }
 }
 
