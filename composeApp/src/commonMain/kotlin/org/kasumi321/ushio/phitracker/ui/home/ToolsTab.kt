@@ -1,8 +1,5 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
@@ -33,7 +30,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DataThresholding
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -56,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -124,6 +121,8 @@ import phitracker.composeapp.generated.resources.tools_view_suggestions
 import org.kasumi321.ushio.phitracker.data.platform.copyToClipboard
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.components.AppExpandableSection
+import org.kasumi321.ushio.phitracker.ui.components.rememberAppExpansionArrowRotation
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
 import org.kasumi321.ushio.phitracker.ui.utils.asString
 import org.kasumi321.ushio.phitracker.domain.model.LegacySyncHistorySummary
@@ -381,6 +380,7 @@ private fun CollapsibleToolCard(
         content: @Composable ColumnScope.() -> Unit
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    val arrowRotation by rememberAppExpansionArrowRotation(expanded)
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -408,21 +408,16 @@ private fun CollapsibleToolCard(
                 )
             }
             Icon(
-                    imageVector =
-                            if (expanded) Icons.Default.KeyboardArrowUp
-                            else Icons.Default.KeyboardArrowDown,
+                    imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription =
                             if (expanded) stringResource(Res.string.tools_collapse)
                             else stringResource(Res.string.tools_expand),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(arrowRotation)
             )
         }
 
-        AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-        ) {
+        AppExpandableSection(expanded = expanded) {
             Column(
                     modifier =
                             Modifier.fillMaxWidth()
