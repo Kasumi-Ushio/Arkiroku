@@ -18,11 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -43,7 +41,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -51,17 +48,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import coil3.compose.AsyncImagePainter
-import coil3.compose.LocalPlatformContext
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.B30RksHistogram
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
 import org.kasumi321.ushio.phitracker.ui.b30.B30RksHistogramChart
-import org.kasumi321.ushio.phitracker.ui.b30.setImageRequestAllowHardware
 import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.components.ColoredTag
 import org.kasumi321.ushio.phitracker.ui.components.phiFontFamily
@@ -74,7 +65,6 @@ import phitracker.composeapp.generated.resources.action_go_login
 import phitracker.composeapp.generated.resources.preload_card_progress
 import phitracker.composeapp.generated.resources.preload_card_title
 import phitracker.composeapp.generated.resources.preload_current_song
-import phitracker.composeapp.generated.resources.profile_avatar
 import phitracker.composeapp.generated.resources.profile_collapse
 import phitracker.composeapp.generated.resources.profile_data_label
 import phitracker.composeapp.generated.resources.profile_expand
@@ -86,7 +76,6 @@ import phitracker.composeapp.generated.resources.profile_never_synced
 import phitracker.composeapp.generated.resources.profile_no_score_changes
 import phitracker.composeapp.generated.resources.profile_not_logged_in
 import phitracker.composeapp.generated.resources.profile_recent_sync
-import phitracker.composeapp.generated.resources.profile_set_avatar
 import phitracker.composeapp.generated.resources.profile_sync_time
 
 private val ChallengeTierColors = listOf(
@@ -199,15 +188,13 @@ fun ProfileTab(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            ProfileHeaderCard(
+            ProfileHeroCard(
                 nickname = nickname,
                 displayRks = displayRks,
                 challengeModeRank = challengeModeRank,
                 moneyString = moneyString,
                 avatarUri = avatarUri,
                 onAvatarClick = onAvatarClick,
-                shape = MaterialTheme.shapes.large,
-                rksStyle = MaterialTheme.typography.titleLargeEmphasized,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -392,8 +379,6 @@ fun ProfileHeaderCard(
     avatarCrossfade: Boolean = true,
     onAvatarSettled: ((Throwable?) -> Unit)? = null
 ) {
-    val platformContext = LocalPlatformContext.current
-
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -408,52 +393,15 @@ fun ProfileHeaderCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (centerContent) Arrangement.Center else Arrangement.Start
         ) {
-            Box(
-                modifier = Modifier
-                    .size(avatarSize)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .then(
-                        if (onAvatarClick != null) Modifier.clickable { onAvatarClick() }
-                        else Modifier
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (avatarUri != null) {
-                    val imageRequest = remember(platformContext, avatarUri, avatarRequestSizePx, avatarCrossfade) {
-                        ImageRequest.Builder(platformContext).apply {
-                            data(avatarUri)
-                            avatarRequestSizePx?.let { size(it) }
-                            crossfade(avatarCrossfade)
-                            setImageRequestAllowHardware(allowHardwareImages)
-                        }.build()
-                    }
-                    AsyncImage(
-                        model = imageRequest,
-                        contentDescription = stringResource(Res.string.profile_avatar),
-                        modifier = Modifier
-                            .size(avatarSize)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                        onState = onAvatarSettled?.let { settled ->
-                            { state ->
-                                when (state) {
-                                    is AsyncImagePainter.State.Success -> settled(null)
-                                    is AsyncImagePainter.State.Error -> settled(state.result.throwable)
-                                    else -> Unit
-                                }
-                            }
-                        }
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(Res.string.profile_set_avatar),
-                        modifier = Modifier.size(avatarSize * 0.4f),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            ProfileAvatar(
+                avatarUri = avatarUri,
+                avatarSize = avatarSize,
+                onAvatarClick = onAvatarClick,
+                allowHardwareImages = allowHardwareImages,
+                avatarRequestSizePx = avatarRequestSizePx,
+                avatarCrossfade = avatarCrossfade,
+                onAvatarSettled = onAvatarSettled
+            )
 
             Spacer(modifier = Modifier.width(avatarTextSpacing))
 
@@ -589,7 +537,7 @@ private fun BadgeStatItem(
 }
 
 @Composable
-private fun ChallengeBadge(challengeModeRank: Int) {
+internal fun ChallengeBadge(challengeModeRank: Int) {
     val tier = challengeModeRank / 100
     val level = challengeModeRank % 100
 
