@@ -1,12 +1,11 @@
 package org.kasumi321.ushio.phitracker.ui.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Favorite
@@ -25,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.data.platform.getAppMetadata
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
-import org.kasumi321.ushio.phitracker.ui.components.CenteredListItem
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.about_acknowledgments
 import phitracker.composeapp.generated.resources.about_acknowledgments_desc
@@ -105,66 +103,86 @@ fun AboutScreen(
                 Text(stringResource(Res.string.about_build_type_label, buildType), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
-            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
 
-            CenteredListItem(
-                headlineContent = { Text(stringResource(Res.string.about_project_home)) },
-                supportingContent = { Text(stringResource(Res.string.about_project_home_desc)) },
-                leadingContent = { Icon(Icons.Default.Code, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
-                modifier = Modifier.clickable {
-                    uriHandler.openUri("https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros")
-                }
-            )
+            SettingsSection(
+                title = stringResource(Res.string.about_title),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                actionItem(
+                    key = "project_home",
+                    onClick = {
+                        uriHandler.openUri("https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros")
+                    },
+                    headlineContent = { Text(stringResource(Res.string.about_project_home)) },
+                    supportingContent = { Text(stringResource(Res.string.about_project_home_desc)) },
+                    leadingContent = { Icon(Icons.Default.Code, contentDescription = null) },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                )
+                actionItem(
+                    key = "feedback",
+                    onClick = {
+                        uriHandler.openUri("https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros/issues")
+                    },
+                    headlineContent = { Text(stringResource(Res.string.about_feedback)) },
+                    supportingContent = { Text(stringResource(Res.string.about_feedback_desc)) },
+                    leadingContent = { Icon(Icons.Default.BugReport, contentDescription = null) },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                )
+                actionItem(
+                    key = "legal",
+                    onClick = onNavigateToDisclaimer,
+                    headlineContent = { Text(stringResource(Res.string.about_legal)) },
+                    supportingContent = { Text(stringResource(Res.string.about_legal_desc)) },
+                    leadingContent = { Icon(Icons.Default.Gavel, contentDescription = null) },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                )
+                actionItem(
+                    key = "acknowledgments",
+                    onClick = onNavigateToAcknowledgments,
+                    headlineContent = { Text(stringResource(Res.string.about_acknowledgments)) },
+                    supportingContent = { Text(stringResource(Res.string.about_acknowledgments_desc)) },
+                    leadingContent = { Icon(Icons.Default.Favorite, contentDescription = null) },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                )
+                actionItem(
+                    key = "privacy_policy",
+                    onClick = onNavigateToPrivacyPolicy,
+                    headlineContent = { Text(stringResource(Res.string.about_privacy_policy)) },
+                    supportingContent = { Text(stringResource(Res.string.about_privacy_policy_desc)) },
+                    leadingContent = { Icon(Icons.Default.Shield, contentDescription = null) },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                )
+                actionItem(
+                    key = "third_party",
+                    onClick = onNavigateToLicenses,
+                    headlineContent = { Text(stringResource(Res.string.about_third_party)) },
+                    supportingContent = { Text(stringResource(Res.string.about_third_party_desc)) },
+                    leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                )
+                actionItem(
+                    key = "rerun_onboarding",
+                    onClick = { showRerunOnboardingDialog = true },
+                    headlineContent = { Text(stringResource(Res.string.settings_rerun_onboarding)) },
+                    supportingContent = { Text(stringResource(Res.string.settings_rerun_onboarding_desc)) },
+                    leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) }
+                )
+            }
 
-            CenteredListItem(
-                headlineContent = { Text(stringResource(Res.string.about_feedback)) },
-                supportingContent = { Text(stringResource(Res.string.about_feedback_desc)) },
-                leadingContent = { Icon(Icons.Default.BugReport, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
-                modifier = Modifier.clickable {
-                    uriHandler.openUri("https://github.com/Kasumi-Ushio/Ushio-Prober-Phigros/issues")
-                }
-            )
-
-            CenteredListItem(
-                headlineContent = { Text(stringResource(Res.string.about_legal)) },
-                supportingContent = { Text(stringResource(Res.string.about_legal_desc)) },
-                leadingContent = { Icon(Icons.Default.Gavel, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
-                modifier = Modifier.clickable { onNavigateToDisclaimer() }
-            )
-
-            CenteredListItem(
-                headlineContent = { Text(stringResource(Res.string.about_acknowledgments)) },
-                supportingContent = { Text(stringResource(Res.string.about_acknowledgments_desc)) },
-                leadingContent = { Icon(Icons.Default.Favorite, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
-                modifier = Modifier.clickable { onNavigateToAcknowledgments() }
-            )
-
-            CenteredListItem(
-                headlineContent = { Text(stringResource(Res.string.about_privacy_policy)) },
-                supportingContent = { Text(stringResource(Res.string.about_privacy_policy_desc)) },
-                leadingContent = { Icon(Icons.Default.Shield, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
-                modifier = Modifier.clickable { onNavigateToPrivacyPolicy() }
-            )
-
-            CenteredListItem(
-                headlineContent = { Text(stringResource(Res.string.about_third_party)) },
-                supportingContent = { Text(stringResource(Res.string.about_third_party_desc)) },
-                leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
-                modifier = Modifier.clickable { onNavigateToLicenses() }
-            )
-
-            CenteredListItem(
-                headlineContent = { Text(stringResource(Res.string.settings_rerun_onboarding)) },
-                supportingContent = { Text(stringResource(Res.string.settings_rerun_onboarding_desc)) },
-                leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
-                modifier = Modifier.clickable { showRerunOnboardingDialog = true }
-            )
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 

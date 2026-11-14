@@ -382,6 +382,23 @@ fun ProfileHeaderCard(
     avatarCrossfade: Boolean = true,
     onAvatarSettled: ((Throwable?) -> Unit)? = null
 ) {
+    val isPrimaryContainer = containerColor == MaterialTheme.colorScheme.primaryContainer
+    val headlineColor = if (isPrimaryContainer) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val supportingColor = if (isPrimaryContainer) {
+        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val accentColor = if (isPrimaryContainer) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -416,13 +433,13 @@ fun ProfileHeaderCard(
                     text = nickname.ifBlank { stringResource(Res.string.profile_not_logged_in) },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = headlineColor
                 )
                 if (moneyString.isNotBlank()) {
                     Text(
                         text = stringResource(Res.string.profile_data_label, moneyString),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = supportingColor
                     )
                 }
                 FlowRow(
@@ -433,7 +450,7 @@ fun ProfileHeaderCard(
                     Text(
                         text = displayRks.formatFour(),
                         style = rksStyle,
-                        color = MaterialTheme.colorScheme.primary
+                        color = accentColor
                     )
                     if (challengeModeRank > 0) {
                         ChallengeBadge(challengeModeRank)

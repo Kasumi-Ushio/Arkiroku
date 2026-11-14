@@ -73,6 +73,7 @@ internal class SettingsSectionScope internal constructor() {
                 leadingContent = leadingContent,
                 trailingContent = trailingContent,
                 supportingContent = supportingContent,
+                verticalAlignment = Alignment.CenterVertically,
                 colors = settingsSegmentedColors(),
                 content = headlineContent
             )
@@ -236,6 +237,7 @@ private fun SettingsValueItem(
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
         supportingContent = effectiveSupportingContent,
+        verticalAlignment = Alignment.CenterVertically,
         trailingContent = {
             Box {
                 Row(verticalAlignment = Alignment.CenterVertically) {
