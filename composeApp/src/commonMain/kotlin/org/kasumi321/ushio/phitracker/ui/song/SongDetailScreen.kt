@@ -407,7 +407,7 @@ private fun SongInfoHeader(
             contentDescription = "Illustration",
             modifier = Modifier
                 .size(120.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable { onIllustrationClick(difficulty) },
             contentScale = ContentScale.Crop
@@ -419,16 +419,15 @@ private fun SongInfoHeader(
             SelectionContainer {
                 BasicText(
                     text = songInfo.name,
-                    style = MaterialTheme.typography.titleLarge.copy(
+                    style = MaterialTheme.typography.titleLargeEmphasized.copy(
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
                         // Fixed titleLarge line height would let an auto-shrunk
                         // title drift off-center; Unspecified follows the font.
                         lineHeight = TextUnit.Unspecified
                     ),
                     autoSize = TextAutoSize.StepBased(
                         minFontSize = 12.sp,
-                        maxFontSize = MaterialTheme.typography.titleLarge.fontSize,
+                        maxFontSize = MaterialTheme.typography.titleLargeEmphasized.fontSize,
                         stepSize = 1.sp
                     ),
                     maxLines = 3,

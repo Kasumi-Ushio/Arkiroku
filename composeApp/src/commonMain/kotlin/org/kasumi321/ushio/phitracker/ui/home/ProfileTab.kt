@@ -42,7 +42,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -204,6 +206,8 @@ fun ProfileTab(
                 moneyString = moneyString,
                 avatarUri = avatarUri,
                 onAvatarClick = onAvatarClick,
+                shape = MaterialTheme.shapes.large,
+                rksStyle = MaterialTheme.typography.titleLargeEmphasized,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -213,6 +217,7 @@ fun ProfileTab(
                 clearCounts = clearCounts,
                 fcCount = fcCount,
                 phiCount = phiCount,
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -223,7 +228,7 @@ fun ProfileTab(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                     ),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = MaterialTheme.shapes.large
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         B30RksHistogramChart(
@@ -375,6 +380,8 @@ fun ProfileHeaderCard(
     avatarSize: Dp = 72.dp,
     avatarTextSpacing: Dp = 16.dp,
     centerContent: Boolean = false,
+    shape: Shape = RoundedCornerShape(16.dp),
+    rksStyle: TextStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
     modifier: Modifier = Modifier,
     allowHardwareImages: Boolean = true,
     // Export tuning: the off-screen B30 capture pins the avatar request size so
@@ -392,7 +399,7 @@ fun ProfileHeaderCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = shape
     ) {
         Row(
             modifier = Modifier
@@ -474,8 +481,7 @@ fun ProfileHeaderCard(
                 ) {
                     Text(
                         text = displayRks.formatFour(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        style = rksStyle,
                         color = MaterialTheme.colorScheme.primary
                     )
                     if (challengeModeRank > 0) {
@@ -495,6 +501,7 @@ fun StatsTableCard(
     contentHorizontalPadding: Dp = 16.dp,
     contentVerticalPadding: Dp = 16.dp,
     rowSpacing: Dp = 12.dp,
+    shape: Shape = RoundedCornerShape(16.dp),
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -502,7 +509,7 @@ fun StatsTableCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = shape
     ) {
         Column(
             modifier = Modifier

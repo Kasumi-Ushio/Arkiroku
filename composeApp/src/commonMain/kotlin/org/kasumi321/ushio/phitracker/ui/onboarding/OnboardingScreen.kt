@@ -322,7 +322,7 @@ fun OnboardingScreen(
 private fun StepHeader(title: String, message: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.titleLargeEmphasized,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth()
     )
@@ -1292,7 +1292,7 @@ private fun WelcomeStep() {
         ) {
             Text(
                 text = stringResource(Res.string.onboarding_title),
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.headlineLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
@@ -1331,7 +1331,7 @@ private fun CompletionStep() {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = stringResource(Res.string.onboarding_step_done_title),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineSmallEmphasized,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(12.dp))
