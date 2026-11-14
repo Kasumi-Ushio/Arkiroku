@@ -417,8 +417,6 @@ fun SettingsTab(
                             Modifier.fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                CategoryTitle(stringResource(Res.string.settings_category_interface_theme))
-
                 val themeOptions =
                         listOf(
                                 stringResource(Res.string.settings_theme_follow_system),
@@ -426,77 +424,8 @@ fun SettingsTab(
                                 stringResource(Res.string.settings_theme_dark),
                                 stringResource(Res.string.settings_theme_amoled)
                         )
-                var expandedTheme by remember { mutableStateOf(false) }
-
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                            stringResource(Res.string.settings_dark_mode),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Box {
-                        TextButton(onClick = { expandedTheme = true }) {
-                            Text(themeOptions.getOrElse(themeMode) { themeOptions[0] })
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                        DropdownMenu(
-                                expanded = expandedTheme,
-                                onDismissRequest = { expandedTheme = false }
-                        ) {
-                            themeOptions.forEachIndexed { index, title ->
-                                DropdownMenuItem(
-                                        text = { Text(title) },
-                                        onClick = {
-                                            onThemeModeChange(index)
-                                            expandedTheme = false
-                                        }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_palette_style),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_palette_style_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Box {
-                        TextButton(onClick = { expandedPaletteStyle = true }) {
-                            Text(paletteStyleName)
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                        DropdownMenu(
-                                expanded = expandedPaletteStyle,
-                                onDismissRequest = { expandedPaletteStyle = false }
-                        ) {
-                            PaletteStyle.entries.forEach { style ->
-                                DropdownMenuItem(
-                                        text = { Text(style.name) },
-                                        onClick = {
-                                            onPaletteStyleNameChange(style.name)
-                                            expandedPaletteStyle = false
-                                        }
-                                )
-                            }
-                        }
-                    }
-                }
-
+                val darkModeTitle = stringResource(Res.string.settings_dark_mode)
+                val paletteStyleTitle = stringResource(Res.string.settings_palette_style)
                 val languageOptions =
                         listOf(
                                 SettingsConstants.LANGUAGE_SYSTEM to stringResource(Res.string.settings_language_follow_system),
@@ -504,239 +433,217 @@ fun SettingsTab(
                                 SettingsConstants.LANGUAGE_ZH_HANS to "简体中文",
                                 SettingsConstants.LANGUAGE_ZH_HANT to "繁體中文"
                         )
+                val languageTitle = stringResource(Res.string.settings_language_title)
+                val colorSourceOptions =
+                        listOf(
+                                THEME_COLOR_SOURCE_SYSTEM to
+                                        stringResource(Res.string.settings_color_source_default),
+                                THEME_COLOR_SOURCE_IMAGE to
+                                        stringResource(Res.string.settings_color_source_image)
+                        )
+                val themeColorSourceTitle = stringResource(Res.string.settings_theme_color_source)
+                val defaultColorSourceLabel = stringResource(Res.string.settings_color_source_default)
+                val amoledBlackTitle = stringResource(Res.string.settings_amoled_black)
+                val hazeBlurTitle = stringResource(Res.string.settings_haze_blur)
+                val blurStrengthTitle = stringResource(Res.string.settings_blur_strength)
+                val showOverflowTitle = stringResource(Res.string.settings_show_overflow)
+                val overflowCountTitle = stringResource(Res.string.settings_overflow_count)
+                var expandedTheme by remember { mutableStateOf(false) }
                 var expandedLanguage by remember { mutableStateOf(false) }
 
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                SettingsSection(
+                        title = stringResource(Res.string.settings_category_interface_theme)
                 ) {
-                    Text(
-                            stringResource(Res.string.settings_language_title),
-                            style = MaterialTheme.typography.bodyLarge
-                    )
-                    Box {
-                        TextButton(onClick = { expandedLanguage = true }) {
-                            Text(
-                                    languageOptions
-                                            .firstOrNull { it.first == appLanguage }
-                                            ?.second
-                                            ?: languageOptions[0].second
-                            )
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                        DropdownMenu(
-                                expanded = expandedLanguage,
-                                onDismissRequest = { expandedLanguage = false }
-                        ) {
-                            languageOptions.forEach { (tag, label) ->
-                                DropdownMenuItem(
-                                        text = { Text(label) },
-                                        onClick = {
-                                            onAppLanguageChange(tag)
-                                            expandedLanguage = false
-                                        }
-                                )
+                    valueItem(
+                            key = "theme_mode",
+                            headline = darkModeTitle,
+                            value = themeOptions.getOrElse(themeMode) { themeOptions[0] },
+                            onClick = { expandedTheme = true },
+                            menuContent = {
+                                DropdownMenu(
+                                        expanded = expandedTheme,
+                                        onDismissRequest = { expandedTheme = false }
+                                ) {
+                                    themeOptions.forEachIndexed { index, title ->
+                                        SettingsMenuItem(
+                                                text = title,
+                                                selected = themeMode == index,
+                                                onClick = {
+                                                    onThemeModeChange(index)
+                                                    expandedTheme = false
+                                                }
+                                        )
+                                    }
+                                }
                             }
-                        }
-                    }
-                }
+                    )
 
-                if (shouldShowThemeColorSourceSetting) {
-                    val colorSourceOptions =
-                            listOf(
-                                    THEME_COLOR_SOURCE_SYSTEM to
-                                            stringResource(Res.string.settings_color_source_default),
-                                    THEME_COLOR_SOURCE_IMAGE to
-                                            stringResource(Res.string.settings_color_source_image)
-                            )
+                    valueItem(
+                            key = "palette_style",
+                            headline = paletteStyleTitle,
+                            value = paletteStyleName,
+                            onClick = { expandedPaletteStyle = true },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_palette_style_desc))
+                            },
+                            menuContent = {
+                                DropdownMenu(
+                                        expanded = expandedPaletteStyle,
+                                        onDismissRequest = { expandedPaletteStyle = false }
+                                ) {
+                                    PaletteStyle.entries.forEach { style ->
+                                        SettingsMenuItem(
+                                                text = style.name,
+                                                selected = paletteStyleName == style.name,
+                                                onClick = {
+                                                    onPaletteStyleNameChange(style.name)
+                                                    expandedPaletteStyle = false
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                    )
 
-                    Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                    stringResource(Res.string.settings_theme_color_source),
-                                    style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                    text =
+                    valueItem(
+                            key = "language",
+                            headline = languageTitle,
+                            value = languageOptions
+                                    .firstOrNull { it.first == appLanguage }
+                                    ?.second
+                                    ?: languageOptions[0].second,
+                            onClick = { expandedLanguage = true },
+                            menuContent = {
+                                DropdownMenu(
+                                        expanded = expandedLanguage,
+                                        onDismissRequest = { expandedLanguage = false }
+                                ) {
+                                    languageOptions.forEach { (tag, label) ->
+                                        SettingsMenuItem(
+                                                text = label,
+                                                selected = appLanguage == tag,
+                                                onClick = {
+                                                    onAppLanguageChange(tag)
+                                                    expandedLanguage = false
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                    )
+
+                    if (shouldShowThemeColorSourceSetting) {
+                        valueItem(
+                                key = "theme_color_source",
+                                headline = themeColorSourceTitle,
+                                value = colorSourceOptions
+                                        .firstOrNull { it.first == themeColorSource }
+                                        ?.second
+                                        ?: defaultColorSourceLabel,
+                                onClick = { expandedColorSource = true },
+                                supportingContent = {
+                                    Text(
                                             if (themeColorSource == THEME_COLOR_SOURCE_IMAGE &&
                                                             themeImageSeedColorArgb != null
                                             ) {
-                                                stringResource(
-                                                        Res.string.settings_theme_color_extracted_subtitle
-                                                )
+                                                stringResource(Res.string.settings_theme_color_extracted_subtitle)
                                             } else {
-                                                stringResource(
-                                                        Res.string.settings_theme_color_source_desc
-                                                )
-                                            },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Box {
-                            TextButton(onClick = { expandedColorSource = true }) {
-                                Text(
-                                        colorSourceOptions
-                                                .firstOrNull { it.first == themeColorSource }
-                                                ?.second
-                                                ?: stringResource(
-                                                        Res.string.settings_color_source_default
-                                                )
-                                )
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                            }
-                            DropdownMenu(
-                                    expanded = expandedColorSource,
-                                    onDismissRequest = { expandedColorSource = false }
-                            ) {
-                                DropdownMenuItem(
-                                        text = {
-                                            Text(stringResource(Res.string.settings_color_source_default))
-                                        },
-                                        onClick = {
-                                            onThemeImageColorClear()
-                                            onThemeColorSourceChange(THEME_COLOR_SOURCE_SYSTEM)
-                                            expandedColorSource = false
-                                        }
-                                )
-                                DropdownMenuItem(
-                                        text = {
-                                            Text(stringResource(Res.string.settings_color_source_image))
-                                        },
-                                        onClick = {
-                                            expandedColorSource = false
-                                            pickThemeImageColor()
-                                        }
-                                )
-                            }
-                        }
+                                                stringResource(Res.string.settings_theme_color_source_desc)
+                                            }
+                                    )
+                                },
+                                menuContent = {
+                                    DropdownMenu(
+                                            expanded = expandedColorSource,
+                                            onDismissRequest = { expandedColorSource = false }
+                                    ) {
+                                        SettingsMenuItem(
+                                                text = stringResource(Res.string.settings_color_source_default),
+                                                selected = themeColorSource == THEME_COLOR_SOURCE_SYSTEM,
+                                                onClick = {
+                                                    onThemeImageColorClear()
+                                                    onThemeColorSourceChange(THEME_COLOR_SOURCE_SYSTEM)
+                                                    expandedColorSource = false
+                                                }
+                                        )
+                                        SettingsMenuItem(
+                                                text = stringResource(Res.string.settings_color_source_image),
+                                                selected = themeColorSource == THEME_COLOR_SOURCE_IMAGE,
+                                                onClick = {
+                                                    expandedColorSource = false
+                                                    pickThemeImageColor()
+                                                }
+                                        )
+                                    }
+                                }
+                        )
                     }
-                }
 
-                // The switch only has an effect in follow-system mode; the
-                // dedicated AMOLED mode (3) always uses pure black.
-                if (themeMode == 0) {
-                    Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                    stringResource(Res.string.settings_amoled_black),
-                                    style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                    text = stringResource(Res.string.settings_amoled_black_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
+                    // The switch only has an effect in follow-system mode; the
+                    // dedicated AMOLED mode (3) always uses pure black.
+                    if (themeMode == 0) {
+                        switchItem(
+                                key = "amoled_black",
+                                headline = amoledBlackTitle,
                                 checked = amoledBlack,
-                                onCheckedChange = { onAmoledBlackChange(it) }
+                                onCheckedChange = onAmoledBlackChange,
+                                supportingContent = {
+                                    Text(stringResource(Res.string.settings_amoled_black_desc))
+                                }
                         )
                     }
-                }
 
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_haze_blur),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_haze_blur_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = hazeBlurEnabled, onCheckedChange = { onHazeBlurEnabledChange(it) })
-                }
+                    switchItem(
+                            key = "haze_blur",
+                            headline = hazeBlurTitle,
+                            checked = hazeBlurEnabled,
+                            onCheckedChange = onHazeBlurEnabledChange,
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_haze_blur_desc))
+                            }
+                    )
 
-                if (hazeBlurEnabled) {
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(stringResource(Res.string.settings_blur_strength))
-                            Text(
-                                    text = "${(hazeBlurStrength * 100).roundToInt()}%",
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Slider(
+                    if (hazeBlurEnabled) {
+                        sliderItem(
+                                key = "haze_blur_strength",
+                                headline = blurStrengthTitle,
+                                valueText = "${(hazeBlurStrength * 100).roundToInt()}%",
                                 value = hazeBlurStrength,
-                                onValueChange = { onHazeBlurStrengthChange(it) },
-                                valueRange =
-                                        SettingsConstants.HAZE_STRENGTH_MIN..SettingsConstants
-                                                .HAZE_STRENGTH_MAX,
-                                steps = SettingsConstants.HAZE_SLIDER_STEPS,
-                                modifier = Modifier.fillMaxWidth()
+                                onValueChange = onHazeBlurStrengthChange,
+                                valueRange = SettingsConstants.HAZE_STRENGTH_MIN..SettingsConstants.HAZE_STRENGTH_MAX,
+                                steps = SettingsConstants.HAZE_SLIDER_STEPS
                         )
                     }
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                CategoryTitle(stringResource(Res.string.settings_category_b30))
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_show_overflow),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_show_overflow_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = showB30Overflow, onCheckedChange = { onShowB30OverflowChange(it) })
-                }
+                SettingsSection(title = stringResource(Res.string.settings_category_b30)) {
+                    switchItem(
+                            key = "show_b30_overflow",
+                            headline = showOverflowTitle,
+                            checked = showB30Overflow,
+                            onCheckedChange = onShowB30OverflowChange,
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_show_overflow_desc))
+                            }
+                    )
 
-                if (showB30Overflow) {
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(stringResource(Res.string.settings_overflow_count))
-                            Text(
-                                    text = overflowCount.toString(),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Slider(
+                    if (showB30Overflow) {
+                        sliderItem(
+                                key = "b30_overflow_count",
+                                headline = overflowCountTitle,
+                                valueText = overflowCount.toString(),
                                 value = overflowCount.toFloat(),
                                 onValueChange = { onOverflowCountChange(it.roundToInt()) },
-                                valueRange =
-                                        SettingsConstants.OVERFLOW_COUNT_MIN
-                                                .toFloat()..SettingsConstants.OVERFLOW_COUNT_MAX
-                                                .toFloat(),
-                                steps = SettingsConstants.OVERFLOW_SLIDER_STEPS,
-                                modifier = Modifier.fillMaxWidth()
+                                valueRange = SettingsConstants.OVERFLOW_COUNT_MIN.toFloat()..
+                                        SettingsConstants.OVERFLOW_COUNT_MAX.toFloat(),
+                                steps = SettingsConstants.OVERFLOW_SLIDER_STEPS
                         )
                     }
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 CategoryTitle(stringResource(Res.string.settings_category_score_api))
 
