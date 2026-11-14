@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -329,7 +330,7 @@ internal fun QrLoginContent(
                     onClick = onStartQrLogin,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(ButtonDefaults.MediumContainerHeight)
                 ) {
                     Icon(Icons.Default.QrCode2, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -503,7 +504,7 @@ internal fun TokenLoginContent(
             onClick = onLogin,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .height(ButtonDefaults.MediumContainerHeight),
             enabled = state.token.isNotBlank() && !state.isLoading && !state.isLoggedIn
         ) {
             AnimatedVisibility(visible = state.isLoading) {

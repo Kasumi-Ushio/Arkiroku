@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -365,7 +366,9 @@ fun B30ImageScreen(
                                     )
                                 }
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(ButtonDefaults.MediumContainerHeight)
                         ) {
                             Icon(Icons.Filled.Save, contentDescription = null)
                             Text(stringResource(Res.string.b30ex_action_save), style = MaterialTheme.typography.labelLarge)
@@ -386,7 +389,9 @@ fun B30ImageScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(ButtonDefaults.MediumContainerHeight)
                         ) {
                             Icon(Icons.Filled.Share, contentDescription = null)
                             Text(stringResource(Res.string.b30ex_action_share), style = MaterialTheme.typography.labelLarge)

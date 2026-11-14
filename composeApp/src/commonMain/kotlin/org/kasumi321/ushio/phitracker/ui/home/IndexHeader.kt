@@ -17,7 +17,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.MediumFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -116,7 +116,7 @@ internal fun IndexSearchFab(
     modifier: Modifier = Modifier
 ) {
     val active = activeFilterCount > 0
-    FloatingActionButton(
+    MediumFloatingActionButton(
         onClick = onClick,
         modifier = modifier,
         containerColor = if (active) {

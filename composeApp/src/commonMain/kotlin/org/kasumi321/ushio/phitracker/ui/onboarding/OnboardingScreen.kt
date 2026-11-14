@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -1421,7 +1422,9 @@ private fun OnboardingBottomBar(
             Button(
                 onClick = onFinish,
                 enabled = canAdvance,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(ButtonDefaults.MediumContainerHeight)
             ) {
                 Text(stringResource(Res.string.onboarding_done_start))
             }
@@ -1464,7 +1467,11 @@ private fun OnboardingBottomBar(
             // The primary action is a filled button: it is the one CTA that
             // advances the wizard, so it must outrank the plain back button.
             // The opening step says "Get started" instead of a bare "Next".
-            Button(onClick = onNext, enabled = canAdvance) {
+            Button(
+                onClick = onNext,
+                enabled = canAdvance,
+                modifier = Modifier.height(ButtonDefaults.MediumContainerHeight)
+            ) {
                 Text(
                     text = stringResource(
                         if (stepIndex == 0) Res.string.onboarding_welcome_start
