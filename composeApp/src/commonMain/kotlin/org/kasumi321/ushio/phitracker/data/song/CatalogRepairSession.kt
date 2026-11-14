@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarDataUpdateCoordinator
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarUpdateAlreadyInProgressException
 import org.kasumi321.ushio.phitracker.data.common.CatalogDownloadException
 import org.kasumi321.ushio.phitracker.data.common.CatalogStorageException
 import org.kasumi321.ushio.phitracker.data.common.StagedRollbackException
@@ -32,7 +34,8 @@ enum class CatalogRepairStartResult {
 enum class CatalogRepairStage {
     Checking,
     Files,
-    Illustrations
+    Illustrations,
+    Avatars
 }
 
 /** The only entry allowed to present a terminal result for its run. */
@@ -67,6 +70,7 @@ data class CatalogRepairState(
     val currentItem: String = "",
     val addedSongNames: List<String> = emptyList(),
     val partialIllustrationFailures: Int = 0,
+    val partialAvatarFailures: Int = 0,
     val failure: CatalogRepairFailure? = null,
     /** Identity of the current run and its terminal result. */
     val resultGeneration: Long = 0L,
@@ -96,7 +100,8 @@ data class CatalogRepairState(
  */
 class CatalogRepairSession(
     private val coordinator: SongDataUpdateCoordinator,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val avatarCoordinator: AvatarDataUpdateCoordinator? = null
 ) {
     private val mutableState = MutableStateFlow(CatalogRepairState())
     val state: StateFlow<CatalogRepairState> = mutableState.asStateFlow()
@@ -115,13 +120,26 @@ class CatalogRepairSession(
     /** Retry the blocking startup repair after a failure. */
     fun retry() = launchStartupRepair(forceBlocking = true)
 
-    /** Full catalog update (downloads both datasets + illustrations). */
+    /** Full manual update: song/collectible data, illustrations and avatars. */
     fun startUpdate(owner: CatalogRepairEntryPoint = CatalogRepairEntryPoint.Settings) =
         launchUpdate(owner)
 
     /** Reset the retained scene and redownload everything (Settings/gate). */
     fun startResetAndRedownload(owner: CatalogRepairEntryPoint = CatalogRepairEntryPoint.Settings) =
         launchReset(owner)
+
+    /** A single upstream probe covering songs, collectibles and the avatar catalog. */
+    suspend fun checkUpstreamChanged(): Result<Boolean> {
+        val catalogResult = coordinator.checkUpstreamChanged()
+        val avatarResult = avatarCoordinator?.checkUpstreamChanged()
+        return when {
+            catalogResult.isFailure -> catalogResult
+            avatarResult?.isFailure == true -> avatarResult
+            else -> Result.success(
+                catalogResult.getOrDefault(false) || avatarResult?.getOrDefault(false) == true
+            )
+        }
+    }
 
     /**
      * Explicit user choice when the download cannot finish: serve the bundled
@@ -211,7 +229,12 @@ class CatalogRepairSession(
                     )
                 }
             )
-            handleUpdateResult(run, result)
+            val avatarResult = if (result.canContinueToAvatars()) {
+                updateAvatars(run)
+            } else {
+                null
+            }
+            handleUpdateResult(run, result, avatarResult)
         }
         return CatalogRepairStartResult.Started
     }
@@ -242,7 +265,14 @@ class CatalogRepairSession(
                     )
                 }
             )
-            handleUpdateResult(run, result, forceBlockingOnFailure = true)
+            val avatarResult = if (owner != CatalogRepairEntryPoint.Recovery &&
+                result.canContinueToAvatars()
+            ) {
+                updateAvatars(run, reset = true)
+            } else {
+                null
+            }
+            handleUpdateResult(run, result, avatarResult, forceBlockingOnFailure = true)
         }
         return CatalogRepairStartResult.Started
     }
@@ -265,28 +295,68 @@ class CatalogRepairSession(
         return CatalogRepairStartResult.Started
     }
 
+    private fun Result<SongDataUpdateCoordinator.UpdateOutcome>.canContinueToAvatars(): Boolean =
+        isSuccess || exceptionOrNull() is IllustrationSyncPartialException
+
+    /** Avatar work is part of manual catalog updates, never the startup blocking gate. */
+    private suspend fun updateAvatars(
+        run: Long,
+        reset: Boolean = false
+    ): Result<AvatarDataUpdateCoordinator.UpdateOutcome>? {
+        val avatar = avatarCoordinator ?: return null
+        val onFileProgress: (Int, Int, String) -> Unit = { completed, total, name ->
+            publishProgress(run, CatalogRepairStage.Avatars, completed, total, name)
+        }
+        val onImageProgress: (AvatarDataUpdateCoordinator.ImageProgress) -> Unit = { progress ->
+            publishProgress(
+                run,
+                CatalogRepairStage.Avatars,
+                progress.completed,
+                progress.total,
+                progress.currentAvatarKey
+            )
+        }
+        return if (reset) {
+            avatar.resetPendingUpdate(onFileProgress, onImageProgress)
+        } else {
+            avatar.update(onFileProgress, onImageProgress)
+        }
+    }
+
     private suspend fun handleUpdateResult(
         run: Long,
         result: Result<SongDataUpdateCoordinator.UpdateOutcome>,
+        avatarResult: Result<AvatarDataUpdateCoordinator.UpdateOutcome>? = null,
         forceBlockingOnFailure: Boolean = false
     ) {
         if (run != generation) return
         val error = result.exceptionOrNull()
+        val partialIllustration = error as? IllustrationSyncPartialException
+        val avatarError = avatarResult?.exceptionOrNull()
         when {
-            error is IllustrationSyncPartialException -> {
-                // Both datasets are committed; only artwork is missing.
-                finishSuccess(run, error.addedSongNames, error.failures)
+            error != null && partialIllustration == null -> {
+                finishFailure(run, error, forceBlockingOnFailure)
             }
 
-            error != null -> finishFailure(run, error, forceBlockingOnFailure)
             coordinator.hasPendingRepair() || coordinator.hasPendingRecovery() -> {
                 finishFailure(run, CatalogStorageException(), forceBlockingOnFailure)
             }
 
+            avatarError != null -> {
+                // Avatar failures belong to this unified result, but must never
+                // turn into the global startup blocking gate.
+                finishFailure(run, avatarError, allowBlocking = false)
+            }
+
+            avatarCoordinator?.let { it.hasPendingRepair() || it.hasPendingRecovery() } == true -> {
+                finishFailure(run, CatalogStorageException(), allowBlocking = false)
+            }
+
             else -> finishSuccess(
                 run,
-                result.getOrNull()?.addedSongNames.orEmpty(),
-                partialIllustrationFailures = 0
+                partialIllustration?.addedSongNames ?: result.getOrNull()?.addedSongNames.orEmpty(),
+                partialIllustrationFailures = partialIllustration?.failures ?: 0,
+                partialAvatarFailures = avatarResult?.getOrNull()?.failedKeys?.size ?: 0
             )
         }
     }
@@ -339,6 +409,7 @@ class CatalogRepairSession(
             currentItem = "",
             addedSongNames = emptyList(),
             partialIllustrationFailures = 0,
+            partialAvatarFailures = 0,
             failure = null,
             resultGeneration = run,
             resultAvailable = false,
@@ -408,7 +479,12 @@ class CatalogRepairSession(
         mutableState.update { it.copy(resultDismissed = true) }
     }
 
-    private fun finishSuccess(run: Long, addedSongNames: List<String>, partialIllustrationFailures: Int) {
+    private fun finishSuccess(
+        run: Long,
+        addedSongNames: List<String>,
+        partialIllustrationFailures: Int,
+        partialAvatarFailures: Int = 0
+    ) {
         if (run != generation) return
         val degraded = coordinator.isUsingBundledCatalogFallback()
         AppLogger.event(
@@ -416,6 +492,7 @@ class CatalogRepairSession(
             "catalog_repair_completed",
             mapOf(
                 "partialIllustrations" to partialIllustrationFailures.toString(),
+                "partialAvatars" to partialAvatarFailures.toString(),
                 "degraded" to degraded.toString()
             )
         )
@@ -432,6 +509,7 @@ class CatalogRepairSession(
                     currentItem = "",
                     addedSongNames = addedSongNames,
                     partialIllustrationFailures = partialIllustrationFailures,
+                    partialAvatarFailures = partialAvatarFailures,
                     failure = null,
                     degraded = degraded
                 )
@@ -456,6 +534,7 @@ class CatalogRepairSession(
                     currentItem = "",
                     addedSongNames = emptyList(),
                     partialIllustrationFailures = 0,
+                    partialAvatarFailures = 0,
                     failure = null,
                     degraded = degraded
                 )
@@ -466,16 +545,20 @@ class CatalogRepairSession(
     private suspend fun finishFailure(
         run: Long,
         error: Throwable?,
-        forceBlocking: Boolean = false
+        forceBlocking: Boolean = false,
+        allowBlocking: Boolean = true
     ) {
         if (run != generation) return
         val failure = error.toCatalogRepairFailure()
         // Scene/rollback failures and every reset failure may leave mixed files
         // or no trusted recovery scene. Never rely on the entry state's flag.
-        val blocking = forceBlocking ||
-            mutableState.value.blocking ||
-            failure == CatalogRepairFailure.Scene ||
-            failure == CatalogRepairFailure.Storage
+        // Avatar-only failures explicitly opt out of the global blocking gate.
+        val blocking = allowBlocking && (
+            forceBlocking ||
+                mutableState.value.blocking ||
+                failure == CatalogRepairFailure.Scene ||
+                failure == CatalogRepairFailure.Storage
+            )
         // A partially failed run may have committed (and discharged the marker
         // of) one dataset. While the gate is blocking, both datasets must stay
         // unrecovered, so re-persist the obligation for a later launch.
@@ -512,6 +595,7 @@ class CatalogRepairSession(
                     currentItem = "",
                     addedSongNames = emptyList(),
                     partialIllustrationFailures = 0,
+                    partialAvatarFailures = 0,
                     failure = failure,
                     degraded = degraded
                 )
@@ -530,6 +614,7 @@ fun Throwable?.toCatalogRepairFailure(): CatalogRepairFailure = when (this) {
     is StagedUpdateBlockedException -> CatalogRepairFailure.Scene
     is StagedRollbackException -> CatalogRepairFailure.Storage
     is CatalogStorageException -> CatalogRepairFailure.Storage
-    is UpdateAlreadyInProgressException -> CatalogRepairFailure.Busy
+    is UpdateAlreadyInProgressException,
+    is AvatarUpdateAlreadyInProgressException -> CatalogRepairFailure.Busy
     else -> CatalogRepairFailure.Unknown
 }

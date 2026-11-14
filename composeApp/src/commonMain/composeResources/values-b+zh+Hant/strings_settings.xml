@@ -134,8 +134,9 @@
     <string name="settings_theme_follow_system">跟隨系統</string>
     <string name="settings_theme_light">一律淺色</string>
     <string name="settings_update_preparing">正在準備更新…</string>
+    <string name="settings_syncing_avatars">正在更新頭像: %1$s (%2$d/%3$d)</string>
     <string name="settings_update_complete">更新完成</string>
-    <string name="settings_update_data_dialog_text">將從遠端倉庫下載最新的圖鑑資訊（包含曲目與收藏品），之後將自動重新整理本機圖鑑資訊。\n下載完畢後，建議重新下載所有曲繪。</string>
+    <string name="settings_update_data_dialog_text">將從遠端倉庫下載最新的曲目、收藏品圖鑑資訊與頭像目錄，之後將自動重新整理本機資料。\n下載完畢後，建議重新下載所有曲繪。</string>
     <string name="settings_update_error_message">發生了錯誤：\n%1$s</string>
     <string name="settings_update_failed">更新失敗</string>
     <string name="catalog_update_error_network_message">下載未能完成。請檢查網路後重新更新。</string>
@@ -148,12 +149,14 @@
     <string name="settings_catalog_management">圖鑑資訊管理</string>
     <string name="settings_catalog_management_desc">更新圖鑑資訊或重設未完成的更新</string>
     <string name="settings_update_song_data">更新圖鑑資訊</string>
-    <string name="settings_update_song_data_desc">下載最新的 Phigros 曲目與收藏品圖鑑資訊</string>
+    <string name="settings_update_song_data_desc">下載最新的 Phigros 曲目、收藏品與頭像資料</string>
     <string name="settings_reset_pending_update">重設未完成的更新</string>
-    <string name="settings_reset_pending_update_dialog_text">確定清除未完成更新的備份與暫存檔案，並重新下載完整曲目與收藏品圖鑑資訊嗎？</string>
+    <string name="settings_reset_pending_update_dialog_text">確定清除未完成更新的備份與暫存檔案，並重新下載完整曲目、收藏品與頭像目錄嗎？</string>
     <string name="settings_reset_pending_update_done">已重設未完成的更新，並完成圖鑑資訊下載</string>
     <string name="settings_use_api_data">使用查分 API 資料</string>
     <string name="settings_use_api_data_desc">開啟後優先顯示社群統計資料</string>
     <string name="settings_update_partial_illustrations">圖鑑資訊已更新，但有 %1$d 張曲繪未能下載，可稍後重試。</string>
+    <string name="settings_update_partial_avatars">圖鑑資訊已更新，但有 %1$d 張頭像圖片未能下載，可稍後重試。</string>
+    <string name="settings_update_partial_images">圖鑑資訊已更新，但部分圖片未能下載（曲繪 %1$d 張，頭像 %2$d 張），可稍後重試。</string>
     <string name="settings_catalog_using_bundled">正在使用內建圖鑑資訊</string>
 </resources>

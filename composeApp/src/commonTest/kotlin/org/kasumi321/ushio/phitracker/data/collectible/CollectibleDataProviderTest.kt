@@ -33,13 +33,13 @@ class CollectibleDataProviderTest {
     // sub_index out of order to exercise part sorting.
     private val zhCsv = header + "\n" +
         "额外章节,,cover-ex.jpg,mope1,1,收容报告·小报,767/06/01,中之层收容所,nonsense,内容A\\n第二行,\n" +
-        "额外章节,,cover-ex.jpg,mope2,2,收容报告·蝴蝶结·线索,767/06/01,中之层收容所,nonsense,内容B,\n" +
+        "额外章节,,cover-ex.jpg,mope2,2,收容报告·蝴蝶结·线索,767/06/02,中之层收容所,nonsense,内容B,\n" +
         "额外章节,,cover-ex.jpg,mope2,1,收容报告·蝴蝶结,767/06/01,中之层收容所,nonsense,内容B1,\n" +
         "冰封世界,第一章,cover-ice.jpg,mope1,1,冰封物品,768/01/01,冰之主管,main,内容C,"
 
     private val enCsv = header + "\n" +
         "Chapter EX,,cover-ex.jpg,mope1,1,[Item Report] Tabloid,767/06/01,Mid-Level Shelter,nonsense,Content A\\nLine 2,\n" +
-        "Chapter EX,,cover-ex.jpg,mope2,2,[Item Report] Bow Clue,767/06/01,Mid-Level Shelter,nonsense,Content B,\n" +
+        "Chapter EX,,cover-ex.jpg,mope2,2,[Item Report] Bow Clue,767/06/02,Mid-Level Shelter,nonsense,Content B,\n" +
         "Chapter EX,,cover-ex.jpg,mope2,1,[Item Report] Bow,767/06/01,Mid-Level Shelter,nonsense,Content B1,\n" +
         "Frozen World,Chapter 1,cover-ice.jpg,mope1,1,Frozen Item,768/01/01,Ice Supervisor,main,Content C,"
 
@@ -120,6 +120,7 @@ class CollectibleDataProviderTest {
         val bow = items.single { it.chapterFolderKey == "额外章节" && it.key == "mope2" }
         assertEquals("收容报告·蝴蝶结", bow.displayName)
         assertEquals(listOf(1, 2), bow.parts.map { it.subIndex })
+        assertEquals(listOf("767/06/01", "767/06/02"), bow.parts.map { it.date })
         assertEquals("内容B1", bow.parts[0].content)
         assertEquals(CollectibleCategory.NONSENSE, bow.parts[0].category)
         assertEquals("内容A\\n第二行", items.first { it.key == "mope1" }.parts[0].content)

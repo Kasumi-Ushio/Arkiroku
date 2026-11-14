@@ -22,6 +22,7 @@
     <string name="songs_songdata_up_to_date">圖鑑資訊已是最新</string>
     <string name="songs_songdata_downloading">正在下載: %1$s (%2$d/%3$d)</string>
     <string name="songs_songdata_syncing_illustrations">正在同步新曲繪: %1$s (%2$d/%3$d)</string>
+    <string name="songs_songdata_syncing_avatars">正在更新頭像: %1$s (%2$d/%3$d)</string>
     <string name="songs_songdata_updated_count">圖鑑資訊已更新，新增 %1$d 首曲目</string>
     <string name="songs_songdata_updated">圖鑑資訊已更新</string>
     <string name="songs_songdata_update_failed">圖鑑資訊更新失敗</string>

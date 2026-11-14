@@ -166,7 +166,7 @@ val dataModule = module {
             collectibleDataUpdater = get()
         )
     }
-    single { CatalogRepairSession(get()) }
+    single { CatalogRepairSession(get(), avatarCoordinator = get()) }
     single {
         IllustrationPreloadCoordinator(
             songDataProvider = get(),

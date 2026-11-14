@@ -35,7 +35,7 @@
     <string name="login_token_tutorial_link">View the tutorial</string>
     <string name="login_skip_to_home">Continue without logging in</string>
     <string name="login_reset_local_session">Repair or reset local session</string>
-    <string name="login_reset_local_session_dialog_text">Clear the current sessionToken and archive the current account data. Use this only when secure credential storage is unavailable or an earlier session recovery is incomplete.</string>
+    <string name="login_reset_local_session_dialog_text">Clear the current sessionToken and archive the current account data? Use this only when secure credential storage is unavailable or an earlier session recovery is incomplete.</string>
     <string name="login_error_reset_failed">The local session reset is incomplete. Save data was kept, but the old sessionToken may remain. Retry repair or reset; if secure storage remains unavailable, restart Arkiroku and try again. If the API Token could not be restored, enter it again in Settings.</string>
     <string name="login_error_reset_pending">The previous local session reset is incomplete. Try resetting again before logging in.</string>
     <string name="login_error_storage_rebuild_required">Secure credential storage remains unavailable after repeated attempts. Use “Repair or reset local session” below, or restart Arkiroku and try again.</string>

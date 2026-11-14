@@ -42,5 +42,5 @@
     <string name="login_error_recovery_unresolved">先前的会话恢复状态无法确认，请尝试重新登录，若问题仍然存在，请尝试通过“修复或重置本地会话”以尝试修复。</string>
     <string name="login_error_previous_data_cleanup">上一账号的本地数据未能清除，因此暂时不能建立新会话。请重试，或通过“修复或重置本地会话”来归档账号。</string>
     <string name="login_error_previous_credential_cleanup">上一账号的数据已归档，但 sessionToken 未能完全删除，请重试，或通过“修复或重置本地会话”以尝试刷新。</string>
-    <string name="login_error_login_finalization">您的新 sessionToken 已保存，但此前存档数据的。请重试恢复标记未能清除，请重新登录以完成恢复；若问题持续，请尝试修复或重置会话。</string>
+    <string name="login_error_login_finalization">您的新 sessionToken 已保存，但此前存档数据的恢复标记未能清除。请重试，请重新登录以完成恢复；若问题持续，请尝试修复或重置会话。</string>
 </resources>

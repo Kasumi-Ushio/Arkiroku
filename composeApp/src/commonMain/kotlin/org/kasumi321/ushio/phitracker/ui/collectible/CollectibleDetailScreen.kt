@@ -70,9 +70,11 @@ import phitracker.composeapp.generated.resources.collectible_detail_supervisor_l
  * region instead of scrolling with the cover, and fades out once the cover has
  * fully passed the status-bar bottom edge; it keeps the system icons readable
  * while any of the cover remains behind them. The cover keeps only the chapter
- * line and the item name over its bottom scrim; category, date and supervisor
+ * line and the item name over its bottom scrim; category and supervisor
  * metadata moves into a body card, and each part's body text gets its own card
- * (same card idiom as the song detail page). The CSV content keeps literal
+ * (same card idiom as the song detail page). A single-part date stays in the
+ * metadata card; multi-part dates stay with their corresponding part cards.
+ * The CSV content keeps literal
  * two-character `\n` sequences; they become real line breaks here. No Haze —
  * the page is plain surface, glass stays on the home navigation.
  */
@@ -96,7 +98,11 @@ fun CollectibleDetailScreen(
     } ?: item.chapterFolderKey
     val sortedParts = item.parts.sortedBy { it.subIndex }
     val categories = sortedParts.map { it.category }.distinct()
-    val dates = sortedParts.map { it.date }.filter { it.isNotBlank() }.distinct()
+    val dates = if (sortedParts.size == 1) {
+        sortedParts.map { it.date }.filter { it.isNotBlank() }
+    } else {
+        emptyList()
+    }
     val supervisors = sortedParts.map { it.supervisor }.filter { it.isNotBlank() }.distinct()
     val hasMetadata = categories.isNotEmpty() || dates.isNotEmpty() || supervisors.isNotEmpty()
 
@@ -154,6 +160,7 @@ fun CollectibleDetailScreen(
                         PartCard(
                             part = part,
                             showHeader = sortedParts.size > 1,
+                            showDate = sortedParts.size > 1,
                             ordinal = index + 1,
                             itemDisplayName = item.displayName
                         )
@@ -293,9 +300,9 @@ private fun DetailArtHeader(
 
 /**
  * Item metadata as a body card: primary-tinted section title followed by
- * label: value rows (same idiom as the song detail header rows). For
- * multi-part items the values are de-duplicated in part order so differing
- * dates or supervisors from each part stay visible.
+ * label: value rows (same idiom as the song detail header rows). Categories
+ * and supervisors are de-duplicated in part order. Only a single-part date is
+ * shown here; multi-part dates belong to their respective [PartCard]s.
  */
 @Composable
 private fun MetadataCard(
@@ -342,6 +349,7 @@ private fun MetadataCard(
 private fun PartCard(
     part: CollectiblePart,
     showHeader: Boolean,
+    showDate: Boolean,
     ordinal: Int,
     itemDisplayName: String
 ) {
@@ -376,6 +384,16 @@ private fun PartCard(
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
+
+            if (showDate && part.date.isNotBlank()) {
+                InfoRow(
+                    label = stringResource(Res.string.collectible_detail_date_label),
+                    value = part.date
+                )
+                if (part.content.isNotBlank() || part.properties.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
 
             if (part.content.isNotBlank()) {
                 SelectionContainer {

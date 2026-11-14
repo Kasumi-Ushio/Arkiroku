@@ -29,12 +29,18 @@ import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogProvider
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarDataUpdateCoordinator
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarDataUpdater
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarImageStore
+import org.kasumi321.ushio.phitracker.data.avatar.AvatarTestFixtures
 import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataProvider
 import org.kasumi321.ushio.phitracker.data.collectible.CollectibleDataUpdater
 import org.kasumi321.ushio.phitracker.data.common.CatalogDownloadException
 import org.kasumi321.ushio.phitracker.data.common.CatalogStorageException
 import org.kasumi321.ushio.phitracker.data.common.StagedRollbackException
 import org.kasumi321.ushio.phitracker.data.common.StagedUpdateBlockedException
+import org.kasumi321.ushio.phitracker.data.platform.BinaryAssetReader
 import org.kasumi321.ushio.phitracker.data.platform.IllustrationThumbnailPreloader
 import org.kasumi321.ushio.phitracker.data.platform.PlatformPaths
 import org.kasumi321.ushio.phitracker.data.platform.StandardArtworkCache
@@ -80,7 +86,8 @@ class CatalogRepairSessionTest {
             "notesInfo.json" to "{}",
             "nicklist.yaml" to "{}",
             "collection_zh_cn.csv" to bundledCsv,
-            "collection_version.txt" to "1.0.0"
+            "collection_version.txt" to "1.0.0",
+            "avatar_catalog.tsv" to "bundled\tbundled\n"
         )
 
     @BeforeTest
@@ -174,7 +181,11 @@ class CatalogRepairSessionTest {
             SongDataUpdater(client, paths, provider)
         },
         collectibleUpdaterFactory: (HttpClient, CollectibleDataProvider) -> CollectibleDataUpdater =
-            { client, provider -> CollectibleDataUpdater(client, paths, provider) }
+            { client, provider -> CollectibleDataUpdater(client, paths, provider) },
+        withAvatar: Boolean = false,
+        avatarCatalog: String = "fresh\tfresh\n",
+        failAvatarImage: Boolean = false,
+        failAvatarCatalog: Boolean = false
     ): Harness {
         val requested = mutableListOf<String>()
         val clearedUrls = mutableListOf<List<String>>()
@@ -185,10 +196,20 @@ class CatalogRepairSessionTest {
             if (failCollectible() && (name.startsWith("collection_") || name == "version.txt")) {
                 return@MockEngine respondError(HttpStatusCode.InternalServerError)
             }
+            if (failAvatarCatalog && name == "tmp.tsv") {
+                return@MockEngine respondError(HttpStatusCode.InternalServerError)
+            }
+            if (failAvatarImage && name == "bad.png") {
+                return@MockEngine respondError(HttpStatusCode.InternalServerError)
+            }
+            if (name.endsWith(".png")) {
+                return@MockEngine respond(AvatarTestFixtures.pngOne)
+            }
             val body = when (name) {
                 "info.csv" -> freshInfo + extraFreshInfo
                 "version.txt" -> "9.9.9"
                 "collection_zh_cn.csv" -> bundledCsv
+                "tmp.tsv" -> avatarCatalog
                 else -> "{}"
             }
             respond(
@@ -212,8 +233,29 @@ class CatalogRepairSessionTest {
             },
             clearCacheUrls = { clearedUrls += it }
         )
+        val avatarCoordinator = if (withAvatar) {
+            val avatarProvider = AvatarCatalogProvider(assetReader = assetReader(), paths = paths)
+            val imageStore = AvatarImageStore(
+                httpClient = client,
+                paths = paths,
+                assetReader = object : BinaryAssetReader {
+                    override fun readBytes(name: String): ByteArray {
+                        if (name != "avatar.bundled.png") error("Asset not found: $name")
+                        return AvatarTestFixtures.pngOne
+                    }
+                },
+                fs = fs
+            )
+            AvatarDataUpdateCoordinator(
+                updater = AvatarDataUpdater(client, paths, avatarProvider, fs),
+                catalogProvider = avatarProvider,
+                imageStore = imageStore
+            )
+        } else {
+            null
+        }
         return Harness(
-            session = CatalogRepairSession(coordinator, scope),
+            session = CatalogRepairSession(coordinator, scope, avatarCoordinator),
             provider = provider,
             collectibleProvider = collectibleProvider,
             cache = cache,
@@ -525,6 +567,74 @@ class CatalogRepairSessionTest {
         assertEquals(CatalogRepairStatus.Succeeded, result.status)
         assertEquals(listOf("New Song"), result.addedSongNames)
         assertEquals(1, result.partialIllustrationFailures)
+    }
+
+    @Test
+    fun upstreamProbeIncludesAvatarCatalog() = runTest(dispatcher) {
+        val harness = createHarness(withAvatar = true)
+
+        val result = harness.session.checkUpstreamChanged()
+
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrDefault(false))
+        assertTrue(harness.requested.contains("tmp.tsv"))
+    }
+
+    @Test
+    fun manualUpdateAlsoDownloadsAvatarCatalogAndImages() = runTest(dispatcher) {
+        val harness = createHarness(withAvatar = true)
+
+        harness.session.startUpdate()
+        val result = harness.awaitTerminal()
+
+        assertEquals(CatalogRepairStatus.Succeeded, result.status)
+        assertEquals(0, result.partialAvatarFailures)
+        assertTrue(harness.requested.contains("tmp.tsv"))
+        assertTrue(harness.requested.contains("fresh.png"))
+        assertTrue(fs.exists(base / "avatar_pool" / "avatar.fresh.png"))
+    }
+
+    @Test
+    fun manualResetAlsoRedownloadsAvatars() = runTest(dispatcher) {
+        val harness = createHarness(withAvatar = true)
+
+        harness.session.startResetAndRedownload()
+        val result = harness.awaitTerminal()
+
+        assertEquals(CatalogRepairStatus.Succeeded, result.status)
+        assertTrue(harness.requested.contains("tmp.tsv"))
+        assertTrue(fs.exists(base / "avatar_pool" / "avatar.fresh.png"))
+    }
+
+    @Test
+    fun avatarImageFailureIsPartOfUnifiedPartialSuccess() = runTest(dispatcher) {
+        val harness = createHarness(
+            withAvatar = true,
+            avatarCatalog = "good\tgood\nbad\tbad\n",
+            failAvatarImage = true
+        )
+
+        harness.session.startUpdate()
+        val result = harness.awaitTerminal()
+
+        assertEquals(CatalogRepairStatus.Succeeded, result.status)
+        assertEquals(listOf("New Song"), result.addedSongNames)
+        assertEquals(1, result.partialAvatarFailures)
+        assertTrue(fs.exists(base / "avatar_pool" / "avatar.good.png"))
+        assertFalse(fs.exists(base / "avatar_pool" / "avatar.bad.png"))
+    }
+
+    @Test
+    fun avatarCatalogFailureFailsUnifiedUpdateWithoutBlockingStartup() = runTest(dispatcher) {
+        val harness = createHarness(withAvatar = true, failAvatarCatalog = true)
+
+        harness.session.startUpdate()
+        val result = harness.awaitTerminal()
+
+        assertEquals(CatalogRepairStatus.Failed, result.status)
+        assertEquals(CatalogRepairFailure.Network, result.failure)
+        assertFalse(result.blocking)
+        assertEquals("New Song", harness.provider.getSongs()["new.0"]?.name)
     }
 
     @Test

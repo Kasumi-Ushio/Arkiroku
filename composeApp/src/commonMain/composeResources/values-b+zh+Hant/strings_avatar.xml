@@ -4,6 +4,7 @@
     <string name="avatar_custom_image">使用自訂圖片</string>
     <string name="avatar_check_updates">檢查更新</string>
     <string name="avatar_update_catalog">更新頭像</string>
+    <string name="avatar_random">隨機頭像</string>
     <string name="avatar_account_required">登入後即可選擇遊戲內建頭像。</string>
     <string name="avatar_selection_in_progress">正在套用頭像…</string>
     <string name="avatar_selection_failed">內建頭像選擇失敗，請重試。</string>

@@ -172,6 +172,7 @@ import phitracker.composeapp.generated.resources.settings_show_api_token
 import phitracker.composeapp.generated.resources.settings_show_overflow
 import phitracker.composeapp.generated.resources.settings_show_overflow_desc
 import phitracker.composeapp.generated.resources.settings_song_name_separator
+import phitracker.composeapp.generated.resources.settings_syncing_avatars
 import phitracker.composeapp.generated.resources.settings_syncing_new_artwork
 import phitracker.composeapp.generated.resources.settings_theme_amoled
 import phitracker.composeapp.generated.resources.settings_theme_color_extracted_subtitle
@@ -187,6 +188,7 @@ import phitracker.composeapp.generated.resources.settings_update_error_message
 import phitracker.composeapp.generated.resources.settings_update_failed
 import phitracker.composeapp.generated.resources.settings_update_new_songs
 import phitracker.composeapp.generated.resources.settings_update_no_new_songs
+import phitracker.composeapp.generated.resources.settings_update_partial_avatars
 import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
 import phitracker.composeapp.generated.resources.settings_update_preparing
 import phitracker.composeapp.generated.resources.settings_update_song_data
@@ -256,6 +258,7 @@ fun SettingsTab(
         updateDataError: UiText? = null,
         updateResultSongNames: List<String>? = null,
         updatePartialIllustrationFailures: Int = 0,
+        updatePartialAvatarFailures: Int = 0,
         catalogDegraded: Boolean = false,
         collectibleDataVersion: String = "",
         onUpdateSongData: () -> Unit = {},
@@ -1587,6 +1590,13 @@ fun SettingsTab(
                         Text(
                                 text =
                                         when {
+                                            updateDataPhase == UpdateDataPhase.Avatars ->
+                                                    stringResource(
+                                                            Res.string.settings_syncing_avatars,
+                                                            updateDataFileName,
+                                                            updateDataProgress,
+                                                            updateDataTotal
+                                                    )
                                             updateDataPhase == UpdateDataPhase.Illustrations ->
                                                     stringResource(
                                                             Res.string.settings_syncing_new_artwork,
@@ -1678,6 +1688,16 @@ fun SettingsTab(
                                     text = stringResource(
                                             Res.string.settings_update_partial_illustrations,
                                             updatePartialIllustrationFailures
+                                    ),
+                                    color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        if (updatePartialAvatarFailures > 0) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                    text = stringResource(
+                                            Res.string.settings_update_partial_avatars,
+                                            updatePartialAvatarFailures
                                     ),
                                     color = MaterialTheme.colorScheme.error
                             )

@@ -124,10 +124,10 @@ class SettingsViewModel(
                 mutableUiState.update { state ->
                     state.copy(
                         isUpdatingData = isRunning,
-                        updateDataPhase = if (repair.stage == CatalogRepairStage.Illustrations) {
-                            UpdateDataPhase.Illustrations
-                        } else {
-                            UpdateDataPhase.Files
+                        updateDataPhase = when (repair.stage) {
+                            CatalogRepairStage.Illustrations -> UpdateDataPhase.Illustrations
+                            CatalogRepairStage.Avatars -> UpdateDataPhase.Avatars
+                            else -> UpdateDataPhase.Files
                         },
                         updateDataProgress = repair.completed,
                         updateDataTotal = repair.total,
@@ -157,6 +157,14 @@ class SettingsViewModel(
                             repair.status == CatalogRepairStatus.Succeeded -> 0
                             else -> state.updatePartialIllustrationFailures
                         },
+                        updatePartialAvatarFailures = when {
+                            !ownsRun || isRunning -> 0
+                            repair.status == CatalogRepairStatus.Succeeded &&
+                                repair.resultAvailable && !repair.resultDismissed ->
+                                repair.partialAvatarFailures
+                            repair.status == CatalogRepairStatus.Succeeded -> 0
+                            else -> state.updatePartialAvatarFailures
+                        },
                         updateDataBusyMessage = if (justFinished) null else state.updateDataBusyMessage,
                         catalogDegraded = repair.degraded,
                         collectibleDataVersion = if (justFinished || terminalAvailable) {
@@ -172,7 +180,8 @@ class SettingsViewModel(
                         "settings_catalog_repair_finished",
                         mapOf(
                             "status" to repair.status.name.lowercase(),
-                            "partialIllustrations" to repair.partialIllustrationFailures.toString()
+                            "partialIllustrations" to repair.partialIllustrationFailures.toString(),
+                            "partialAvatars" to repair.partialAvatarFailures.toString()
                         )
                     )
                 }
@@ -359,7 +368,8 @@ class SettingsViewModel(
                     updateDataError = null,
                     updateDataBusyMessage = null,
                     updateResultSongNames = null,
-                    updatePartialIllustrationFailures = 0
+                    updatePartialIllustrationFailures = 0,
+                    updatePartialAvatarFailures = 0
                 )
             }
             CatalogRepairStartResult.AlreadyRunning -> mutableUiState.update {
@@ -389,7 +399,8 @@ class SettingsViewModel(
                     updateDataError = null,
                     updateDataBusyMessage = null,
                     updateResultSongNames = null,
-                    updatePartialIllustrationFailures = 0
+                    updatePartialIllustrationFailures = 0,
+                    updatePartialAvatarFailures = 0
                 )
             }
             CatalogRepairStartResult.AlreadyRunning -> mutableUiState.update {
@@ -407,7 +418,11 @@ class SettingsViewModel(
     fun dismissUpdateDataResult() {
         acknowledgeCatalogRepairResult()
         mutableUiState.update {
-            it.copy(updateResultSongNames = null, updatePartialIllustrationFailures = 0)
+            it.copy(
+                updateResultSongNames = null,
+                updatePartialIllustrationFailures = 0,
+                updatePartialAvatarFailures = 0
+            )
         }
     }
 

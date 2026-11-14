@@ -71,12 +71,15 @@ import phitracker.composeapp.generated.resources.settings_catalog_using_bundled
 import phitracker.composeapp.generated.resources.settings_reset_token_result_rejected
 import phitracker.composeapp.generated.resources.settings_reset_token_result_success
 import phitracker.composeapp.generated.resources.settings_reset_token_result_unknown
+import phitracker.composeapp.generated.resources.settings_update_partial_avatars
 import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
+import phitracker.composeapp.generated.resources.settings_update_partial_images
 import phitracker.composeapp.generated.resources.api_error_missing_fields
 import phitracker.composeapp.generated.resources.b30_tag_analysis_failed
 import phitracker.composeapp.generated.resources.songs_preload_partial_failed
 import phitracker.composeapp.generated.resources.songs_songdata_checking
 import phitracker.composeapp.generated.resources.songs_songdata_downloading
+import phitracker.composeapp.generated.resources.songs_songdata_syncing_avatars
 import phitracker.composeapp.generated.resources.songs_songdata_syncing_illustrations
 import phitracker.composeapp.generated.resources.songs_songdata_up_to_date
 import phitracker.composeapp.generated.resources.songs_songdata_updated
@@ -320,7 +323,7 @@ class HomeViewModel(
             }
             val shouldAutoCheckSongData = settingsRepository.autoCheckSongDataUpdate.first()
             if (shouldAutoCheckSongData) {
-                val upstreamResult = songDataUpdateCoordinator.checkUpstreamChanged()
+                val upstreamResult = catalogRepairSession.checkUpstreamChanged()
                 upstreamResult.fold(
                     onSuccess = { changed ->
                         if (changed) updateSongs { it.copy(songDataUpdateAvailable = true) }
@@ -440,6 +443,12 @@ class HomeViewModel(
                                     repair.completed,
                                     repair.total
                                 )
+                                CatalogRepairStage.Avatars -> UiText.Res(
+                                    Res.string.songs_songdata_syncing_avatars,
+                                    repair.currentItem,
+                                    repair.completed,
+                                    repair.total
+                                )
                             },
                             songDataProgressFraction = progress,
                             songDataMessage = null
@@ -451,9 +460,19 @@ class HomeViewModel(
                         val addedCount = repair.addedSongNames.size
                         finishSongDataRefresh(
                             when {
+                                repair.partialIllustrationFailures > 0 && repair.partialAvatarFailures > 0 ->
+                                    UiText.Res(
+                                        Res.string.settings_update_partial_images,
+                                        repair.partialIllustrationFailures,
+                                        repair.partialAvatarFailures
+                                    )
                                 repair.partialIllustrationFailures > 0 -> UiText.Res(
                                     Res.string.settings_update_partial_illustrations,
                                     repair.partialIllustrationFailures
+                                )
+                                repair.partialAvatarFailures > 0 -> UiText.Res(
+                                    Res.string.settings_update_partial_avatars,
+                                    repair.partialAvatarFailures
                                 )
                                 addedCount > 0 -> UiText.Res(Res.string.songs_songdata_updated_count, addedCount)
                                 else -> UiText.Res(Res.string.songs_songdata_updated)
@@ -488,7 +507,7 @@ class HomeViewModel(
                     songDataMessage = null
                 )
             }
-            val upstreamResult = songDataUpdateCoordinator.checkUpstreamChanged()
+            val upstreamResult = catalogRepairSession.checkUpstreamChanged()
             val changed = upstreamResult.getOrElse { error ->
                 finishSongDataRefresh(error.toCatalogRepairFailure().toCatalogRepairErrorText())
                 return@launch

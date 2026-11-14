@@ -39,6 +39,8 @@ data class SettingsUiState(
     // Non-zero when the last update committed the index but some newly added
     // illustrations failed; shown alongside the success result.
     val updatePartialIllustrationFailures: Int = 0,
+    // Non-zero when avatar data committed but some avatar images failed.
+    val updatePartialAvatarFailures: Int = 0,
     // True while the bundled catalog is served because the downloaded copy was
     // set aside by an explicit offline fallback.
     val catalogDegraded: Boolean = false,
@@ -62,7 +64,8 @@ data class SettingsUiState(
 
 enum class UpdateDataPhase {
     Files,
-    Illustrations
+    Illustrations,
+    Avatars
 }
 
 sealed interface SettingsEvent {

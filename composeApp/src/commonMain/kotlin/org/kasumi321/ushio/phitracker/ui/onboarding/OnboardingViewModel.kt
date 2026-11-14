@@ -20,6 +20,7 @@ import phitracker.composeapp.generated.resources.settings_api_token_save_failed
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairEntryPoint
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairFailure
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStage
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStartResult
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStatus
 import org.kasumi321.ushio.phitracker.data.song.IllustrationPreloadRunStatus
@@ -116,7 +117,9 @@ data class OnboardingUiState(
     val songDataCompleted: Int = 0,
     val songDataTotal: Int = 0,
     val songDataCurrentFile: String? = null,
+    val songDataStage: CatalogRepairStage = CatalogRepairStage.Checking,
     val songDataPartialIllustrationFailures: Int = 0,
+    val songDataPartialAvatarFailures: Int = 0,
     val autoCheckUpdate: Boolean = true,
     val autoCheckSongDataUpdate: Boolean = true,
     val includePreRelease: Boolean = false,
@@ -431,7 +434,7 @@ class OnboardingViewModel(
         if (status == OnboardingSongDataStatus.Checking || status == OnboardingSongDataStatus.Updating) return
         viewModelScope.launch {
             _uiState.update { refreshed(it.copy(songDataStatus = OnboardingSongDataStatus.Checking)) }
-            songDataUpdateCoordinator.checkUpstreamChanged().fold(
+            catalogRepairSession.checkUpstreamChanged().fold(
                 onSuccess = { changed ->
                     _uiState.update {
                         refreshed(
@@ -498,7 +501,9 @@ class OnboardingViewModel(
                             songDataCompleted = repair.completed,
                             songDataTotal = repair.total,
                             songDataCurrentFile = repair.currentItem,
+                            songDataStage = repair.stage,
                             songDataPartialIllustrationFailures = repair.partialIllustrationFailures,
+                            songDataPartialAvatarFailures = repair.partialAvatarFailures,
                             illustrationTotalCount = if (status == OnboardingSongDataStatus.Updated) {
                                 songDataProvider.getSongs().size
                             } else {

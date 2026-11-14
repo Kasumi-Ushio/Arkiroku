@@ -104,6 +104,7 @@ fun SettingsScreen(
         updateDataError = state.updateDataBusyMessage ?: state.updateDataError,
         updateResultSongNames = state.updateResultSongNames,
         updatePartialIllustrationFailures = state.updatePartialIllustrationFailures,
+        updatePartialAvatarFailures = state.updatePartialAvatarFailures,
         catalogDegraded = state.catalogDegraded,
         collectibleDataVersion = state.collectibleDataVersion,
         onUpdateSongData = { viewModel.updateSongData() },

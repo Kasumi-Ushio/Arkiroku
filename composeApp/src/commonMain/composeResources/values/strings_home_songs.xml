@@ -22,6 +22,7 @@
     <string name="songs_songdata_up_to_date">Index data is already up to date</string>
     <string name="songs_songdata_downloading">Downloading: %1$s (%2$d/%3$d)</string>
     <string name="songs_songdata_syncing_illustrations">Syncing new illustrations: %1$s (%2$d/%3$d)</string>
+    <string name="songs_songdata_syncing_avatars">Updating avatars: %1$s (%2$d/%3$d)</string>
     <string name="songs_songdata_updated_count">Index data updated — %1$d new songs added</string>
     <string name="songs_songdata_updated">Index data updated</string>
     <string name="songs_songdata_update_failed">Failed to update index data</string>

@@ -134,8 +134,9 @@
     <string name="settings_theme_follow_system">Follow system</string>
     <string name="settings_theme_light">Always light</string>
     <string name="settings_update_preparing">Preparing the update…</string>
+    <string name="settings_syncing_avatars">Updating avatars: %1$s (%2$d/%3$d)</string>
     <string name="settings_update_complete">Update complete</string>
-    <string name="settings_update_data_dialog_text">The latest index data will be downloaded from the remote repository, covering both songs and collectibles. Local index data refreshes automatically afterwards.\nAfter the download, re-downloading all illustrations is recommended.</string>
+    <string name="settings_update_data_dialog_text">The latest song and collectible index data and avatar catalog will be downloaded from the remote repository. Local data refreshes automatically afterwards.\nAfter the download, re-downloading all illustrations is recommended.</string>
     <string name="settings_update_error_message">An error occurred:\n%1$s</string>
     <string name="settings_update_failed">Update failed</string>
     <string name="catalog_update_error_network_message">The download could not finish. Check your connection and try updating again.</string>
@@ -148,12 +149,14 @@
     <string name="settings_catalog_management">Index Data Management</string>
     <string name="settings_catalog_management_desc">Update index data or reset an unfinished update</string>
     <string name="settings_update_song_data">Update index data</string>
-    <string name="settings_update_song_data_desc">Download the latest Phigros song and collectible index</string>
+    <string name="settings_update_song_data_desc">Download the latest Phigros song, collectible and avatar data</string>
     <string name="settings_reset_pending_update">Reset unfinished update</string>
-    <string name="settings_reset_pending_update_dialog_text">Discard the unfinished update's backup and staging files, then download the complete song and collectible catalog again?</string>
+    <string name="settings_reset_pending_update_dialog_text">Discard the unfinished update's backup and staging files, then download the complete song, collectible and avatar catalogs again?</string>
     <string name="settings_reset_pending_update_done">Unfinished update state was reset and the index was downloaded successfully.</string>
     <string name="settings_use_api_data">Use score lookup API data</string>
     <string name="settings_use_api_data_desc">When enabled, community statistics are shown first</string>
     <string name="settings_update_partial_illustrations">Index data was updated, but %1$d illustrations could not be downloaded. You can retry later.</string>
+    <string name="settings_update_partial_avatars">Index data was updated, but %1$d avatar images could not be downloaded. You can retry later.</string>
+    <string name="settings_update_partial_images">Index data was updated, but some images could not be downloaded (illustrations: %1$d, avatars: %2$d). You can retry later.</string>
     <string name="settings_catalog_using_bundled">Using the built-in catalog.</string>
 </resources>

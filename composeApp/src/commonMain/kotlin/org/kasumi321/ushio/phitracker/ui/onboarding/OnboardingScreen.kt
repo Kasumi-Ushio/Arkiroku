@@ -71,6 +71,7 @@ import dev.chrisbanes.haze.rememberHazeState
 import dev.chrisbanes.haze.blur.hazeBlur
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
+import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStage
 import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportCardStyle
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportSpec
@@ -155,9 +156,12 @@ import phitracker.composeapp.generated.resources.settings_theme_amoled
 import phitracker.composeapp.generated.resources.settings_theme_dark
 import phitracker.composeapp.generated.resources.settings_theme_follow_system
 import phitracker.composeapp.generated.resources.settings_theme_light
+import phitracker.composeapp.generated.resources.settings_update_partial_avatars
 import phitracker.composeapp.generated.resources.settings_update_partial_illustrations
+import phitracker.composeapp.generated.resources.settings_update_partial_images
 import phitracker.composeapp.generated.resources.songs_songdata_checking
 import phitracker.composeapp.generated.resources.songs_songdata_downloading
+import phitracker.composeapp.generated.resources.songs_songdata_syncing_avatars
 import phitracker.composeapp.generated.resources.songs_songdata_updated
 import phitracker.composeapp.generated.resources.songs_songdata_up_to_date
 
@@ -259,7 +263,9 @@ fun OnboardingScreen(
                         completed = state.songDataCompleted,
                         total = state.songDataTotal,
                         currentFile = state.songDataCurrentFile,
+                        stage = state.songDataStage,
                         partialIllustrationFailures = state.songDataPartialIllustrationFailures,
+                        partialAvatarFailures = state.songDataPartialAvatarFailures,
                         onCheck = viewModel::checkSongDataUpdate,
                         onUpdate = viewModel::startSongDataUpdate,
                         onCancel = viewModel::cancelSongDataUpdate
@@ -827,7 +833,9 @@ private fun SongDataUpdateStep(
     completed: Int,
     total: Int,
     currentFile: String?,
+    stage: CatalogRepairStage,
     partialIllustrationFailures: Int,
+    partialAvatarFailures: Int,
     onCheck: () -> Unit,
     onUpdate: () -> Unit,
     onCancel: () -> Unit
@@ -888,7 +896,11 @@ private fun SongDataUpdateStep(
                     currentFile?.let { file ->
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = stringResource(Res.string.songs_songdata_downloading, file, completed, total),
+                            text = if (stage == CatalogRepairStage.Avatars) {
+                                stringResource(Res.string.songs_songdata_syncing_avatars, file, completed, total)
+                            } else {
+                                stringResource(Res.string.songs_songdata_downloading, file, completed, total)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -909,16 +921,24 @@ private fun SongDataUpdateStep(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (partialIllustrationFailures > 0) {
-                            stringResource(
+                        text = when {
+                            partialIllustrationFailures > 0 && partialAvatarFailures > 0 -> stringResource(
+                                Res.string.settings_update_partial_images,
+                                partialIllustrationFailures,
+                                partialAvatarFailures
+                            )
+                            partialIllustrationFailures > 0 -> stringResource(
                                 Res.string.settings_update_partial_illustrations,
                                 partialIllustrationFailures
                             )
-                        } else {
-                            stringResource(Res.string.songs_songdata_updated)
+                            partialAvatarFailures > 0 -> stringResource(
+                                Res.string.settings_update_partial_avatars,
+                                partialAvatarFailures
+                            )
+                            else -> stringResource(Res.string.songs_songdata_updated)
                         },
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (partialIllustrationFailures > 0) {
+                        color = if (partialIllustrationFailures > 0 || partialAvatarFailures > 0) {
                             MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.primary

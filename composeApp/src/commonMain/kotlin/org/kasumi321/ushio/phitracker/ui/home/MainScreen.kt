@@ -117,14 +117,12 @@ import phitracker.composeapp.generated.resources.profile_set_avatar
 import phitracker.composeapp.generated.resources.songs_all_songs_count
 import org.kasumi321.ushio.phitracker.data.logging.AppLogger
 import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogProvider
-import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogSession
-import org.kasumi321.ushio.phitracker.data.avatar.AvatarCatalogRunStatus
 import org.kasumi321.ushio.phitracker.data.avatar.AvatarImageStore
 import org.kasumi321.ushio.phitracker.data.platform.rememberAvatarPicker
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameAvatar
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportPayload
-import org.kasumi321.ushio.phitracker.ui.home.avatar.AvatarPickerSheet
+import org.kasumi321.ushio.phitracker.ui.home.avatar.AvatarPickerDialog
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesTab
 import org.kasumi321.ushio.phitracker.ui.collectible.CollectiblesViewModel
 import org.kasumi321.ushio.phitracker.ui.collectible.STACK_LIST_DEFAULT_FRACTION
@@ -509,10 +507,8 @@ fun MainScreen(
         BottomNavItem(HomeTab.Tools, stringResource(Res.string.home_tab_tools), Icons.Filled.Build, Icons.Outlined.Build)
     )
 
-    val avatarCatalogSession = koinInject<AvatarCatalogSession>()
     val avatarCatalogProvider = koinInject<AvatarCatalogProvider>()
     val avatarImageStore = koinInject<AvatarImageStore>()
-    val avatarCatalogState by avatarCatalogSession.state.collectAsState()
     var avatarEntries by remember { mutableStateOf(emptyList<GameAvatar>()) }
     var showAvatarPicker by rememberSaveable { mutableStateOf(false) }
     var customAvatarPending by remember { mutableStateOf(false) }
@@ -521,20 +517,9 @@ fun MainScreen(
     }
 
     LaunchedEffect(showAvatarPicker) {
-        if (showAvatarPicker) avatarCatalogSession.ensureReady()
-    }
-    LaunchedEffect(
-        showAvatarPicker,
-        avatarCatalogState.status,
-        avatarCatalogState.usingBundledFallback
-    ) {
-        if (
-            showAvatarPicker && (
-                avatarCatalogState.status == AvatarCatalogRunStatus.Ready ||
-                    avatarCatalogState.status == AvatarCatalogRunStatus.ReconcilingImages ||
-                    avatarCatalogState.status == AvatarCatalogRunStatus.PartiallySucceeded
-                )
-        ) {
+        if (showAvatarPicker) {
+            // Selection reads the committed/bundled catalog only. Recovery and
+            // downloads belong exclusively to the unified catalog update flow.
             avatarEntries = runCatching { avatarCatalogProvider.getAvatars() }.getOrDefault(emptyList())
         }
     }
@@ -1145,9 +1130,8 @@ fun MainScreen(
     }
 
     if (showAvatarPicker) {
-        AvatarPickerSheet(
+        AvatarPickerDialog(
             avatars = avatarEntries,
-            catalogState = avatarCatalogState,
             accountAvailable = state.profile.hasAccountAccess,
             selectionInProgress = state.profile.isSelectingGameAvatar,
             selectionError = state.profile.avatarSelectionError,
@@ -1164,10 +1148,6 @@ fun MainScreen(
                 customAvatarPending = false
                 viewModel.setGameAvatar(it.id)
             },
-            onCheckForUpdates = avatarCatalogSession::checkForUpdates,
-            onUpdate = avatarCatalogSession::update,
-            onUseBundledFallback = avatarCatalogSession::useBundledFallback,
-            onDismissResult = avatarCatalogSession::dismissResult,
             previewUri = avatarImageStore::previewUri
         )
     }

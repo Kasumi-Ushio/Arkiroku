@@ -4,6 +4,7 @@
     <string name="avatar_custom_image">Use a custom image</string>
     <string name="avatar_check_updates">Check for updates</string>
     <string name="avatar_update_catalog">Update avatars</string>
+    <string name="avatar_random">Random avatar</string>
     <string name="avatar_account_required">Log in to choose a built-in game avatar.</string>
     <string name="avatar_selection_in_progress">Applying avatar…</string>
     <string name="avatar_selection_failed">Could not select the built-in avatar. Please try again.</string>
