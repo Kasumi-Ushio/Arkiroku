@@ -724,6 +724,7 @@ fun MainScreen(
         }
     }
     val indexShowsCollectibles = indexSubTabState.selected == IndexSubTab.Collectibles
+    val indexAtTop = if (indexShowsCollectibles) collectiblesAtTop else songsAtTop
 
     // The two Index sub-tabs live in a pager. IndexSubTabState stays the
     // single selection source: a tab click updates it and the effect below
@@ -783,15 +784,13 @@ fun MainScreen(
         snackbarHostState = snackbarHostState,
         navMode = navMode,
         topBar = { hazeState, glassStyle ->
-            val indexAtTop = if (indexShowsCollectibles) collectiblesAtTop else songsAtTop
             GlassTopBar(hazeState = hazeState, style = glassStyle) {
                 when (selectedTab) {
                     HomeTab.B30 -> B30Header(
                         state = state.b30,
                         tip = tip,
                         expanded = b30HeaderExpanded,
-                        onToggle = toggleB30Header,
-                        onGenerateImage = generateB30Image
+                        onToggle = toggleB30Header
                     )
                     HomeTab.Index -> IndexHeader(
                         countText = if (indexShowsCollectibles) {
@@ -934,24 +933,45 @@ fun MainScreen(
                     )
                 }
             }
-            HomeTab.B30 -> B30Tab(
-                state = state.b30,
-                nickname = state.profile.nickname,
-                challengeModeRank = state.profile.challengeModeRank,
-                getIllustrationUrl = { viewModel.getLowIllustrationUrl(it) },
-                onSongClick = { songId, difficulty ->
-                    if (difficulty != null) {
-                        onNavigateToSongDetailWithDifficulty(songId, difficulty)
-                    } else {
-                        onNavigateToSongDetail(songId)
+            HomeTab.B30 -> {
+                val b30ContentPadding = PaddingValues(
+                    top = contentPadding.calculateTopPadding(),
+                    bottom = contentPadding.calculateBottomPadding() + 72.dp
+                )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    B30Tab(
+                        state = state.b30,
+                        nickname = state.profile.nickname,
+                        challengeModeRank = state.profile.challengeModeRank,
+                        getIllustrationUrl = { viewModel.getLowIllustrationUrl(it) },
+                        onSongClick = { songId, difficulty ->
+                            if (difficulty != null) {
+                                onNavigateToSongDetailWithDifficulty(songId, difficulty)
+                            } else {
+                                onNavigateToSongDetail(songId)
+                            }
+                        },
+                        contentPadding = b30ContentPadding,
+                        listState = b30ListState,
+                        useGrid = b30UseGrid,
+                        gridState = b30GridState,
+                        onRetryTagAnalysis = { viewModel.retryTagAnalysis() }
+                    )
+                    if (state.b30.b30.isNotEmpty()) {
+                        B30ExportFab(
+                            expanded = b30AtTop,
+                            loading = state.b30.tagAnalysis.isLoading,
+                            onClick = generateB30Image,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(
+                                    end = 16.dp,
+                                    bottom = contentPadding.calculateBottomPadding() + 16.dp
+                                )
+                        )
                     }
-                },
-                contentPadding = contentPadding,
-                listState = b30ListState,
-                useGrid = b30UseGrid,
-                gridState = b30GridState,
-                onRetryTagAnalysis = { viewModel.retryTagAnalysis() }
-            )
+                }
+            }
             HomeTab.Index -> {
                 val indexSubTabName = if (indexShowsCollectibles) "collectibles" else "songs"
                 val indexContentPadding = PaddingValues(
@@ -1090,6 +1110,7 @@ fun MainScreen(
                         } else {
                             songsActiveFilterCount + if (state.songs.searchQuery.isNotBlank()) 1 else 0
                         }),
+                        expanded = indexAtTop,
                         onClick = {
                             if (indexShowsCollectibles) {
                                 collectiblesViewModel.toggleFilterSheet(true)

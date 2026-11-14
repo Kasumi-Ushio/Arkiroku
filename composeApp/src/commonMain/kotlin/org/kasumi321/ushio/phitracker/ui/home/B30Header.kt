@@ -11,14 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,7 +35,6 @@ import phitracker.composeapp.generated.resources.b30_header_b27_floor
 import phitracker.composeapp.generated.resources.b30_header_collapse_rks_info
 import phitracker.composeapp.generated.resources.b30_header_current_rks
 import phitracker.composeapp.generated.resources.b30_header_expand_rks_info
-import phitracker.composeapp.generated.resources.b30_header_generate_image
 import phitracker.composeapp.generated.resources.b30_header_rks_label
 import phitracker.composeapp.generated.resources.b30_header_title
 
@@ -48,8 +43,8 @@ import phitracker.composeapp.generated.resources.b30_header_title
  * card with one continuous glass surface. The tip line hugs the title and stays
  * visible in both states, like the other tabs' top bars, and the title shrinks
  * to titleMedium while collapsed, matching the songs header. Collapsed the
- * header keeps the page identity, the current RKS and the image generation
- * entry; expanded it also shows Best Phi and the B27 tail, preceded by a
+ * header keeps the page identity and current RKS, while image generation lives
+ * in the screen-level FAB; expanded it also shows Best Phi and the B27 tail, preceded by a
  * reserved gap where the tip used to sit so the RKS row keeps its distance
  * from the title. The whole header toggles expansion, the arrow hit target is
  * not limited to the icon itself.
@@ -60,7 +55,6 @@ fun B30Header(
     tip: String,
     expanded: Boolean,
     onToggle: () -> Unit,
-    onGenerateImage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val arrowRotation by rememberExpansionArrowRotation(expanded)
@@ -134,21 +128,6 @@ fun B30Header(
                 modifier = Modifier.rotate(arrowRotation)
             )
 
-            IconButton(
-                onClick = onGenerateImage,
-                enabled = state.b30.isNotEmpty()
-            ) {
-                // The export click is gated on the tag analysis settling;
-                // mirror that wait on the button itself.
-                if (state.tagAnalysis.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(Icons.Filled.Image, contentDescription = stringResource(Res.string.b30_header_generate_image))
-                }
-            }
         }
 
         ExpandableGlassSection(expanded = expanded) {
