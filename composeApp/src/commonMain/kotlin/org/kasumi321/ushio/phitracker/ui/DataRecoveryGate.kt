@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -183,7 +184,12 @@ private fun DataRecoveryScreen(
                         OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(Res.string.data_recovery_retry))
                         }
-                        Button(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = onReset,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(ButtonDefaults.MediumContainerHeight)
+                        ) {
                             Text(stringResource(Res.string.data_recovery_reset))
                         }
                     }
