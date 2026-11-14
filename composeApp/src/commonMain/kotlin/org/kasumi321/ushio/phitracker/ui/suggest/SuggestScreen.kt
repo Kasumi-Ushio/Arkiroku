@@ -1,11 +1,5 @@
 package org.kasumi321.ushio.phitracker.ui.suggest
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,6 +56,8 @@ import org.kasumi321.ushio.phitracker.domain.model.BestRecord
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.usecase.SuggestItem
 import org.kasumi321.ushio.phitracker.domain.usecase.SuggestTargetMode
+import org.kasumi321.ushio.phitracker.ui.components.AppExpandableSection
+import org.kasumi321.ushio.phitracker.ui.components.rememberAppExpansionArrowRotation
 import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
 import org.kasumi321.ushio.phitracker.ui.glass.rememberGlassHazeStyle
 import org.kasumi321.ushio.phitracker.ui.home.ScoreCardContent
@@ -142,11 +138,7 @@ fun SuggestScreen(
                                 .padding(horizontal = 16.dp)
                                 .padding(bottom = 12.dp)
                         ) {
-                            AnimatedVisibility(
-                                    visible = descriptionVisible,
-                                    enter = expandVertically() + fadeIn(),
-                                    exit = shrinkVertically() + fadeOut()
-                            ) {
+                            AppExpandableSection(expanded = descriptionVisible) {
                                 Column {
                                     Text(
                                             text = stringResource(Res.string.suggest_hint_input),
@@ -309,8 +301,7 @@ private fun SuggestScoreCard(
             marqueeSongTitle = true,
             onClick = { _, _ -> expanded = !expanded },
             footer = {
-                val arrowRotation by
-                        animateFloatAsState(targetValue = if (expanded) 180f else 0f)
+                val arrowRotation by rememberAppExpansionArrowRotation(expanded)
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 Box(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -323,11 +314,7 @@ private fun SuggestScoreCard(
                             modifier = Modifier.size(18.dp).rotate(arrowRotation)
                     )
                 }
-                AnimatedVisibility(
-                        visible = expanded,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                ) {
+                AppExpandableSection(expanded = expanded) {
                     Column(
                             modifier =
                                     Modifier.fillMaxWidth()

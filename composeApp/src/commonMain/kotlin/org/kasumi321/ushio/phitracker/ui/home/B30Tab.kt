@@ -1,8 +1,5 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +24,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,12 +37,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.ui.b30.B30TagAnalysisContent
+import org.kasumi321.ushio.phitracker.ui.components.AppExpandableSection
+import org.kasumi321.ushio.phitracker.ui.components.rememberAppExpansionArrowRotation
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
 import org.kasumi321.ushio.phitracker.ui.utils.asString
 import phitracker.composeapp.generated.resources.Res
@@ -299,6 +298,7 @@ private fun CollapsibleTagAnalysis(
     var userExpanded by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val autoExpanded = !state.isLoading && state.analysis != null
     val expanded = userExpanded ?: autoExpanded
+    val arrowRotation by rememberAppExpansionArrowRotation(expanded)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -320,21 +320,17 @@ private fun CollapsibleTagAnalysis(
             }
             Spacer(modifier = Modifier.weight(1f))
             Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowUp
-                else Icons.Default.KeyboardArrowDown,
+                imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = stringResource(
                     if (expanded) Res.string.b30_action_collapse
                     else Res.string.b30_action_expand
                 ),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.rotate(arrowRotation)
             )
         }
 
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
+        AppExpandableSection(expanded = expanded) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
