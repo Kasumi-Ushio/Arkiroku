@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.MediumFloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -110,12 +110,27 @@ fun IndexHeader(
 @Composable
 internal fun IndexSearchFab(
     activeFilterCount: Int,
+    expanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val active = activeFilterCount > 0
-    MediumFloatingActionButton(
+    ExtendedFloatingActionButton(
+        text = { Text(stringResource(Res.string.songs_cd_filter)) },
+        icon = {
+            BadgedBox(
+                badge = {
+                    if (active) Badge { Text(activeFilterCount.toString()) }
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = stringResource(Res.string.songs_cd_filter)
+                )
+            }
+        },
         onClick = onClick,
+        expanded = expanded,
         modifier = modifier,
         containerColor = if (active) {
             MaterialTheme.colorScheme.primary
@@ -127,18 +142,7 @@ internal fun IndexSearchFab(
         } else {
             MaterialTheme.colorScheme.onPrimaryContainer
         }
-    ) {
-        BadgedBox(
-            badge = {
-                if (active) Badge { Text(activeFilterCount.toString()) }
-            }
-        ) {
-            Icon(
-                Icons.Filled.Search,
-                contentDescription = stringResource(Res.string.songs_cd_filter)
-            )
-        }
-    }
+    )
 }
 
 @Composable

@@ -1424,9 +1424,12 @@ private fun OnboardingBottomBar(
                 enabled = canAdvance,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(ButtonDefaults.MediumContainerHeight)
+                    .height(ButtonDefaults.ExtraLargeContainerHeight)
             ) {
-                Text(stringResource(Res.string.onboarding_done_start))
+                Text(
+                    text = stringResource(Res.string.onboarding_done_start),
+                    style = MaterialTheme.typography.titleLargeEmphasized
+                )
             }
         }
         return
