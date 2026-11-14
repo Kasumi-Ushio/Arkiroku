@@ -28,17 +28,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -113,8 +109,6 @@ import dev.chrisbanes.haze.rememberHazeState
 import org.koin.compose.koinInject
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.action_back
-import phitracker.composeapp.generated.resources.b30ex_action_save
-import phitracker.composeapp.generated.resources.b30ex_action_share
 import phitracker.composeapp.generated.resources.b30ex_album_image
 import phitracker.composeapp.generated.resources.b30ex_background
 import phitracker.composeapp.generated.resources.b30ex_background_blur
@@ -344,15 +338,14 @@ fun B30ImageScreen(
         bottomBar = {
             if (export != null && !isGenerating) {
                 GlassBottomBar(hazeState = hazeState, style = glassStyle) {
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .navigationBarsPadding(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            .navigationBarsPadding()
                     ) {
-                        Button(
-                            onClick = {
+                        B30ExportActions(
+                            onSave = {
                                 coroutineScope.launch {
                                     val fileName = buildB30ExportFilename(nickname)
                                     val result = saveB30ImageToPictures(export.pngBytes, fileName)
@@ -366,16 +359,7 @@ fun B30ImageScreen(
                                     )
                                 }
                             },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(ButtonDefaults.MediumContainerHeight)
-                        ) {
-                            Icon(Icons.Filled.Save, contentDescription = null)
-                            Text(stringResource(Res.string.b30ex_action_save), style = MaterialTheme.typography.labelLarge)
-                        }
-
-                        OutlinedButton(
-                            onClick = {
+                            onShare = {
                                 coroutineScope.launch {
                                     val fileName = buildB30ExportFilename(nickname)
                                     val result = shareB30Image(export.pngBytes, fileName)
@@ -389,13 +373,8 @@ fun B30ImageScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(ButtonDefaults.MediumContainerHeight)
-                        ) {
-                            Icon(Icons.Filled.Share, contentDescription = null)
-                            Text(stringResource(Res.string.b30ex_action_share), style = MaterialTheme.typography.labelLarge)
-                        }
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
