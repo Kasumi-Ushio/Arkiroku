@@ -71,6 +71,7 @@ import io.github.alexzhirkevich.qrose.options.solid
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.Server
+import org.kasumi321.ushio.phitracker.ui.components.AppLoadingIndicator
 import org.kasumi321.ushio.phitracker.ui.components.ElasticClickPrimaryIndicator
 import org.kasumi321.ushio.phitracker.ui.utils.asString
 import org.kasumi321.ushio.phitracker.ui.utils.resolve
@@ -136,7 +137,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator()
+            AppLoadingIndicator()
         }
         return
     }

@@ -49,6 +49,7 @@ import org.kasumi321.ushio.phitracker.data.platform.showPlatformAlert
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
 import org.kasumi321.ushio.phitracker.ui.components.CenteredListItem
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
 import org.kasumi321.ushio.phitracker.ui.glass.rememberCollapsingTitleStyle
 import org.kasumi321.ushio.phitracker.ui.glass.rememberGlassHazeStyle
@@ -1620,7 +1621,7 @@ fun SettingsTab(
                                 if (updateDataTotal > 0)
                                         updateDataProgress.toFloat() / updateDataTotal
                                 else 0f
-                        LinearProgressIndicator(
+                        AppLinearProgressIndicator(
                                 progress = { progress },
                                 modifier = Modifier.fillMaxWidth()
                         )
