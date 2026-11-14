@@ -5,6 +5,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -80,6 +81,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -268,6 +272,68 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector
 )
 
+/** Static equivalent of the official navigation item used when motion is reduced. */
+@Composable
+private fun StaticNavigationItem(
+    item: BottomNavItem,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val iconColor = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val labelColor = if (selected) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Column(
+        modifier = modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick
+            )
+            .semantics { this.selected = selected },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 56.dp, height = 32.dp)
+                .clip(CircleShape)
+                .background(
+                    if (selected) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        Color.Transparent
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                contentDescription = null,
+                tint = iconColor
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = item.label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = labelColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 @Composable
 private fun MainBottomBar(
     navItems: List<BottomNavItem>,
@@ -309,22 +375,18 @@ private fun MainBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceAround
+                .height(80.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             navItems.forEach { item ->
-                val selected = selectedTab == item.tab
-                TextButton(onClick = { onTabSelected(item.tab) }) {
-                    Text(
-                        text = item.label,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                }
+                StaticNavigationItem(
+                    item = item,
+                    selected = selectedTab == item.tab,
+                    onClick = { onTabSelected(item.tab) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(80.dp)
+                )
             }
         }
     }
@@ -426,31 +488,30 @@ private fun MainNavigationRail(
 
         Surface(
             color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxHeight()
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(80.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .padding(horizontal = 4.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 RailAvatar(avatarUri = avatarUri, onClick = onAvatarClick)
                 Spacer(modifier = Modifier.weight(1f))
                 navItems.forEach { item ->
-                    val selected = selectedTab == item.tab
-                    TextButton(onClick = { onTabSelected(item.tab) }) {
-                        Text(
-                            text = item.label,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
+                    StaticNavigationItem(
+                        item = item,
+                        selected = selectedTab == item.tab,
+                        onClick = { onTabSelected(item.tab) },
+                        modifier = Modifier
+                            .width(80.dp)
+                            .height(56.dp)
+                    )
                 }
                 Spacer(modifier = Modifier.height(64.dp))
             }
