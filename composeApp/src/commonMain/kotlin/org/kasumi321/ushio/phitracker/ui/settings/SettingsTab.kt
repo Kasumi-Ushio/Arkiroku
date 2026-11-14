@@ -1,14 +1,12 @@
 package org.kasumi321.ushio.phitracker.ui.settings
 
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -47,7 +45,6 @@ import org.kasumi321.ushio.phitracker.data.platform.shareTextLog
 import org.kasumi321.ushio.phitracker.data.platform.shouldShowThemeColorSourceSetting
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformAlert
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
-import org.kasumi321.ushio.phitracker.ui.components.CenteredListItem
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
 import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
@@ -443,10 +440,7 @@ fun SettingsTab(
                         )
                 val themeColorSourceTitle = stringResource(Res.string.settings_theme_color_source)
                 val defaultColorSourceLabel = stringResource(Res.string.settings_color_source_default)
-                val amoledBlackTitle = stringResource(Res.string.settings_amoled_black)
-                val hazeBlurTitle = stringResource(Res.string.settings_haze_blur)
                 val blurStrengthTitle = stringResource(Res.string.settings_blur_strength)
-                val showOverflowTitle = stringResource(Res.string.settings_show_overflow)
                 val overflowCountTitle = stringResource(Res.string.settings_overflow_count)
                 var expandedTheme by remember { mutableStateOf(false) }
                 var expandedLanguage by remember { mutableStateOf(false) }
@@ -584,7 +578,7 @@ fun SettingsTab(
                     if (themeMode == 0) {
                         switchItem(
                                 key = "amoled_black",
-                                headline = amoledBlackTitle,
+                                headlineContent = { Text(stringResource(Res.string.settings_amoled_black)) },
                                 checked = amoledBlack,
                                 onCheckedChange = onAmoledBlackChange,
                                 supportingContent = {
@@ -595,7 +589,7 @@ fun SettingsTab(
 
                     switchItem(
                             key = "haze_blur",
-                            headline = hazeBlurTitle,
+                            headlineContent = { Text(stringResource(Res.string.settings_haze_blur)) },
                             checked = hazeBlurEnabled,
                             onCheckedChange = onHazeBlurEnabledChange,
                             supportingContent = {
@@ -621,7 +615,7 @@ fun SettingsTab(
                 SettingsSection(title = stringResource(Res.string.settings_category_b30)) {
                     switchItem(
                             key = "show_b30_overflow",
-                            headline = showOverflowTitle,
+                            headlineContent = { Text(stringResource(Res.string.settings_show_overflow)) },
                             checked = showB30Overflow,
                             onCheckedChange = onShowB30OverflowChange,
                             supportingContent = {
@@ -645,25 +639,10 @@ fun SettingsTab(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                CategoryTitle(stringResource(Res.string.settings_category_score_api))
-
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_enable_score_api),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_enable_score_api_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
+                SettingsSection(title = stringResource(Res.string.settings_category_score_api)) {
+                    switchItem(
+                            key = "score_api_enabled",
+                            headlineContent = { Text(stringResource(Res.string.settings_enable_score_api)) },
                             checked = apiEnabled,
                             onCheckedChange = { enabled ->
                                 if (enabled) {
@@ -671,458 +650,405 @@ fun SettingsTab(
                                 } else {
                                     onApiEnabledChange(false)
                                 }
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_enable_score_api_desc))
+                            }
+                    )
+
+                    if (apiEnabled) {
+                        val credentialsConfigured = apiPlatform.isNotBlank() &&
+                                apiPlatformId.isNotBlank() && apiUserId.isNotBlank() && apiToken.isNotBlank()
+
+                        actionItem(
+                                key = "score_api_credentials",
+                                onClick = { showApiCredentialDialog = true },
+                                headlineContent = {
+                                    Text(stringResource(Res.string.settings_api_credentials))
+                                },
+                                supportingContent = {
+                                    Text(
+                                            if (credentialsConfigured) {
+                                                stringResource(Res.string.settings_api_credentials_configured)
+                                            } else {
+                                                stringResource(Res.string.settings_api_credentials_not_configured)
+                                            }
+                                    )
+                                }
+                        )
+
+                        switchItem(
+                                key = "score_api_use_data",
+                                headlineContent = { Text(stringResource(Res.string.settings_use_api_data)) },
+                                checked = useApiData,
+                                onCheckedChange = onUseApiDataChange,
+                                supportingContent = {
+                                    Column {
+                                        Text(stringResource(Res.string.settings_use_api_data_desc))
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(stringResource(Res.string.settings_api_data_disclaimer))
+                                    }
+                                }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                SettingsSection(title = stringResource(Res.string.settings_category_updates)) {
+                    switchItem(
+                            key = "auto_check_update",
+                            headlineContent = { Text(stringResource(Res.string.settings_auto_check_update)) },
+                            checked = autoCheckUpdate,
+                            onCheckedChange = onAutoCheckUpdateChange,
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_auto_check_update_desc))
+                            }
+                    )
+                    switchItem(
+                            key = "auto_check_song_data_update",
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_auto_check_song_data_update))
+                            },
+                            checked = autoCheckSongDataUpdate,
+                            onCheckedChange = onAutoCheckSongDataUpdateChange,
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_auto_check_song_data_update_desc))
+                            }
+                    )
+                    switchItem(
+                            key = "include_prerelease",
+                            headlineContent = { Text(stringResource(Res.string.settings_include_prerelease)) },
+                            checked = includePreRelease,
+                            onCheckedChange = onIncludePreReleaseChange,
+                            supportingContent = {
+                                Column {
+                                    Text(stringResource(Res.string.settings_include_prerelease_desc))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(stringResource(Res.string.settings_prerelease_notice))
+                                }
                             }
                     )
                 }
 
-                if (apiEnabled) {
-                    val credentialsConfigured = apiPlatform.isNotBlank() &&
-                            apiPlatformId.isNotBlank() && apiUserId.isNotBlank() && apiToken.isNotBlank()
+                Spacer(modifier = Modifier.height(24.dp))
 
-                    CenteredListItem(
+                SettingsSection(title = stringResource(Res.string.settings_category_data_cache)) {
+                    actionItem(
+                            key = "cache_b30_artwork",
+                            onClick = {
+                                onCacheB30Artwork { result ->
+                                    if (result.isSuccess) {
+                                        showPlatformMessage(artworkPreloadDoneMessage)
+                                    } else {
+                                        showPlatformMessage(artworkPreloadFailedMessage)
+                                    }
+                                }
+                            },
                             headlineContent = {
-                                Text(stringResource(Res.string.settings_api_credentials))
+                                Text(stringResource(Res.string.settings_cache_b30_artwork))
                             },
                             supportingContent = {
                                 Text(
-                                        text =
-                                                if (credentialsConfigured)
-                                                        stringResource(
-                                                                Res.string.settings_api_credentials_configured
-                                                        )
-                                                else
-                                                        stringResource(
-                                                                Res.string.settings_api_credentials_not_configured
-                                                        ),
-                                        style = MaterialTheme.typography.bodySmall
+                                        if (isCachingB30Artwork) {
+                                            stringResource(
+                                                    Res.string.settings_caching_progress,
+                                                    b30ArtworkCacheCompleted,
+                                                    b30ArtworkCacheTotal
+                                            )
+                                        } else {
+                                            stringResource(Res.string.settings_cache_b30_artwork_desc)
+                                        }
                                 )
                             },
-                            modifier = Modifier.clickable { showApiCredentialDialog = true }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                    stringResource(Res.string.settings_use_api_data),
-                                    style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                    text = stringResource(Res.string.settings_use_api_data_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(checked = useApiData, onCheckedChange = onUseApiDataChange)
-                    }
-
-                    Text(
-                            text = stringResource(Res.string.settings_api_data_disclaimer),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-                CategoryTitle(stringResource(Res.string.settings_category_updates))
-
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_auto_check_update),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_auto_check_update_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = autoCheckUpdate, onCheckedChange = { onAutoCheckUpdateChange(it) })
-                }
-
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_auto_check_song_data_update),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_auto_check_song_data_update_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                            checked = autoCheckSongDataUpdate,
-                            onCheckedChange = { onAutoCheckSongDataUpdateChange(it) }
-                    )
-                }
-
-                Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                stringResource(Res.string.settings_include_prerelease),
-                                style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                                text = stringResource(Res.string.settings_include_prerelease_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                            checked = includePreRelease,
-                            onCheckedChange = { onIncludePreReleaseChange(it) }
-                    )
-                }
-
-                Text(
-                        text = stringResource(Res.string.settings_prerelease_notice),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-                CategoryTitle(stringResource(Res.string.settings_category_data_cache))
-
-                CenteredListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.settings_cache_b30_artwork))
-                        },
-                        supportingContent = {
-                            if (isCachingB30Artwork) {
-                                Text(
-                                        stringResource(
-                                                Res.string.settings_caching_progress,
-                                                b30ArtworkCacheCompleted,
-                                                b30ArtworkCacheTotal
-                                        )
-                                )
-                            } else {
-                                Text(
-                                        stringResource(Res.string.settings_cache_b30_artwork_desc)
-                                )
-                            }
-                        },
-                        leadingContent = {
-                            if (isCachingB30Artwork) {
-                                CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null)
-                            }
-                        },
-                        modifier =
-                                Modifier.clickable(enabled = !isCachingB30Artwork) {
-                                    onCacheB30Artwork { result ->
-                                        if (result.isSuccess) {
-                                            showPlatformMessage(artworkPreloadDoneMessage)
-                                        } else {
-                                            showPlatformMessage(artworkPreloadFailedMessage)
-                                        }
-                                    }
+                            leadingContent = {
+                                if (isCachingB30Artwork) {
+                                    CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = null)
                                 }
-                )
-
-                CenteredListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.settings_clear_artwork_cache))
-                        },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_clear_artwork_cache_desc))
-                        },
-                        leadingContent = { Icon(Icons.Default.DeleteSweep, contentDescription = null) },
-                        modifier = Modifier.clickable { showClearCacheDialog = true }
-                )
-
-                CenteredListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.settings_redownload_artwork))
-                        },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_redownload_artwork_desc))
-                        },
-                        leadingContent = {
-                            Icon(
-                                    Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        modifier = Modifier.clickable { showRedownloadDialog = true }
-                )
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_catalog_management)) },
-                        supportingContent = {
-                            Column {
-                                Text(stringResource(Res.string.settings_catalog_management_desc))
-                                if (catalogDegraded) {
+                            },
+                            enabled = !isCachingB30Artwork
+                    )
+                    actionItem(
+                            key = "clear_artwork_cache",
+                            onClick = { showClearCacheDialog = true },
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_clear_artwork_cache))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_clear_artwork_cache_desc))
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                            }
+                    )
+                    actionItem(
+                            key = "redownload_artwork",
+                            onClick = { showRedownloadDialog = true },
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_redownload_artwork))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_redownload_artwork_desc))
+                            },
+                            leadingContent = {
+                                Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                    )
+                    actionItem(
+                            key = "catalog_management",
+                            onClick = { showCatalogManagementDialog = true },
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_catalog_management))
+                            },
+                            supportingContent = {
+                                Column {
+                                    Text(stringResource(Res.string.settings_catalog_management_desc))
+                                    if (catalogDegraded) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                                text = stringResource(Res.string.settings_catalog_using_bundled),
+                                                color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                            text = stringResource(Res.string.settings_catalog_using_bundled),
-                                            color = MaterialTheme.colorScheme.error
+                                            stringResource(
+                                                    Res.string.settings_collectible_data_version,
+                                                    collectibleDataVersion.ifBlank { "—" }
+                                            )
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                        stringResource(
-                                                Res.string.settings_collectible_data_version,
-                                                collectibleDataVersion.ifBlank { "—" }
-                                        )
-                                )
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null)
                             }
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.CloudDownload, contentDescription = null)
-                        },
-                        modifier = Modifier.clickable { showCatalogManagementDialog = true }
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-                CategoryTitle(stringResource(Res.string.settings_category_diagnostics))
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.login_reset_local_session)) },
-                        supportingContent = {
-                            Text(stringResource(Res.string.login_reset_local_session_dialog_text))
-                        },
-                        leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
-                        trailingContent = {
-                            if (isResettingLocalSession) {
-                                CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                )
-                            }
-                        },
-                        modifier = Modifier.clickable(enabled = !isResettingLocalSession) {
-                            showLocalSessionResetDialog = true
-                        }
-                )
-                localSessionResetMessage?.let { message ->
-                    Text(
-                            text = message.asString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
 
-                CenteredListItem(
-                        headlineContent = {
-                            Text(stringResource(Res.string.settings_export_crash_log))
-                        },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_export_crash_log_desc))
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.BugReport, contentDescription = null)
-                        },
-                        modifier =
-                                Modifier.clickable {
-                                    if (!hasCrashLogs) {
-                                        showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
-                                        return@clickable
+                Spacer(modifier = Modifier.height(24.dp))
+
+                SettingsSection(title = stringResource(Res.string.settings_category_diagnostics)) {
+                    actionItem(
+                            key = "reset_local_session",
+                            onClick = { showLocalSessionResetDialog = true },
+                            headlineContent = {
+                                Text(stringResource(Res.string.login_reset_local_session))
+                            },
+                            supportingContent = {
+                                Column {
+                                    Text(stringResource(Res.string.login_reset_local_session_dialog_text))
+                                    localSessionResetMessage?.let { message ->
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                                text = message.asString(),
+                                                color = MaterialTheme.colorScheme.error
+                                        )
                                     }
-                                    val text = onExportCrashLog()
+                                }
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                            },
+                            trailingContent = {
+                                if (isResettingLocalSession) {
+                                    CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp
+                                    )
+                                }
+                            },
+                            enabled = !isResettingLocalSession
+                    )
+                    actionItem(
+                            key = "export_crash_log",
+                            onClick = exportCrashLog@ {
+                                if (!hasCrashLogs) {
+                                    showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
+                                    return@exportCrashLog
+                                }
+                                val text = onExportCrashLog()
+                                if (text.isBlank()) {
+                                    showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
+                                    return@exportCrashLog
+                                }
+                                coroutineScope.launch {
+                                    val result = shareTextLog(text, "phitracker_crash_reports.txt")
+                                    if (result.isFailure) {
+                                        showPlatformAlert(
+                                                exportCrashLogFailedTitle,
+                                                getString(
+                                                        Res.string.settings_export_crash_failed_message,
+                                                        result.exceptionOrNull()?.message
+                                                                ?: exportFailedUnknownError
+                                                )
+                                        )
+                                    }
+                                }
+                            },
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_export_crash_log))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_export_crash_log_desc))
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.BugReport, contentDescription = null)
+                            }
+                    )
+                    actionItem(
+                            key = "clear_logs",
+                            onClick = {
+                                val ok = onClearAllLogs()
+                                if (ok) {
+                                    showPlatformAlert(clearLogsDoneTitle, clearLogsDoneMessage)
+                                } else {
+                                    showPlatformAlert(clearLogsFailedTitle, clearLogsFailedMessage)
+                                }
+                            },
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_clear_logs))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_clear_logs_desc))
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                            }
+                    )
+
+                    if (isDebugBuild) {
+                        actionItem(
+                                key = "crash_notification_permission",
+                                onClick = {
+                                    requestCrashNotificationPermission { granted ->
+                                        notificationPermissionGranted = granted
+                                        if (!granted) {
+                                            showPlatformMessage(notificationPermissionDeniedMessage)
+                                        }
+                                    }
+                                },
+                                headlineContent = {
+                                    Text(stringResource(Res.string.settings_crash_notification_permission))
+                                },
+                                supportingContent = {
+                                    Text(
+                                            if (notificationPermissionGranted) {
+                                                stringResource(Res.string.settings_crash_notification_granted)
+                                            } else {
+                                                stringResource(Res.string.settings_crash_notification_denied)
+                                            }
+                                    )
+                                },
+                                leadingContent = {
+                                    Icon(Icons.Default.Info, contentDescription = null)
+                                }
+                        )
+                        actionItem(
+                                key = "export_runtime_log",
+                                onClick = exportRuntimeLog@ {
+                                    if (!hasRuntimeLogs) {
+                                        showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
+                                        return@exportRuntimeLog
+                                    }
+                                    val text = onExportRuntimeLog()
                                     if (text.isBlank()) {
-                                        showPlatformAlert(noCrashLogTitle, noCrashLogMessage)
-                                        return@clickable
+                                        showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
+                                        return@exportRuntimeLog
                                     }
                                     coroutineScope.launch {
-                                        val result =
-                                                shareTextLog(text, "phitracker_crash_reports.txt")
+                                        val result = shareTextLog(text, "phitracker_runtime_logs.txt")
                                         if (result.isFailure) {
                                             showPlatformAlert(
-                                                    exportCrashLogFailedTitle,
+                                                    exportRuntimeLogFailedTitle,
                                                     getString(
-                                                            Res.string
-                                                                    .settings_export_crash_failed_message,
+                                                            Res.string.settings_export_runtime_failed_message,
                                                             result.exceptionOrNull()?.message
                                                                     ?: exportFailedUnknownError
                                                     )
                                             )
                                         }
                                     }
+                                },
+                                headlineContent = {
+                                    Text(stringResource(Res.string.settings_export_runtime_log))
+                                },
+                                supportingContent = {
+                                    Text(stringResource(Res.string.settings_export_runtime_log_desc))
+                                },
+                                leadingContent = {
+                                    Icon(Icons.Default.BugReport, contentDescription = null)
                                 }
-                )
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_clear_logs)) },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_clear_logs_desc))
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = null)
-                        },
-                        modifier =
-                                Modifier.clickable {
-                                    val ok = onClearAllLogs()
-                                    if (ok) {
-                                        showPlatformAlert(
-                                                clearLogsDoneTitle,
-                                                clearLogsDoneMessage
-                                        )
-                                    } else {
-                                        showPlatformAlert(
-                                                clearLogsFailedTitle,
-                                                clearLogsFailedMessage
-                                        )
-                                    }
-                                }
-                )
-
-                if (isDebugBuild) {
-                    CenteredListItem(
-                            headlineContent = {
-                                Text(stringResource(Res.string.settings_crash_notification_permission))
-                            },
-                            supportingContent = {
-                                if (notificationPermissionGranted) {
-                                    Text(
-                                            stringResource(
-                                                    Res.string.settings_crash_notification_granted
-                                            )
-                                    )
-                                } else {
-                                    Text(
-                                            stringResource(
-                                                    Res.string.settings_crash_notification_denied
-                                            )
-                                    )
-                                }
-                            },
-                            leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
-                            modifier =
-                                    Modifier.clickable {
-                                        requestCrashNotificationPermission { granted ->
-                                            notificationPermissionGranted = granted
-                                            if (!granted) {
-                                                showPlatformMessage(
-                                                        notificationPermissionDeniedMessage
-                                                )
-                                            }
-                                        }
-                                    }
-                    )
-
-                    CenteredListItem(
-                            headlineContent = {
-                                Text(stringResource(Res.string.settings_export_runtime_log))
-                            },
-                            supportingContent = {
-                                Text(stringResource(Res.string.settings_export_runtime_log_desc))
-                            },
-                            leadingContent = {
-                                Icon(Icons.Default.BugReport, contentDescription = null)
-                            },
-                            modifier =
-                                    Modifier.clickable {
-                                        if (!hasRuntimeLogs) {
-                                            showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
-                                            return@clickable
-                                        }
-                                        val text = onExportRuntimeLog()
-                                        if (text.isBlank()) {
-                                            showPlatformAlert(noRuntimeLogTitle, noRuntimeLogMessage)
-                                            return@clickable
-                                        }
-                                        coroutineScope.launch {
-                                            val result =
-                                                    shareTextLog(text, "phitracker_runtime_logs.txt")
-                                            if (result.isFailure) {
-                                                showPlatformAlert(
-                                                        exportRuntimeLogFailedTitle,
-                                                        getString(
-                                                                Res.string
-                                                                        .settings_export_runtime_failed_message,
-                                                                result.exceptionOrNull()?.message
-                                                                        ?: exportFailedUnknownError
-                                                        )
-                                                )
-                                            }
-                                        }
-                                    }
-                    )
-
+                        )
+                    }
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                CategoryTitle(stringResource(Res.string.settings_category_about))
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_check_update)) },
-                        supportingContent = {
-                            when (val state = updateCheckState) {
-                                is UpdateCheckState.Checking ->
-                                    Text(stringResource(Res.string.settings_checking_update))
-                                is UpdateCheckState.NoUpdate ->
-                                    Text(stringResource(Res.string.settings_already_latest))
-                                is UpdateCheckState.Error ->
-                                    Text(
-                                            stringResource(
-                                                    Res.string.settings_check_update_failed,
-                                                    state.message
-                                            )
+                SettingsSection(title = stringResource(Res.string.settings_category_about)) {
+                    actionItem(
+                            key = "check_app_update",
+                            onClick = onCheckForUpdate,
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_check_update))
+                            },
+                            supportingContent = {
+                                when (val state = updateCheckState) {
+                                    is UpdateCheckState.Checking ->
+                                        Text(stringResource(Res.string.settings_checking_update))
+                                    is UpdateCheckState.NoUpdate ->
+                                        Text(stringResource(Res.string.settings_already_latest))
+                                    is UpdateCheckState.Error ->
+                                        Text(
+                                                stringResource(
+                                                        Res.string.settings_check_update_failed,
+                                                        state.message
+                                                )
+                                        )
+                                    else ->
+                                        Text(stringResource(Res.string.settings_check_update_desc))
+                                }
+                            },
+                            leadingContent = {
+                                if (updateCheckState is UpdateCheckState.Checking) {
+                                    CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 2.dp
                                     )
-                                else ->
-                                    Text(stringResource(Res.string.settings_check_update_desc))
-                            }
-                        },
-                        leadingContent = {
-                            if (updateCheckState is UpdateCheckState.Checking) {
-                                CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
+                                } else {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = null)
+                                }
+                            },
+                            enabled = updateCheckState !is UpdateCheckState.Checking
+                    )
+                    actionItem(
+                            key = "about_app",
+                            onClick = onNavigateToAbout,
+                            headlineContent = {
+                                Text(stringResource(Res.string.settings_about_app))
+                            },
+                            supportingContent = {
+                                Text(stringResource(Res.string.settings_about_app_desc))
+                            },
+                            leadingContent = {
+                                Icon(Icons.Default.Info, contentDescription = null)
+                            },
+                            trailingContent = {
+                                Icon(
+                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = null
                                 )
-                            } else {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null)
                             }
-                        },
-                        modifier =
-                                Modifier.clickable(
-                                        enabled = updateCheckState !is UpdateCheckState.Checking
-                                ) { onCheckForUpdate() }
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                CenteredListItem(
-                        headlineContent = { Text(stringResource(Res.string.settings_about_app)) },
-                        supportingContent = {
-                            Text(stringResource(Res.string.settings_about_app_desc))
-                        },
-                        leadingContent = { Icon(Icons.Default.Info, contentDescription = null) },
-                        trailingContent = {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-                        },
-                        modifier = Modifier.clickable { onNavigateToAbout() }
-                )
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -1672,16 +1598,6 @@ fun SettingsTab(
                 }
         )
     }
-}
-
-@Composable
-private fun CategoryTitle(title: String) {
-    Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(vertical = 8.dp)
-    )
 }
 
 internal fun shouldShowCrashNotificationGuide(
