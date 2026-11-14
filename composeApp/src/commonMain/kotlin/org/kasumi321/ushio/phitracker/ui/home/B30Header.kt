@@ -105,8 +105,7 @@ fun B30Header(
                                 Res.string.b30_header_current_rks,
                                 state.displayRks.formatFour()
                             ),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMediumEmphasized,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(start = 12.dp)
                         )
@@ -170,8 +169,7 @@ fun B30Header(
                         )
                         Text(
                             text = state.displayRks.formatFour(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.headlineMediumEmphasized
                         )
                     }
 

@@ -165,7 +165,7 @@ fun LoginScreen(
 
                 Text(
                     text = "Arkiroku",
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.headlineLargeEmphasized,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -567,7 +567,7 @@ private fun QrCodeImage(url: String, onClick: (() -> Unit)? = null) {
             .fillMaxWidth()
             .aspectRatio(1f)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
     ) {
