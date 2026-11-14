@@ -19,6 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -37,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.core.tween
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -453,46 +453,56 @@ internal fun decideStartGate(
         )
 }
 
-private const val NavTransitionDurationMillis = 250
-
-private fun forwardEnterTransition(reducedMotionEnabled: Boolean): EnterTransition =
+private fun forwardEnterTransition(
+    reducedMotionEnabled: Boolean,
+    motionScheme: MotionScheme
+): EnterTransition =
     if (reducedMotionEnabled) {
         EnterTransition.None
     } else {
         slideInHorizontally(
-            animationSpec = tween(durationMillis = NavTransitionDurationMillis),
+            animationSpec = motionScheme.defaultSpatialSpec(),
             initialOffsetX = { fullWidth -> fullWidth / 10 }
-        ) + fadeIn(animationSpec = tween(durationMillis = NavTransitionDurationMillis))
+        ) + fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
     }
 
-private fun forwardExitTransition(reducedMotionEnabled: Boolean): ExitTransition =
+private fun forwardExitTransition(
+    reducedMotionEnabled: Boolean,
+    motionScheme: MotionScheme
+): ExitTransition =
     if (reducedMotionEnabled) {
         ExitTransition.None
     } else {
         slideOutHorizontally(
-            animationSpec = tween(durationMillis = NavTransitionDurationMillis),
+            animationSpec = motionScheme.defaultSpatialSpec(),
             targetOffsetX = { fullWidth -> -fullWidth / 10 }
-        ) + fadeOut(animationSpec = tween(durationMillis = NavTransitionDurationMillis))
+        ) + fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
     }
 
-private fun popEnterTransition(reducedMotionEnabled: Boolean): EnterTransition =
+private fun popEnterTransition(
+    reducedMotionEnabled: Boolean,
+    motionScheme: MotionScheme
+): EnterTransition =
     if (reducedMotionEnabled) {
         EnterTransition.None
     } else {
         slideInHorizontally(
-            animationSpec = tween(durationMillis = NavTransitionDurationMillis),
+            animationSpec = motionScheme.defaultSpatialSpec(),
             initialOffsetX = { fullWidth -> -fullWidth / 10 }
-        ) + fadeIn(animationSpec = tween(durationMillis = NavTransitionDurationMillis))
+        ) + fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
     }
 
-private fun popExitTransition(reducedMotionEnabled: Boolean): ExitTransition =
+private fun popExitTransition(
+    reducedMotionEnabled: Boolean,
+    motionScheme: MotionScheme
+): ExitTransition =
     if (reducedMotionEnabled) {
         ExitTransition.None
     } else {
         slideOutHorizontally(
-            animationSpec = tween(durationMillis = NavTransitionDurationMillis),
+            animationSpec = motionScheme.defaultSpatialSpec(),
             targetOffsetX = { fullWidth -> fullWidth / 10 }
-        ) + fadeOut(animationSpec = tween(durationMillis = NavTransitionDurationMillis))
+        ) + fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
     }
 
 @Composable
@@ -622,6 +632,7 @@ fun PhiTrackerNavHost() {
         )
     }
     val reducedMotionEnabled = rememberReducedMotionEnabled()
+    val motionScheme = MaterialTheme.motionScheme
 
     NavHost(
         navController = navController,
@@ -632,10 +643,10 @@ fun PhiTrackerNavHost() {
     ) {
         composable(
             route = Screen.Onboarding.route,
-            enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-            exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-            popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-            popExitTransition = { popExitTransition(reducedMotionEnabled) }
+            enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+            exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+            popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+            popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
         ) {
             LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_onboarding") }
             val onboardingViewModel: OnboardingViewModel = koinViewModel()
@@ -661,10 +672,10 @@ fun PhiTrackerNavHost() {
         }
         composable(
             route = Screen.Login.route,
-            enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-            exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-            popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-            popExitTransition = { popExitTransition(reducedMotionEnabled) }
+            enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+            exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+            popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+            popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
         ) {
             LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_login") }
             AppLogger.event("startup", "Login.beforeViewModel")
@@ -680,10 +691,10 @@ fun PhiTrackerNavHost() {
         }
         composable(
             route = Screen.Home.route,
-            enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-            exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-            popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-            popExitTransition = { popExitTransition(reducedMotionEnabled) }
+            enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+            exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+            popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+            popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
         ) {
             LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_home") }
             val homeViewModel: HomeViewModel = koinViewModel()
@@ -761,15 +772,16 @@ fun PhiTrackerNavHost() {
             b30Navigation = b30Navigation,
             b30Host = B30Host.OuterGraph,
             reducedMotionEnabled = reducedMotionEnabled,
+            motionScheme = motionScheme,
             settingsRepository = settingsRepository,
             detailPaneState = detailPaneState,
             migrateOnExpanded = true
         )
         composable<IllustrationPreviewRoute>(
-            enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-            exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-            popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-            popExitTransition = { popExitTransition(reducedMotionEnabled) }
+            enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+            exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+            popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+            popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
         ) { backStackEntry ->
             val route = backStackEntry.toRoute<IllustrationPreviewRoute>()
             LaunchedEffect(route.songId) {
@@ -861,16 +873,17 @@ internal fun NavGraphBuilder.secondaryDestinations(
     b30Navigation: B30NavigationCoordinator,
     b30Host: B30Host,
     reducedMotionEnabled: Boolean,
+    motionScheme: MotionScheme,
     settingsRepository: SettingsRepository,
     detailPaneState: DetailPaneState,
     migrateOnExpanded: Boolean
 ) {
     composable(
         route = Screen.B30Image.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) { backStackEntry ->
         LaunchedEffect(Unit) { AppLogger.event("navigation", "entered_b30image") }
         // SavedStateHandle keeps the first owner across recomposition and the
@@ -927,10 +940,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
     }
     composable(
         route = Screen.About.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) {
         MigrateSecondaryToDetailOnExpanded(
             request = DetailRouteRequest.Plain(Screen.About.route),
@@ -951,10 +964,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
     }
     composable(
         route = Screen.Disclaimer.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) {
         MigrateSecondaryToDetailOnExpanded(
             request = DetailRouteRequest.Plain(Screen.Disclaimer.route),
@@ -968,10 +981,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
     }
     composable(
         route = Screen.Acknowledgments.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) {
         MigrateSecondaryToDetailOnExpanded(
             request = DetailRouteRequest.Plain(Screen.Acknowledgments.route),
@@ -985,10 +998,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
     }
     composable(
         route = Screen.Licenses.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) {
         MigrateSecondaryToDetailOnExpanded(
             request = DetailRouteRequest.Plain(Screen.Licenses.route),
@@ -1002,10 +1015,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
     }
     composable(
         route = Screen.Settings.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) {
         MigrateSecondaryToDetailOnExpanded(
             request = DetailRouteRequest.Plain(Screen.Settings.route),
@@ -1024,10 +1037,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
     }
     composable(
         route = Screen.Suggest.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) {
         MigrateSecondaryToDetailOnExpanded(
             request = DetailRouteRequest.Plain(Screen.Suggest.route),
@@ -1055,10 +1068,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
     }
     composable(
         route = Screen.PrivacyPolicy.route,
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) {
         MigrateSecondaryToDetailOnExpanded(
             request = DetailRouteRequest.Plain(Screen.PrivacyPolicy.route),
@@ -1071,10 +1084,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
         )
     }
     composable<SongDetailRoute>(
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) { backStackEntry ->
         val route = backStackEntry.toRoute<SongDetailRoute>()
         MigrateSecondaryToDetailOnExpanded(
@@ -1131,10 +1144,10 @@ internal fun NavGraphBuilder.secondaryDestinations(
         }
     }
     composable<CollectibleDetailRoute>(
-        enterTransition = { forwardEnterTransition(reducedMotionEnabled) },
-        exitTransition = { forwardExitTransition(reducedMotionEnabled) },
-        popEnterTransition = { popEnterTransition(reducedMotionEnabled) },
-        popExitTransition = { popExitTransition(reducedMotionEnabled) }
+        enterTransition = { forwardEnterTransition(reducedMotionEnabled, motionScheme) },
+        exitTransition = { forwardExitTransition(reducedMotionEnabled, motionScheme) },
+        popEnterTransition = { popEnterTransition(reducedMotionEnabled, motionScheme) },
+        popExitTransition = { popExitTransition(reducedMotionEnabled, motionScheme) }
     ) { backStackEntry ->
         val route = backStackEntry.toRoute<CollectibleDetailRoute>()
         MigrateSecondaryToDetailOnExpanded(

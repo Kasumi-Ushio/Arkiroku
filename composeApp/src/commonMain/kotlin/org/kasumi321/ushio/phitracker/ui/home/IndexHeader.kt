@@ -1,9 +1,7 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,7 +56,7 @@ fun IndexHeader(
     val reducedMotion = rememberReducedMotionEnabled()
     val expansion by animateFloatAsState(
         targetValue = if (compact) 0f else 1f,
-        animationSpec = if (reducedMotion) snap() else spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultSpatialSpec(),
         label = "indexHeaderExpansion"
     )
     val titleStyle = MaterialTheme.typography.titleLarge
