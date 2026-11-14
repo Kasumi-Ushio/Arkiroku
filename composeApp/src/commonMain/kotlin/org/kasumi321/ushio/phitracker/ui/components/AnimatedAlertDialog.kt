@@ -1,8 +1,9 @@
 package org.kasumi321.ushio.phitracker.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.flow.first
+import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 
 /**
  * Whether the platform already renders enter/exit animations for dialogs.
@@ -128,6 +130,8 @@ private fun AnimatedAlertDialogContent(
 ) {
     val visibilityState = remember { MutableTransitionState(false) }
     visibilityState.targetState = true
+    val reducedMotion = rememberReducedMotionEnabled()
+    val motionScheme = MaterialTheme.motionScheme
 
     BasicAlertDialog(
         onDismissRequest = { visibilityState.targetState = false },
@@ -136,8 +140,18 @@ private fun AnimatedAlertDialogContent(
     ) {
         AnimatedVisibility(
             visible = visibilityState.targetState,
-            enter = fadeIn(animationSpec = tween(150)) + scaleIn(initialScale = 0.9f),
-            exit = fadeOut(animationSpec = tween(120)) + scaleOut(targetScale = 0.9f)
+            enter = if (reducedMotion) {
+                EnterTransition.None
+            } else {
+                fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
+                    scaleIn(initialScale = 0.9f, animationSpec = motionScheme.defaultSpatialSpec())
+            },
+            exit = if (reducedMotion) {
+                ExitTransition.None
+            } else {
+                fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
+                    scaleOut(targetScale = 0.9f, animationSpec = motionScheme.defaultSpatialSpec())
+            }
         ) {
             Surface(
                 shape = shape,

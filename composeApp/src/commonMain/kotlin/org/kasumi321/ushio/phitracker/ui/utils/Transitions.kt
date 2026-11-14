@@ -4,10 +4,8 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.material3.MotionScheme
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -21,16 +19,20 @@ import androidx.compose.animation.togetherWith
  * vanishing at once.
  */
 fun AnimatedContentTransitionScope<Boolean>.expandCollapseTransition(
-    reducedMotion: Boolean
+    reducedMotion: Boolean,
+    motionScheme: MotionScheme
 ) = (
     if (targetState) {
         EnterTransition.None togetherWith ExitTransition.None
     } else {
-        fadeIn(animationSpec = if (reducedMotion) snap() else tween(250)) togetherWith
-            fadeOut(animationSpec = if (reducedMotion) snap() else tween(250))
+        fadeIn(
+            animationSpec = if (reducedMotion) snap() else motionScheme.defaultEffectsSpec()
+        ) togetherWith fadeOut(
+            animationSpec = if (reducedMotion) snap() else motionScheme.defaultEffectsSpec()
+        )
     }
     ).using(
         SizeTransform(clip = true) { _, _ ->
-            if (reducedMotion) snap() else spring(stiffness = Spring.StiffnessMediumLow)
+            if (reducedMotion) snap() else motionScheme.defaultSpatialSpec()
         }
     )

@@ -1,7 +1,7 @@
 package org.kasumi321.ushio.phitracker.ui.collectible
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,6 +54,7 @@ import coil3.request.crossfade
 import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.CollectibleCategory
 import org.kasumi321.ushio.phitracker.domain.model.CollectiblePart
+import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.action_back
 import phitracker.composeapp.generated.resources.collectible_detail_category_label
@@ -119,9 +120,10 @@ fun CollectibleDetailScreen(
             coverHeightPx == 0 || scrollState.value < coverHeightPx - statusBarHeightPx
         }
     }
+    val reducedMotion = rememberReducedMotionEnabled()
     val scrimAlpha by animateFloatAsState(
         targetValue = if (scrimVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "collectibleCoverScrimAlpha"
     )
 

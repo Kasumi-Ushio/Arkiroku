@@ -687,9 +687,10 @@ private fun GameUpdateInfoCard(
                     modifier = Modifier.rotate(arrowRotation)
                 )
             }
+            val motionScheme = MaterialTheme.motionScheme
             AnimatedContent(
                 targetState = expanded,
-                transitionSpec = { expandCollapseTransition(reducedMotion) },
+                transitionSpec = { expandCollapseTransition(reducedMotion, motionScheme) },
                 label = "gameUpdateChangelog",
                 modifier = Modifier.padding(top = 8.dp)
             ) { targetExpanded ->

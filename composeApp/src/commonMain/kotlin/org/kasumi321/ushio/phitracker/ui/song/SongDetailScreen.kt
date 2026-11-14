@@ -587,9 +587,10 @@ private fun AliasChips(
                 ) {
                     nicknames.forEach { AliasChip(it) }
                 }
+                val motionScheme = MaterialTheme.motionScheme
                 AnimatedContent(
                     targetState = expanded,
-                    transitionSpec = { expandCollapseTransition(reducedMotion) },
+                    transitionSpec = { expandCollapseTransition(reducedMotion, motionScheme) },
                     label = "aliasChips",
                     modifier = Modifier.fillMaxWidth()
                 ) { targetExpanded ->

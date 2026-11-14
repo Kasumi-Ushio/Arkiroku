@@ -292,6 +292,7 @@ internal fun ExpandedHomeScreen(
         },
         label = "detailPaneProgress"
     )
+    val motionScheme = MaterialTheme.motionScheme
 
     BoxWithConstraints(
         modifier = Modifier
@@ -405,6 +406,7 @@ internal fun ExpandedHomeScreen(
                     b30Navigation = b30Navigation,
                     b30Host = B30Host.DetailPane,
                     reducedMotionEnabled = reducedMotionEnabled,
+                    motionScheme = motionScheme,
                     settingsRepository = settingsRepository,
                     detailPaneState = detailPaneState,
                     migrateOnExpanded = false

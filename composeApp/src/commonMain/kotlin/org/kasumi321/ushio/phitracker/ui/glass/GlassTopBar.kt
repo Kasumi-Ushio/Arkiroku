@@ -2,7 +2,6 @@ package org.kasumi321.ushio.phitracker.ui.glass
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,7 +80,7 @@ fun rememberCollapsingTitleStyle(compact: Boolean): TextStyle {
     val reducedMotion = rememberReducedMotionEnabled()
     val fraction by animateFloatAsState(
         targetValue = if (compact) 1f else 0f,
-        animationSpec = if (reducedMotion) snap() else tween(250),
+        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultSpatialSpec(),
         label = "collapsingTitleStyle"
     )
     return remember(expandedStyle, compactStyle, fraction) {
