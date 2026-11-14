@@ -103,7 +103,7 @@ internal class SettingsSectionScope internal constructor() {
 
     fun switchItem(
         key: String,
-        headline: String,
+        headlineContent: @Composable () -> Unit,
         checked: Boolean,
         onCheckedChange: (Boolean) -> Unit,
         supportingContent: @Composable (() -> Unit)? = null,
@@ -112,7 +112,7 @@ internal class SettingsSectionScope internal constructor() {
     ) {
         add(key) { shapes ->
             SettingsSwitchItem(
-                headline = headline,
+                headlineContent = headlineContent,
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 shapes = shapes,
@@ -263,7 +263,7 @@ private fun SettingsValueItem(
 
 @Composable
 private fun SettingsSwitchItem(
-    headline: String,
+    headlineContent: @Composable () -> Unit,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     shapes: ListItemShapes,
@@ -292,7 +292,9 @@ private fun SettingsSwitchItem(
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = headline, style = MaterialTheme.typography.bodyLarge)
+                ProvideTextStyle(MaterialTheme.typography.bodyLarge) {
+                    headlineContent()
+                }
                 supportingContent?.let {
                     ProvideTextStyle(
                         MaterialTheme.typography.bodySmall.copy(
