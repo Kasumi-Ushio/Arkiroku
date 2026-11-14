@@ -141,7 +141,8 @@ actual object B30ImageGenerator {
                 PhiTrackerTheme(
                     darkTheme = exportData.darkTheme,
                     isAmoled = exportData.isAmoled,
-                    settings = exportData.themeSettings
+                    settings = exportData.themeSettings,
+                    expressive = false
                 ) {
                     B30ExportLayout(
                         data = exportData,

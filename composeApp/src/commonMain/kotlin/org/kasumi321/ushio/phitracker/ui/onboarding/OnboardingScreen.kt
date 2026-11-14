@@ -1242,7 +1242,8 @@ private fun B30CardPreview(
         settings = PhiTrackerThemeSettings(
             themeMode = effectiveThemeMode,
             paletteStyleName = paletteStyleName
-        )
+        ),
+        expressive = false
     ) {
         Box(
             modifier = Modifier.fillMaxWidth(),
