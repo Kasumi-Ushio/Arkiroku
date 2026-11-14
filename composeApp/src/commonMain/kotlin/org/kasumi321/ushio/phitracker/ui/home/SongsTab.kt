@@ -66,6 +66,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.SongInfo
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.components.DifficultyTag
 import org.kasumi321.ushio.phitracker.ui.theme.DifficultyColors
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
@@ -273,7 +274,7 @@ fun SongDataRefreshProgressCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             if (progressFraction != null) {
-                LinearProgressIndicator(
+                AppLinearProgressIndicator(
                     progress = { progressFraction },
                     modifier = Modifier.fillMaxWidth()
                 )

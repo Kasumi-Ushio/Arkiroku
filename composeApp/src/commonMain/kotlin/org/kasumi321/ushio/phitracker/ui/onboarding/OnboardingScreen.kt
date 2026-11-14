@@ -28,13 +28,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -77,6 +75,8 @@ import org.kasumi321.ushio.phitracker.ui.b30.B30ExportCardStyle
 import org.kasumi321.ushio.phitracker.ui.b30.B30ExportSpec
 import org.kasumi321.ushio.phitracker.ui.b30.B30_EXPORT_CARD_THUMBNAIL_SCALE
 import org.kasumi321.ushio.phitracker.ui.b30.ExportPosterCard
+import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppLoadingIndicator
 import org.kasumi321.ushio.phitracker.ui.glass.rememberGlassHazeStyle
 import org.kasumi321.ushio.phitracker.ui.home.ScoreCardContent
 import org.kasumi321.ushio.phitracker.ui.login.LoginMethodSection
@@ -660,7 +660,7 @@ private fun InlineLoginSection(onLoggedIn: () -> Unit, onSkip: () -> Unit) {
     }
 
     if (loginState.isCheckingToken) {
-        CircularProgressIndicator()
+        AppLoadingIndicator()
         return
     }
 
@@ -861,7 +861,7 @@ private fun SongDataUpdateStep(
             when (status) {
                 OnboardingSongDataStatus.Idle,
                 OnboardingSongDataStatus.Checking -> {
-                    CircularProgressIndicator()
+                    AppLoadingIndicator()
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = stringResource(Res.string.songs_songdata_checking),
@@ -889,7 +889,7 @@ private fun SongDataUpdateStep(
                 }
 
                 OnboardingSongDataStatus.Updating -> {
-                    LinearProgressIndicator(
+                    AppLinearProgressIndicator(
                         progress = { if (total == 0) 0f else completed.toFloat() / total },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -915,7 +915,7 @@ private fun SongDataUpdateStep(
                 OnboardingSongDataStatus.Updated -> {
                     // Same idiom as the preload step: the full bar stays visible so
                     // the completion reads as the end state of the run above it.
-                    LinearProgressIndicator(
+                    AppLinearProgressIndicator(
                         progress = { 1f },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1014,7 +1014,7 @@ private fun PreloadChoiceStep(
                 }
 
                 OnboardingPreloadStatus.Running -> {
-                    LinearProgressIndicator(
+                    AppLinearProgressIndicator(
                         progress = { if (total == 0) 0f else completed.toFloat() / total },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1043,7 +1043,7 @@ private fun PreloadChoiceStep(
                     // Keep the full progress bar and counter visible so the
                     // completion reads as the end state of the download above,
                     // not as a disconnected message.
-                    LinearProgressIndicator(
+                    AppLinearProgressIndicator(
                         progress = { 1f },
                         modifier = Modifier.fillMaxWidth()
                     )

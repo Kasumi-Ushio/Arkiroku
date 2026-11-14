@@ -28,7 +28,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +60,7 @@ import org.kasumi321.ushio.phitracker.domain.model.Difficulty
 import org.kasumi321.ushio.phitracker.domain.model.GameUpdateInfo
 import org.kasumi321.ushio.phitracker.ui.b30.B30RksHistogramChart
 import org.kasumi321.ushio.phitracker.ui.b30.setImageRequestAllowHardware
+import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.components.ColoredTag
 import org.kasumi321.ushio.phitracker.ui.components.phiFontFamily
 import org.kasumi321.ushio.phitracker.ui.glass.rememberExpansionArrowRotation
@@ -353,7 +353,7 @@ private fun PreloadProgressCard(
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
-            LinearProgressIndicator(
+            AppLinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth()
             )

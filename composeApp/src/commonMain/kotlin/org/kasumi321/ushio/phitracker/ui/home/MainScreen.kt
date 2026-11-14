@@ -46,7 +46,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -60,7 +59,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -129,6 +127,8 @@ import org.kasumi321.ushio.phitracker.ui.collectible.STACK_LIST_DEFAULT_FRACTION
 import org.kasumi321.ushio.phitracker.ui.collectible.clampStackedFraction
 import org.kasumi321.ushio.phitracker.ui.collectible.isBrowsingActive
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppPullToRefreshIndicator
 import org.kasumi321.ushio.phitracker.ui.components.ElasticPagerPrimaryIndicator
 import org.kasumi321.ushio.phitracker.ui.glass.GlassBottomBar
 import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
@@ -896,9 +896,9 @@ fun MainScreen(
                     modifier = Modifier.fillMaxSize(),
                     indicator = {
                         // The tab content draws full-bleed behind the glass top
-                        // bar, so push the spinner below the bar's bottom edge
+                        // bar, so push the indicator below the bar's bottom edge
                         // to keep it out of the blurred area
-                        PullToRefreshDefaults.Indicator(
+                        AppPullToRefreshIndicator(
                             state = pullRefreshState,
                             isRefreshing = state.sync.isSyncing,
                             modifier = Modifier
@@ -1167,7 +1167,7 @@ private fun IndexPullToRefreshBox(
         state = pullRefreshState,
         modifier = Modifier.fillMaxSize(),
         indicator = {
-            PullToRefreshDefaults.Indicator(
+            AppPullToRefreshIndicator(
                 state = pullRefreshState,
                 isRefreshing = isRefreshing,
                 modifier = Modifier
@@ -1217,7 +1217,7 @@ private fun IllustrationPreloadDialog(
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    LinearProgressIndicator(
+                    AppLinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier.fillMaxWidth()
                     )

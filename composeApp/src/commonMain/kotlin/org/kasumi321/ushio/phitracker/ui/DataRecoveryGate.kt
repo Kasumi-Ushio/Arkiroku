@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -35,6 +33,8 @@ import org.kasumi321.ushio.phitracker.data.song.CatalogRepairSession
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStage
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairState
 import org.kasumi321.ushio.phitracker.data.song.CatalogRepairStatus
+import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppLoadingIndicator
 import org.koin.compose.koinInject
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.common_cancel
@@ -132,7 +132,7 @@ private fun DataRecoveryScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (!failed) {
-                CircularProgressIndicator()
+                AppLoadingIndicator()
             }
             Spacer(Modifier.height(24.dp))
             Text(
@@ -161,7 +161,7 @@ private fun DataRecoveryScreen(
             )
             if (!failed && state.total > 0) {
                 Spacer(Modifier.height(16.dp))
-                LinearProgressIndicator(
+                AppLinearProgressIndicator(
                     progress = { state.completed.toFloat() / state.total },
                     modifier = Modifier.fillMaxWidth()
                 )
