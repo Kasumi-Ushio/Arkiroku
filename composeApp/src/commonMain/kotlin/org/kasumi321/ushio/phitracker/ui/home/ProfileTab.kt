@@ -188,13 +188,15 @@ fun ProfileTab(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            ProfileHeroCard(
+            ProfileHeaderCard(
                 nickname = nickname,
                 displayRks = displayRks,
                 challengeModeRank = challengeModeRank,
                 moneyString = moneyString,
                 avatarUri = avatarUri,
                 onAvatarClick = onAvatarClick,
+                shape = MaterialTheme.shapes.extraLarge,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -368,6 +370,7 @@ fun ProfileHeaderCard(
     avatarTextSpacing: Dp = 16.dp,
     centerContent: Boolean = false,
     shape: Shape = RoundedCornerShape(16.dp),
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     rksStyle: TextStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
     modifier: Modifier = Modifier,
     allowHardwareImages: Boolean = true,
@@ -382,7 +385,7 @@ fun ProfileHeaderCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = containerColor
         ),
         shape = shape
     ) {

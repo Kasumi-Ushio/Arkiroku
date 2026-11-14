@@ -286,9 +286,10 @@ fun B30Tab(
 }
 
 /**
- * Collapsible B30 tag-analysis block in a low-emphasis container. While loading
- * it stays collapsed; once the analysis first arrives it auto-expands once,
- * after which the manual user toggle wins.
+ * Collapsible B30 tag-analysis block. Its section title shares the list's
+ * content start line, while the low-emphasis card contains only the analysis.
+ * Loading stays collapsed; the first arrived analysis auto-expands once, after
+ * which the manual user toggle wins.
  */
 @Composable
 private fun CollapsibleTagAnalysis(
@@ -299,50 +300,47 @@ private fun CollapsibleTagAnalysis(
     val autoExpanded = !state.isLoading && state.analysis != null
     val expanded = userExpanded ?: autoExpanded
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = MaterialTheme.shapes.largeIncreased
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { userExpanded = !expanded }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(Res.string.b30_tag_analysis_title),
-                    style = MaterialTheme.typography.titleLargeEmphasized,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                if (state.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp
-                    else Icons.Default.KeyboardArrowDown,
-                    contentDescription = stringResource(
-                        if (expanded) Res.string.b30_action_collapse
-                        else Res.string.b30_action_expand
-                    ),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { userExpanded = !expanded }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(Res.string.b30_tag_analysis_title),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            if (state.isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
             }
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowUp
+                else Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(
+                    if (expanded) Res.string.b30_action_collapse
+                    else Res.string.b30_action_expand
+                ),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.largeIncreased
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     when {
                         state.error != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
