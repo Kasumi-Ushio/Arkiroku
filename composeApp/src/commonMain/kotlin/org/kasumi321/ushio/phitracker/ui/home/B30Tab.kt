@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -285,9 +286,7 @@ fun B30Tab(
 }
 
 /**
- * Collapsible B30 tag-analysis block. Behaves like the Tools-tab
- * CollapsibleToolCard interaction (collapsed by default, expandVertically),
- * but sits in the score-card list without a card background. While loading
+ * Collapsible B30 tag-analysis block in a low-emphasis container. While loading
  * it stays collapsed; once the analysis first arrives it auto-expands once,
  * after which the manual user toggle wins.
  */
@@ -300,57 +299,62 @@ private fun CollapsibleTagAnalysis(
     val autoExpanded = !state.isLoading && state.analysis != null
     val expanded = userExpanded ?: autoExpanded
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { userExpanded = !expanded }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(Res.string.b30_tag_analysis_title),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            if (state.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowUp
-                else Icons.Default.KeyboardArrowDown,
-                contentDescription = stringResource(
-                    if (expanded) Res.string.b30_action_collapse
-                    else Res.string.b30_action_expand
-                ),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            Column(
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.largeIncreased
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                    .clickable { userExpanded = !expanded }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                when {
-                    state.error != null -> Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = state.error!!.asString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = onRetry) { Text(stringResource(Res.string.b30_action_retry)) }
+                Text(
+                    text = stringResource(Res.string.b30_tag_analysis_title),
+                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                if (state.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp
+                    else Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(
+                        if (expanded) Res.string.b30_action_collapse
+                        else Res.string.b30_action_expand
+                    ),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    when {
+                        state.error != null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = state.error!!.asString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = onRetry) { Text(stringResource(Res.string.b30_action_retry)) }
+                        }
+                        state.analysis != null -> B30TagAnalysisContent(analysis = state.analysis)
                     }
-                    state.analysis != null -> B30TagAnalysisContent(analysis = state.analysis)
                 }
             }
         }
