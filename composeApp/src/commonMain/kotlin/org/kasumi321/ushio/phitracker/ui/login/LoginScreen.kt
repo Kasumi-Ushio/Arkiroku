@@ -2,9 +2,6 @@ package org.kasumi321.ushio.phitracker.ui.login
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +72,8 @@ import org.kasumi321.ushio.phitracker.domain.model.Server
 import org.kasumi321.ushio.phitracker.ui.components.AppLoadingIndicator
 import org.kasumi321.ushio.phitracker.ui.components.ElasticClickPrimaryIndicator
 import org.kasumi321.ushio.phitracker.ui.utils.asString
+import org.kasumi321.ushio.phitracker.ui.utils.horizontalContentTransition
+import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import org.kasumi321.ushio.phitracker.ui.utils.resolve
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.login_app_credit
@@ -249,6 +248,8 @@ internal fun LoginMethodSection(
     onLogin: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    val reducedMotion = rememberReducedMotionEnabled()
+    val motionScheme = MaterialTheme.motionScheme
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -283,7 +284,13 @@ internal fun LoginMethodSection(
 
         AnimatedContent(
             targetState = selectedTab,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            transitionSpec = {
+                horizontalContentTransition(
+                    reducedMotion = reducedMotion,
+                    motionScheme = motionScheme,
+                    forward = targetState > initialState
+                )
+            },
             label = "login_tab"
         ) { tab ->
             when (tab) {

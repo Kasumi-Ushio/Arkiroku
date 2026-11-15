@@ -96,6 +96,7 @@ import org.kasumi321.ushio.phitracker.ui.settings.SettingsConstants
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerTheme
 import org.kasumi321.ushio.phitracker.ui.theme.PhiTrackerThemeSettings
 import org.kasumi321.ushio.phitracker.ui.utils.asString
+import org.kasumi321.ushio.phitracker.ui.utils.horizontalContentTransition
 import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import org.koin.compose.viewmodel.koinViewModel
 import phitracker.composeapp.generated.resources.Res
@@ -184,6 +185,8 @@ fun OnboardingScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val systemDark = isSystemInDarkTheme()
+    val reducedMotion = rememberReducedMotionEnabled()
+    val motionScheme = MaterialTheme.motionScheme
     // themeMode 0 (follow system) is not a valid manual export choice, so the
     // global mode is resolved to a concrete value before use as the manual
     // default — same rule as the B30 export page.
@@ -240,7 +243,17 @@ fun OnboardingScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            AnimatedContent(targetState = state.step, label = "onboardingStep") { step ->
+            AnimatedContent(
+                targetState = state.step,
+                transitionSpec = {
+                    horizontalContentTransition(
+                        reducedMotion = reducedMotion,
+                        motionScheme = motionScheme,
+                        forward = targetState.ordinal > initialState.ordinal
+                    )
+                },
+                label = "onboardingStep"
+            ) { step ->
                 when (step) {
                     OnboardingStep.Welcome -> WelcomeStep()
                     OnboardingStep.Language -> LanguageStep(

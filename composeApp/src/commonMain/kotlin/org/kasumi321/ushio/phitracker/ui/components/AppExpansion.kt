@@ -12,6 +12,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntSize
 import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
@@ -32,12 +33,18 @@ fun AppExpandableSection(
         enter = if (reducedMotion) {
             EnterTransition.None
         } else {
-            expandVertically(animationSpec = sizeSpec) + fadeIn(animationSpec = floatSpec)
+            expandVertically(
+                animationSpec = sizeSpec,
+                expandFrom = Alignment.Top
+            ) + fadeIn(animationSpec = floatSpec)
         },
         exit = if (reducedMotion) {
             ExitTransition.None
         } else {
-            shrinkVertically(animationSpec = sizeSpec) + fadeOut(animationSpec = floatSpec)
+            shrinkVertically(
+                animationSpec = sizeSpec,
+                shrinkTowards = Alignment.Top
+            ) + fadeOut(animationSpec = floatSpec)
         }
     ) {
         content()

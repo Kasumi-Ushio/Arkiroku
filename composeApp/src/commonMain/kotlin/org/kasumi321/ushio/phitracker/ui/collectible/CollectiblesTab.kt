@@ -3,12 +3,10 @@ package org.kasumi321.ushio.phitracker.ui.collectible
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -97,6 +95,7 @@ import org.kasumi321.ushio.phitracker.domain.model.CollectibleItem
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
 import org.kasumi321.ushio.phitracker.ui.home.IndexSearchField
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
+import org.kasumi321.ushio.phitracker.ui.utils.horizontalContentTransition
 import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.collectible_category_bold
@@ -236,6 +235,8 @@ fun CollectiblesTab(
         state.filteredItems.groupingBy { it.chapterFolderKey }.eachCount()
     }
     val browsingActive = state.isBrowsingActive()
+    val reducedMotion = rememberReducedMotionEnabled()
+    val motionScheme = MaterialTheme.motionScheme
 
     // The header consumed the top inset; pad the list so the first group
     // stays clear of it and the last item clears the floating glass bar.
@@ -272,13 +273,11 @@ fun CollectiblesTab(
                     targetState = drilledChapterKey,
                     modifier = Modifier.fillMaxSize(),
                     transitionSpec = {
-                        if (targetState != null) {
-                            slideInHorizontally { width -> width / 10 } + fadeIn() togetherWith
-                                slideOutHorizontally { width -> -width / 10 } + fadeOut()
-                        } else {
-                            slideInHorizontally { width -> -width / 10 } + fadeIn() togetherWith
-                                slideOutHorizontally { width -> width / 10 } + fadeOut()
-                        }
+                        horizontalContentTransition(
+                            reducedMotion = reducedMotion,
+                            motionScheme = motionScheme,
+                            forward = targetState != null
+                        )
                     },
                     label = "collectiblesChapterDrill"
                 ) { chapterKey ->
@@ -426,6 +425,7 @@ private fun StackedChapterPane(
     modifier: Modifier = Modifier
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
+    val motionScheme = MaterialTheme.motionScheme
     val chapterOpen = drilledChapterKey != null
     var retainedChapterKey by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(drilledChapterKey) {
@@ -475,12 +475,14 @@ private fun StackedChapterPane(
                     enter = if (reducedMotion) {
                         EnterTransition.None
                     } else {
-                        fadeIn(animationSpec = tween(180)) + slideInHorizontally { width -> width / 4 }
+                        fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
+                            slideInHorizontally(animationSpec = motionScheme.defaultSpatialSpec()) { width -> width / 4 }
                     },
                     exit = if (reducedMotion) {
                         ExitTransition.None
                     } else {
-                        fadeOut(animationSpec = tween(120)) + slideOutHorizontally { width -> width / 4 }
+                        fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
+                            slideOutHorizontally(animationSpec = motionScheme.defaultSpatialSpec()) { width -> width / 4 }
                     },
                     label = "collectibleStackChapterList"
                 ) {
@@ -499,12 +501,11 @@ private fun StackedChapterPane(
                                     .weight(1f)
                                     .fillMaxHeight(),
                                 transitionSpec = {
-                                    if (reducedMotion) {
-                                        EnterTransition.None togetherWith ExitTransition.None
-                                    } else {
-                                        slideInHorizontally { width -> width / 10 } + fadeIn() togetherWith
-                                            slideOutHorizontally { width -> -width / 10 } + fadeOut()
-                                    }
+                                    horizontalContentTransition(
+                                        reducedMotion = reducedMotion,
+                                        motionScheme = motionScheme,
+                                        forward = true
+                                    )
                                 },
                                 label = "collectibleStackChapterContent"
                             ) { currentChapterKey ->
