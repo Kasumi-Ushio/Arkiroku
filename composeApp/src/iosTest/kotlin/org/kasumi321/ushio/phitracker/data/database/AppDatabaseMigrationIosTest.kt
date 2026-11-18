@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.kasumi321.ushio.phitracker.data.platform.createPlatformPaths
 import platform.Foundation.NSFileManager
 import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -13,6 +14,20 @@ import kotlin.test.assertNull
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 class AppDatabaseMigrationIosTest {
     private val path = createPlatformPaths().filesDir + "/phi_tracker.db"
+
+    @BeforeTest
+    fun setUp() {
+        // A standalone native test binary has no app container setup, so the
+        // Documents directory used by the production factory may not exist.
+        check(
+            NSFileManager.defaultManager.createDirectoryAtPath(
+                createPlatformPaths().filesDir,
+                true,
+                null,
+                null
+            )
+        ) { "Unable to create the iOS test Documents directory" }
+    }
 
     @AfterTest
     fun tearDown() {
