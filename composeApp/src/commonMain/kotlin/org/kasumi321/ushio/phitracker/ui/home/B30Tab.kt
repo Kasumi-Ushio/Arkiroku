@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package org.kasumi321.ushio.phitracker.ui.home
 
 import androidx.compose.foundation.clickable
@@ -25,7 +27,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -199,7 +203,7 @@ fun B30Tab(
                 state = listState,
                 modifier = modifier.fillMaxSize(),
                 contentPadding = listContentPadding,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
             ) {
             if (showTagSection) {
                 item(contentType = "tag_analysis") {
@@ -217,7 +221,7 @@ fun B30Tab(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
                     )
                 }
                 itemsIndexed(
@@ -229,7 +233,8 @@ fun B30Tab(
                         rank = index + 1,
                         record = record,
                         illustrationUrl = getIllustrationUrl(record.songId),
-                        onSongClick = onSongClick
+                        onSongClick = onSongClick,
+                        shape = ListItemDefaults.segmentedShapes(index = index, count = phi3.size).shape
                     )
                 }
             }
@@ -240,7 +245,7 @@ fun B30Tab(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    modifier = Modifier.padding(top = 14.dp, bottom = 10.dp)
                 )
             }
             itemsIndexed(
@@ -252,7 +257,8 @@ fun B30Tab(
                     rank = index + 1,
                     record = record,
                     illustrationUrl = getIllustrationUrl(record.songId),
-                    onSongClick = onSongClick
+                    onSongClick = onSongClick,
+                    shape = ListItemDefaults.segmentedShapes(index = index, count = b27.size).shape
                 )
             }
 
@@ -263,7 +269,7 @@ fun B30Tab(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(top = 22.dp, bottom = 10.dp)
                     )
                 }
                 itemsIndexed(
@@ -275,7 +281,8 @@ fun B30Tab(
                         rank = index + 1,
                         record = record,
                         illustrationUrl = getIllustrationUrl(record.songId),
-                        onSongClick = onSongClick
+                        onSongClick = onSongClick,
+                        shape = ListItemDefaults.segmentedShapes(index = index, count = overflow.size).shape
                     )
                 }
             }
