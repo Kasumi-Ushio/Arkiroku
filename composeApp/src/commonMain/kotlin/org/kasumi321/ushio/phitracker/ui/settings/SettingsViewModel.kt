@@ -197,6 +197,7 @@ class SettingsViewModel(
         viewModelScope.launch { settingsRepository.themeImageSeedColorArgb.collect { value -> mutableUiState.update { it.copy(themeImageSeedColorArgb = value) } } }
         viewModelScope.launch { settingsRepository.themeImageUri.collect { value -> mutableUiState.update { it.copy(themeImageUri = value) } } }
         viewModelScope.launch { settingsRepository.paletteStyleName.collect { value -> mutableUiState.update { it.copy(paletteStyleName = value) } } }
+        viewModelScope.launch { settingsRepository.colorSpecVersion.collect { value -> mutableUiState.update { it.copy(colorSpecVersion = value) } } }
         viewModelScope.launch { settingsRepository.showB30Overflow.collect { value -> mutableUiState.update { it.copy(showB30Overflow = value) } } }
         viewModelScope.launch { settingsRepository.overflowCount.collect { value -> mutableUiState.update { it.copy(overflowCount = value) } } }
         viewModelScope.launch { settingsRepository.hazeBlurEnabled.collect { value -> mutableUiState.update { it.copy(hazeBlurEnabled = value) } } }

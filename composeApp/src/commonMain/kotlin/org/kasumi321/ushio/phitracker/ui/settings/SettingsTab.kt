@@ -54,6 +54,7 @@ import org.kasumi321.ushio.phitracker.ui.theme.THEME_COLOR_SOURCE_IMAGE
 import org.kasumi321.ushio.phitracker.ui.theme.THEME_COLOR_SOURCE_SYSTEM
 import org.kasumi321.ushio.phitracker.ui.theme.argbToColor
 import org.kasumi321.ushio.phitracker.ui.theme.colorToArgb
+import org.kasumi321.ushio.phitracker.ui.theme.supportsSpec2025
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.update.UpdateResultDialog
 import org.kasumi321.ushio.phitracker.ui.utils.UiText
@@ -159,6 +160,9 @@ import phitracker.composeapp.generated.resources.settings_no_runtime_log
 import phitracker.composeapp.generated.resources.settings_no_runtime_log_title
 import phitracker.composeapp.generated.resources.settings_notification_permission_denied_toast
 import phitracker.composeapp.generated.resources.settings_overflow_count
+import phitracker.composeapp.generated.resources.settings_color_spec
+import phitracker.composeapp.generated.resources.settings_color_spec_desc
+import phitracker.composeapp.generated.resources.settings_color_spec_fallback
 import phitracker.composeapp.generated.resources.settings_palette_style
 import phitracker.composeapp.generated.resources.settings_palette_style_desc
 import phitracker.composeapp.generated.resources.settings_prerelease_notice
@@ -204,6 +208,7 @@ fun SettingsTab(
         seedColorArgb: Int = -10011977,
         themeImageSeedColorArgb: Int? = null,
         paletteStyleName: String = PaletteStyle.TonalSpot.name,
+        colorSpecVersion: String = "SPEC_2021",
         showB30Overflow: Boolean,
         overflowCount: Int,
         hazeBlurEnabled: Boolean = true,
@@ -216,6 +221,7 @@ fun SettingsTab(
         onThemeImageColorSelected: (String?, Int) -> Unit = { _, _ -> },
         onThemeImageColorClear: () -> Unit = {},
         onPaletteStyleNameChange: (String) -> Unit = {},
+        onColorSpecVersionChange: (String) -> Unit = {},
         onShowB30OverflowChange: (Boolean) -> Unit,
         onOverflowCountChange: (Int) -> Unit,
         onHazeBlurEnabledChange: (Boolean) -> Unit = {},
@@ -317,6 +323,7 @@ fun SettingsTab(
     var showNotificationGuideDialog by remember { mutableStateOf(false) }
     var expandedColorSource by remember { mutableStateOf(false) }
     var expandedPaletteStyle by remember { mutableStateOf(false) }
+    var expandedColorSpec by remember { mutableStateOf(false) }
     var pendingThemeImageColor by remember { mutableStateOf<ThemeImageColorPickResult?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val pickThemeImageColor = rememberThemeImageColorPicker { result ->
@@ -423,6 +430,7 @@ fun SettingsTab(
                         )
                 val darkModeTitle = stringResource(Res.string.settings_dark_mode)
                 val paletteStyleTitle = stringResource(Res.string.settings_palette_style)
+                val colorSpecTitle = stringResource(Res.string.settings_color_spec)
                 val languageOptions =
                         listOf(
                                 SettingsConstants.LANGUAGE_SYSTEM to stringResource(Res.string.settings_language_follow_system),
@@ -492,6 +500,41 @@ fun SettingsTab(
                                                 onClick = {
                                                     onPaletteStyleNameChange(style.name)
                                                     expandedPaletteStyle = false
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                    )
+
+                    valueItem(
+                            key = "color_spec",
+                            headline = colorSpecTitle,
+                            value = if (colorSpecVersion == "SPEC_2025") "2025" else "2021",
+                            onClick = { expandedColorSpec = true },
+                            supportingContent = {
+                                Text(
+                                        stringResource(
+                                                if (colorSpecVersion == "SPEC_2025" && !supportsSpec2025(paletteStyleName)) {
+                                                    Res.string.settings_color_spec_fallback
+                                                } else {
+                                                    Res.string.settings_color_spec_desc
+                                                }
+                                        )
+                                )
+                            },
+                            menuContent = {
+                                DropdownMenu(
+                                        expanded = expandedColorSpec,
+                                        onDismissRequest = { expandedColorSpec = false }
+                                ) {
+                                    listOf("SPEC_2021" to "2021", "SPEC_2025" to "2025").forEach { (version, label) ->
+                                        SettingsMenuItem(
+                                                text = label,
+                                                selected = colorSpecVersion == version,
+                                                onClick = {
+                                                    onColorSpecVersionChange(version)
+                                                    expandedColorSpec = false
                                                 }
                                         )
                                     }

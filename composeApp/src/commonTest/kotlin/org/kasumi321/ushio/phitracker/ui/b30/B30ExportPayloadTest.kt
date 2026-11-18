@@ -20,9 +20,19 @@ class B30ExportPayloadTest {
         assertEquals(mapOf("IN" to 4), payload.clearCounts)
     }
 
+    @Test
+    fun retainsColorSpecVersion() {
+        val payload = payload(
+            themeSettings = PhiTrackerThemeSettings(colorSpecVersion = "SPEC_2025")
+        )
+
+        assertEquals("SPEC_2025", payload.themeSettings.colorSpecVersion)
+    }
+
     private fun payload(
         records: List<BestRecord> = listOf(record("first")),
-        clearCounts: Map<String, Int> = mapOf("IN" to 4)
+        clearCounts: Map<String, Int> = mapOf("IN" to 4),
+        themeSettings: PhiTrackerThemeSettings = PhiTrackerThemeSettings()
     ) = B30ExportPayload(
         b30 = records,
         displayRks = 15.4f,
@@ -35,7 +45,7 @@ class B30ExportPayloadTest {
         avatarUri = "avatar://player",
         showB30Overflow = true,
         overflowCount = 9,
-        themeSettings = PhiTrackerThemeSettings()
+        themeSettings = themeSettings
     )
 
     private fun record(songId: String) = BestRecord(

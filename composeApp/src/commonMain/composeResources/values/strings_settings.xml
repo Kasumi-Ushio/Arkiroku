@@ -111,6 +111,9 @@
     <string name="settings_overflow_count">Overflow count</string>
     <string name="settings_palette_style">Palette style</string>
     <string name="settings_palette_style_desc">Change the look of the theme with different palette styles</string>
+    <string name="settings_color_spec">Color specification</string>
+    <string name="settings_color_spec_desc">Choose the color-role generation standard used by dynamic themes</string>
+    <string name="settings_color_spec_fallback">The current palette style generates colors using the 2021 specification</string>
     <string name="settings_prerelease_notice">Pre-release versions may contain bugs or unstable features. In most cases, please prefer the stable release. Enable this option only if you want to join our feature testing.</string>
     <string name="settings_redownload_artwork">Re-download all illustrations</string>
     <string name="settings_redownload_artwork_desc">Deletes all images and forces an app restart</string>

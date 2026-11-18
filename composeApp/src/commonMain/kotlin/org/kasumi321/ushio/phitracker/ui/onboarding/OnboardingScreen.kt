@@ -313,6 +313,7 @@ fun OnboardingScreen(
                         exportThemeMode = state.b30ExportThemeMode,
                         globalThemeMode = state.themeMode,
                         paletteStyleName = state.paletteStyleName,
+                        colorSpecVersion = state.colorSpecVersion,
                         systemDark = systemDark,
                         getLowIllustrationUrl = viewModel::getLowIllustrationUrl,
                         onCardStyleChange = viewModel::selectB30CardStyle,
@@ -1119,6 +1120,7 @@ private fun B30StyleStep(
     exportThemeMode: Int?,
     globalThemeMode: Int,
     paletteStyleName: String,
+    colorSpecVersion: String,
     systemDark: Boolean,
     getLowIllustrationUrl: (String) -> String?,
     onCardStyleChange: (B30ExportCardStyle) -> Unit,
@@ -1201,6 +1203,7 @@ private fun B30StyleStep(
                 exportThemeMode = exportThemeMode,
                 globalThemeMode = globalThemeMode,
                 paletteStyleName = paletteStyleName,
+                colorSpecVersion = colorSpecVersion,
                 systemDark = systemDark,
                 getLowIllustrationUrl = getLowIllustrationUrl
             )
@@ -1224,6 +1227,7 @@ private fun B30CardPreview(
     exportThemeMode: Int?,
     globalThemeMode: Int,
     paletteStyleName: String,
+    colorSpecVersion: String,
     systemDark: Boolean,
     getLowIllustrationUrl: (String) -> String?
 ) {
@@ -1266,7 +1270,8 @@ private fun B30CardPreview(
         isAmoled = effectiveThemeMode == 3,
         settings = PhiTrackerThemeSettings(
             themeMode = effectiveThemeMode,
-            paletteStyleName = paletteStyleName
+            paletteStyleName = paletteStyleName,
+            colorSpecVersion = colorSpecVersion
         ),
         expressive = false
     ) {

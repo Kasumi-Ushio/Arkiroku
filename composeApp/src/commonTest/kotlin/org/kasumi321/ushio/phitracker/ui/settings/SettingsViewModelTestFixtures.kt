@@ -110,6 +110,8 @@ internal class FakeSettingsRepository : SettingsRepository {
     override val themeImageUri: Flow<String?> = imageUriState
     private val paletteState = MutableStateFlow("TonalSpot")
     override val paletteStyleName: Flow<String> = paletteState
+    private val colorSpecState = MutableStateFlow("SPEC_2021")
+    override val colorSpecVersion: Flow<String> = colorSpecState
     private val overflowState = MutableStateFlow(false)
     override val showB30Overflow: Flow<Boolean> = overflowState
     private val countState = MutableStateFlow(9)
@@ -167,6 +169,7 @@ internal class FakeSettingsRepository : SettingsRepository {
     override suspend fun setThemeImageColor(uri: String?, seedColorArgb: Int) { imageUriState.value = uri; imageSeedState.value = seedColorArgb }
     override suspend fun clearThemeImageColor() { imageUriState.value = null; imageSeedState.value = null }
     override suspend fun setPaletteStyleName(name: String) { paletteState.value = name }
+    override suspend fun setColorSpecVersion(version: String) { colorSpecState.value = version }
     override suspend fun setShowB30Overflow(show: Boolean) { overflowState.value = show }
     override suspend fun setOverflowCount(count: Int) { countState.value = count.coerceIn(1, 30) }
     override suspend fun setAppLanguage(language: String) { appLanguageState.value = language }

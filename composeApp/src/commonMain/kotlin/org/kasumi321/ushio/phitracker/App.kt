@@ -39,6 +39,7 @@ fun App() {
     val seedColorArgb by settingsRepository.seedColorArgb.collectAsState(initial = -10011977)
     val imageSeedColorArgb by settingsRepository.themeImageSeedColorArgb.collectAsState(initial = null)
     val paletteStyleName by settingsRepository.paletteStyleName.collectAsState(initial = "TonalSpot")
+    val colorSpecVersion by settingsRepository.colorSpecVersion.collectAsState(initial = "SPEC_2021")
     val hazeBlurEnabled by settingsRepository.hazeBlurEnabled.collectAsState(initial = true)
     val hazeBlurStrength by settingsRepository.hazeBlurStrength.collectAsState(initial = 0.75f)
 
@@ -53,7 +54,8 @@ fun App() {
         colorSource = themeColorSource,
         seedColorArgb = seedColorArgb,
         imageSeedColorArgb = imageSeedColorArgb,
-        paletteStyleName = paletteStyleName
+        paletteStyleName = paletteStyleName,
+        colorSpecVersion = colorSpecVersion
     )
 
     PhiTrackerTheme(darkTheme = darkTheme, isAmoled = isAmoled, settings = themeSettings) {

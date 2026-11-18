@@ -92,6 +92,7 @@ data class OnboardingUiState(
     val appLanguage: String = SettingsConstants.LANGUAGE_SYSTEM,
     val themeMode: Int = 0,
     val paletteStyleName: String = "TonalSpot",
+    val colorSpecVersion: String = "SPEC_2021",
     val hazeBlurEnabled: Boolean = true,
     val hazeBlurStrength: Float = 0.75f,
     val loginChoice: OnboardingLoginChoice = OnboardingLoginChoice.Undecided,
@@ -175,6 +176,7 @@ class OnboardingViewModel(
             val preRelease = settingsRepository.includePreRelease.first()
             val themeMode = settingsRepository.themeMode.first()
             val paletteStyleName = settingsRepository.paletteStyleName.first()
+            val colorSpecVersion = settingsRepository.colorSpecVersion.first()
             val hazeBlurEnabled = settingsRepository.hazeBlurEnabled.first()
             val hazeBlurStrength = settingsRepository.hazeBlurStrength.first()
             val apiEnabled = settingsRepository.apiEnabled.first()
@@ -194,6 +196,7 @@ class OnboardingViewModel(
                         includePreRelease = preRelease,
                         themeMode = themeMode,
                         paletteStyleName = paletteStyleName,
+                        colorSpecVersion = colorSpecVersion,
                         hazeBlurEnabled = hazeBlurEnabled,
                         hazeBlurStrength = hazeBlurStrength,
                         apiEnabled = apiEnabled,

@@ -2,6 +2,7 @@ package org.kasumi321.ushio.phitracker.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamiccolor.ColorSpec
 
 const val THEME_COLOR_SOURCE_SYSTEM = "system"
 const val THEME_COLOR_SOURCE_SEED = "seed"
@@ -14,11 +15,28 @@ data class PhiTrackerThemeSettings(
     val colorSource: String = THEME_COLOR_SOURCE_SYSTEM,
     val seedColorArgb: Int = DEFAULT_THEME_SEED_ARGB,
     val imageSeedColorArgb: Int? = null,
-    val paletteStyleName: String = PaletteStyle.TonalSpot.name
+    val paletteStyleName: String = PaletteStyle.TonalSpot.name,
+    val colorSpecVersion: String = ColorSpec.SpecVersion.SPEC_2021.name
 )
 
 fun resolvePaletteStyle(name: String): PaletteStyle =
     PaletteStyle.entries.firstOrNull { it.name == name } ?: PaletteStyle.TonalSpot
+
+fun resolveColorSpecVersion(name: String): ColorSpec.SpecVersion =
+    ColorSpec.SpecVersion.entries.firstOrNull { it.name == name } ?: ColorSpec.SpecVersion.SPEC_2021
+
+fun supportsSpec2025(paletteStyleName: String): Boolean =
+    when (resolvePaletteStyle(paletteStyleName)) {
+        PaletteStyle.TonalSpot,
+        PaletteStyle.Neutral,
+        PaletteStyle.Vibrant,
+        PaletteStyle.Expressive -> true
+        PaletteStyle.Monochrome,
+        PaletteStyle.Fidelity,
+        PaletteStyle.Content,
+        PaletteStyle.Rainbow,
+        PaletteStyle.FruitSalad -> false
+    }
 
 /**
  * Whether the dark scheme should use the AMOLED variant. Theme mode 3 is the

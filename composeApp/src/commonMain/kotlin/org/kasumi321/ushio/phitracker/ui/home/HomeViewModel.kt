@@ -246,6 +246,11 @@ class HomeViewModel(
                 updateB30 { it.copy(themeSettings = it.themeSettings.copy(paletteStyleName = style)) }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.colorSpecVersion.collect { version ->
+                updateB30 { it.copy(themeSettings = it.themeSettings.copy(colorSpecVersion = version)) }
+            }
+        }
 
         viewModelScope.launch {
             settingsRepository.showB30Overflow.collect { show ->
