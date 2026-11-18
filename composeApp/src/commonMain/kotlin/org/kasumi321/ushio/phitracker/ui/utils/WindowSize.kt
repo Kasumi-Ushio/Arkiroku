@@ -37,3 +37,15 @@ fun WindowSizeClass.isExpanded(): Boolean =
 
 /** Minimum column width for adaptive song/B30 grids on Medium and wider. */
 val ADAPTIVE_GRID_MIN_COLUMN_WIDTH: Dp = 340.dp
+
+/** Matches GridCells.Adaptive's integer column-count calculation. */
+fun adaptiveGridColumnCount(
+    availableWidthPx: Int,
+    minColumnWidthPx: Int,
+    spacingPx: Int
+): Int {
+    require(minColumnWidthPx > 0) { "Minimum column width must be positive" }
+    require(spacingPx >= 0) { "Spacing must not be negative" }
+    if (availableWidthPx <= 0) return 1
+    return maxOf((availableWidthPx + spacingPx) / (minColumnWidthPx + spacingPx), 1)
+}

@@ -5,6 +5,7 @@ package org.kasumi321.ushio.phitracker.ui.home
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -42,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -51,6 +53,7 @@ import org.kasumi321.ushio.phitracker.ui.b30.B30TagAnalysisContent
 import org.kasumi321.ushio.phitracker.ui.components.AppExpandableSection
 import org.kasumi321.ushio.phitracker.ui.components.rememberAppExpansionArrowRotation
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
+import org.kasumi321.ushio.phitracker.ui.utils.adaptiveGridColumnCount
 import org.kasumi321.ushio.phitracker.ui.utils.asString
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.b30_action_collapse
@@ -111,14 +114,23 @@ fun B30Tab(
             bottom = contentPadding.calculateBottomPadding() + 8.dp
         )
         if (useGrid) {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(ADAPTIVE_GRID_MIN_COLUMN_WIDTH),
-                state = gridState,
-                modifier = modifier.fillMaxSize(),
-                contentPadding = listContentPadding,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            val density = LocalDensity.current
+            BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+                val columnCount = with(density) {
+                    adaptiveGridColumnCount(
+                        availableWidthPx = (constraints.maxWidth - 32.dp.roundToPx()).coerceAtLeast(0),
+                        minColumnWidthPx = ADAPTIVE_GRID_MIN_COLUMN_WIDTH.roundToPx(),
+                        spacingPx = ListItemDefaults.SegmentedGap.roundToPx()
+                    )
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(ADAPTIVE_GRID_MIN_COLUMN_WIDTH),
+                    state = gridState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = listContentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+                ) {
                 if (showTagSection) {
                     item(contentType = "tag_analysis", span = { GridItemSpan(maxLineSpan) }) {
                         CollapsibleTagAnalysis(
@@ -135,7 +147,7 @@ fun B30Tab(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
                         )
                     }
                     itemsIndexed(
@@ -147,7 +159,11 @@ fun B30Tab(
                             rank = index + 1,
                             record = record,
                             illustrationUrl = getIllustrationUrl(record.songId),
-                            onSongClick = onSongClick
+                            onSongClick = onSongClick,
+                            shape = ListItemDefaults.segmentedShapes(
+                                index = index / columnCount,
+                                count = (phi3.size + columnCount - 1) / columnCount
+                            ).shape
                         )
                     }
                 }
@@ -158,7 +174,7 @@ fun B30Tab(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(top = 14.dp, bottom = 10.dp)
                     )
                 }
                 itemsIndexed(
@@ -170,7 +186,11 @@ fun B30Tab(
                         rank = index + 1,
                         record = record,
                         illustrationUrl = getIllustrationUrl(record.songId),
-                        onSongClick = onSongClick
+                        onSongClick = onSongClick,
+                        shape = ListItemDefaults.segmentedShapes(
+                            index = index / columnCount,
+                            count = (b27.size + columnCount - 1) / columnCount
+                        ).shape
                     )
                 }
 
@@ -181,7 +201,7 @@ fun B30Tab(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                            modifier = Modifier.padding(top = 22.dp, bottom = 10.dp)
                         )
                     }
                     itemsIndexed(
@@ -193,10 +213,15 @@ fun B30Tab(
                             rank = index + 1,
                             record = record,
                             illustrationUrl = getIllustrationUrl(record.songId),
-                            onSongClick = onSongClick
+                            onSongClick = onSongClick,
+                            shape = ListItemDefaults.segmentedShapes(
+                                index = index / columnCount,
+                                count = (overflow.size + columnCount - 1) / columnCount
+                            ).shape
                         )
                     }
                 }
+            }
             }
         } else {
             LazyColumn(
