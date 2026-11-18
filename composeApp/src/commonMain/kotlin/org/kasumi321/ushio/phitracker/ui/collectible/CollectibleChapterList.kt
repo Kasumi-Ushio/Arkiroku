@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package org.kasumi321.ushio.phitracker.ui.collectible
 
 import androidx.compose.foundation.background
@@ -19,8 +21,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,11 +64,13 @@ fun CollectibleChapterContent(
         state = listState,
         modifier = modifier,
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
     ) {
         if (header != null) {
             item(key = "chapter_content_header", contentType = "chapter_content_header") {
-                header()
+                Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                    header()
+                }
             }
         }
         itemsIndexed(
@@ -79,7 +85,8 @@ fun CollectibleChapterContent(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 selected = item.key == selectedItemKey,
-                rank = index + 1
+                rank = index + 1,
+                shape = ListItemDefaults.segmentedShapes(index = index, count = items.size).shape
             )
         }
     }
