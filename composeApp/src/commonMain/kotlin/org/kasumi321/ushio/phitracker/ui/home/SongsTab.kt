@@ -5,6 +5,7 @@ package org.kasumi321.ushio.phitracker.ui.home
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -58,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,6 +78,7 @@ import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.components.DifficultyTag
 import org.kasumi321.ushio.phitracker.ui.theme.DifficultyColors
 import org.kasumi321.ushio.phitracker.ui.utils.ADAPTIVE_GRID_MIN_COLUMN_WIDTH
+import org.kasumi321.ushio.phitracker.ui.utils.adaptiveGridColumnCount
 import org.kasumi321.ushio.phitracker.ui.utils.chapterDisplayNameLocalized
 import phitracker.composeapp.generated.resources.Res
 import phitracker.composeapp.generated.resources.common_cancel
@@ -140,33 +144,49 @@ fun SongsTab(
         bottom = contentPadding.calculateBottomPadding() + 8.dp
     )
     if (useGrid) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(ADAPTIVE_GRID_MIN_COLUMN_WIDTH),
-            state = gridState,
-            modifier = modifier.fillMaxSize(),
-            contentPadding = listContentPadding,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            if (state.songDataUpdateAvailable && !state.isSongDataRefreshing) {
-                item(
-                    key = "song_data_update_banner",
-                    contentType = "song_data_banner",
-                    span = { GridItemSpan(maxLineSpan) }
-                ) {
-                    SongDataUpdateBanner(onRefreshSongData)
-                }
-            }
-            items(
-                songs,
-                key = { it.id },
-                contentType = { "song_item" }
-            ) { song ->
-                SongItem(
-                    song = song,
-                    illustrationUrl = getIllustrationUrl(song.id),
-                    onSongClick = { songId -> onSongClick(songId, null) }
+        val density = LocalDensity.current
+        BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+            val columnCount = with(density) {
+                adaptiveGridColumnCount(
+                    availableWidthPx = (constraints.maxWidth - 32.dp.roundToPx()).coerceAtLeast(0),
+                    minColumnWidthPx = ADAPTIVE_GRID_MIN_COLUMN_WIDTH.roundToPx(),
+                    spacingPx = ListItemDefaults.SegmentedGap.roundToPx()
                 )
+            }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(ADAPTIVE_GRID_MIN_COLUMN_WIDTH),
+                state = gridState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = listContentPadding,
+                horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+            ) {
+                if (state.songDataUpdateAvailable && !state.isSongDataRefreshing) {
+                    item(
+                        key = "song_data_update_banner",
+                        contentType = "song_data_banner",
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                            SongDataUpdateBanner(onRefreshSongData)
+                        }
+                    }
+                }
+                itemsIndexed(
+                    songs,
+                    key = { _, song -> song.id },
+                    contentType = { _, _ -> "song_item" }
+                ) { index, song ->
+                    SongItem(
+                        song = song,
+                        illustrationUrl = getIllustrationUrl(song.id),
+                        onSongClick = { songId -> onSongClick(songId, null) },
+                        shape = ListItemDefaults.segmentedShapes(
+                            index = index / columnCount,
+                            count = (songs.size + columnCount - 1) / columnCount
+                        ).shape
+                    )
+                }
             }
         }
     } else {
