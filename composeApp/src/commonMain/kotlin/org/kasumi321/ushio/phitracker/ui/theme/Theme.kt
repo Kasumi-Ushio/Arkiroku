@@ -39,7 +39,8 @@ fun PhiTrackerTheme(
         },
         isDark = darkTheme,
         isAmoled = isAmoled && darkTheme,
-        style = resolvePaletteStyle(settings.paletteStyleName)
+        style = resolvePaletteStyle(settings.paletteStyleName),
+        specVersion = resolveColorSpecVersion(settings.colorSpecVersion)
     )
 
     val baseColorScheme = when (effectiveColorSource) {

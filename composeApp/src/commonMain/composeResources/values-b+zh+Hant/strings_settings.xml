@@ -111,6 +111,9 @@
     <string name="settings_overflow_count">Overflow 顯示數量</string>
     <string name="settings_palette_style">調色盤風格</string>
     <string name="settings_palette_style_desc">可以透過不同的調色盤風格改變主題風格</string>
+    <string name="settings_color_spec">取色標準</string>
+    <string name="settings_color_spec_desc">選擇動態主題產生顏色角色時採用的標準</string>
+    <string name="settings_color_spec_fallback">目前調色盤風格會按 2021 標準產生顏色</string>
     <string name="settings_prerelease_notice">預先發行版本可能包含錯誤或不穩定功能，在絕大多數情況下，請優先考慮正式版。如果您希望參與我們的功能測試，則可以選擇啟用此選項。</string>
     <string name="settings_redownload_artwork">重新下載所有曲繪</string>
     <string name="settings_redownload_artwork_desc">清空所有圖片並強制重新啟動應用程式</string>

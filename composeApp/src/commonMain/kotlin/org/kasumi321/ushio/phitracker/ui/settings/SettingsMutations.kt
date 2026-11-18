@@ -39,6 +39,11 @@ fun SettingsViewModel.setPaletteStyleName(value: String) = launchSetting {
     settingsRepository.setPaletteStyleName(value)
 }
 
+fun SettingsViewModel.setColorSpecVersion(value: String) = launchSetting {
+    AppLogger.event("settings", "color_spec_version_changed", mapOf("version" to value))
+    settingsRepository.setColorSpecVersion(value)
+}
+
 fun SettingsViewModel.setShowB30Overflow(value: Boolean) = launchSetting {
     AppLogger.event("settings", "b30_overflow_changed", mapOf("enabled" to value.toString()))
     settingsRepository.setShowB30Overflow(value)

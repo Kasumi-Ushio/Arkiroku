@@ -11,6 +11,7 @@ data class SettingsUiState(
     val themeImageSeedColorArgb: Int? = null,
     val themeImageUri: String? = null,
     val paletteStyleName: String = "TonalSpot",
+    val colorSpecVersion: String = "SPEC_2021",
     val showB30Overflow: Boolean = false,
     val overflowCount: Int = 9,
     val hazeBlurEnabled: Boolean = true,

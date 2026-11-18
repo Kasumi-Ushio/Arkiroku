@@ -44,6 +44,13 @@ class SettingsRepositoryImpl(
     private val paletteStyleNameState = MutableStateFlow(storage.getString(KEY_PALETTE_STYLE_NAME) ?: "TonalSpot")
     override val paletteStyleName: Flow<String> = paletteStyleNameState.asStateFlow()
 
+    private val colorSpecVersionState = MutableStateFlow(
+        storage.getString(KEY_COLOR_SPEC_VERSION)
+            ?.takeIf { it in SUPPORTED_COLOR_SPEC_VERSIONS }
+            ?: "SPEC_2021"
+    )
+    override val colorSpecVersion: Flow<String> = colorSpecVersionState.asStateFlow()
+
     private val showB30OverflowState = MutableStateFlow(storage.getString(KEY_SHOW_B30_OVERFLOW)?.toBooleanStrictOrNull() ?: false)
     override val showB30Overflow: Flow<Boolean> = showB30OverflowState.asStateFlow()
 
@@ -104,6 +111,12 @@ class SettingsRepositoryImpl(
     override suspend fun setPaletteStyleName(name: String) {
         storage.putString(KEY_PALETTE_STYLE_NAME, name)
         paletteStyleNameState.value = name
+    }
+
+    override suspend fun setColorSpecVersion(version: String) {
+        val normalized = version.takeIf { it in SUPPORTED_COLOR_SPEC_VERSIONS } ?: "SPEC_2021"
+        storage.putString(KEY_COLOR_SPEC_VERSION, normalized)
+        colorSpecVersionState.value = normalized
     }
 
     override suspend fun setShowB30Overflow(show: Boolean) {
@@ -383,6 +396,8 @@ class SettingsRepositoryImpl(
         const val KEY_THEME_IMAGE_SEED_COLOR_ARGB = "theme_image_seed_color_argb"
         const val KEY_THEME_IMAGE_URI = "theme_image_uri"
         const val KEY_PALETTE_STYLE_NAME = "palette_style_name"
+        const val KEY_COLOR_SPEC_VERSION = "color_spec_version"
+        val SUPPORTED_COLOR_SPEC_VERSIONS = setOf("SPEC_2021", "SPEC_2025")
         const val KEY_SHOW_B30_OVERFLOW = "show_b30_overflow"
         const val KEY_OVERFLOW_COUNT = "overflow_count"
         const val KEY_APP_LANGUAGE = "app_language"

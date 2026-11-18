@@ -51,6 +51,7 @@ class SettingsRepositoryImplTest {
         assertNull(repo.themeImageSeedColorArgb.first())
         assertNull(repo.themeImageUri.first())
         assertEquals("TonalSpot", repo.paletteStyleName.first())
+        assertEquals("SPEC_2021", repo.colorSpecVersion.first())
     }
 
     @Test
@@ -59,17 +60,33 @@ class SettingsRepositoryImplTest {
         repo.setThemeColorSource("seed")
         repo.setSeedColorArgb(-16738680)
         repo.setPaletteStyleName("Vibrant")
+        repo.setColorSpecVersion("SPEC_2025")
         repo.setThemeImageColor("content://image/1", -1499549)
 
         assertEquals("seed", repo.themeColorSource.first())
         assertEquals(-16738680, repo.seedColorArgb.first())
         assertEquals("Vibrant", repo.paletteStyleName.first())
+        assertEquals("SPEC_2025", repo.colorSpecVersion.first())
         assertEquals("content://image/1", repo.themeImageUri.first())
         assertEquals(-1499549, repo.themeImageSeedColorArgb.first())
 
         repo.clearThemeImageColor()
         assertNull(repo.themeImageUri.first())
         assertNull(repo.themeImageSeedColorArgb.first())
+    }
+
+    @Test
+    fun invalidColorSpecFallsBackTo2021(): Unit = runTest {
+        val storage = FakeSecureKeyValueStorage().apply {
+            map["color_spec_version"] = "future-spec"
+        }
+        val repo = SettingsRepositoryImpl(storage, FakeSecureKeyValueStorage(), FakeSecureKeyValueStorage())
+
+        assertEquals("SPEC_2021", repo.colorSpecVersion.first())
+
+        repo.setColorSpecVersion("future-spec")
+        assertEquals("SPEC_2021", repo.colorSpecVersion.first())
+        assertEquals("SPEC_2021", storage.map["color_spec_version"])
     }
 
     @Test

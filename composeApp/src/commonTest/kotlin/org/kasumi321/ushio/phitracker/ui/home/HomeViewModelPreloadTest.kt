@@ -1267,6 +1267,7 @@ class HomeViewModelPreloadTest {
         override val themeImageSeedColorArgb: Flow<Int?> = flowOf(null)
         override val themeImageUri: Flow<String?> = flowOf(null)
         override val paletteStyleName: Flow<String> = flowOf("TonalSpot")
+        override val colorSpecVersion: Flow<String> = flowOf("SPEC_2021")
         override val showB30Overflow: Flow<Boolean> = flowOf(false)
         override val overflowCount: Flow<Int> = flowOf(9)
         override val b30CardStyle: Flow<String> = flowOf("classic")
@@ -1288,6 +1289,7 @@ class HomeViewModelPreloadTest {
         override suspend fun setThemeImageColor(uri: String?, seedColorArgb: Int) = Unit
         override suspend fun clearThemeImageColor() = Unit
         override suspend fun setPaletteStyleName(name: String) = Unit
+        override suspend fun setColorSpecVersion(version: String) = Unit
         override suspend fun setShowB30Overflow(show: Boolean) = Unit
         override suspend fun setOverflowCount(count: Int) = Unit
         override suspend fun setHazeBlurEnabled(enabled: Boolean) = Unit

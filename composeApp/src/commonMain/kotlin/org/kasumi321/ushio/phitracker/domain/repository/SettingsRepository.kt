@@ -17,6 +17,7 @@ interface SettingsRepository {
     val themeImageSeedColorArgb: Flow<Int?>
     val themeImageUri: Flow<String?>
     val paletteStyleName: Flow<String>
+    val colorSpecVersion: Flow<String>
     val showB30Overflow: Flow<Boolean>
     val overflowCount: Flow<Int>
 
@@ -58,6 +59,7 @@ interface SettingsRepository {
     suspend fun setThemeImageColor(uri: String?, seedColorArgb: Int)
     suspend fun clearThemeImageColor()
     suspend fun setPaletteStyleName(name: String)
+    suspend fun setColorSpecVersion(version: String)
     suspend fun setShowB30Overflow(show: Boolean)
     suspend fun setOverflowCount(count: Int)
     suspend fun getPreloadDone(): Boolean    suspend fun setPreloadDone(done: Boolean)
