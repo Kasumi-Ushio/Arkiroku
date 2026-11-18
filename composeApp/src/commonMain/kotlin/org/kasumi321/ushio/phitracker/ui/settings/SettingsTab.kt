@@ -46,6 +46,7 @@ import org.kasumi321.ushio.phitracker.data.platform.shouldShowThemeColorSourceSe
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformAlert
 import org.kasumi321.ushio.phitracker.data.platform.showPlatformMessage
 import org.kasumi321.ushio.phitracker.ui.components.AnimatedAlertDialog
+import org.kasumi321.ushio.phitracker.ui.components.AppCircularProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.components.AppLinearProgressIndicator
 import org.kasumi321.ushio.phitracker.ui.glass.GlassTopBar
 import org.kasumi321.ushio.phitracker.ui.glass.rememberCollapsingTitleStyle
@@ -806,7 +807,7 @@ fun SettingsTab(
                             },
                             leadingContent = {
                                 if (isCachingB30Artwork) {
-                                    CircularProgressIndicator(
+                                    AppCircularProgressIndicator(
                                             modifier = Modifier.size(24.dp),
                                             strokeWidth = 2.dp
                                     )
@@ -903,7 +904,7 @@ fun SettingsTab(
                             },
                             trailingContent = {
                                 if (isResettingLocalSession) {
-                                    CircularProgressIndicator(
+                                    AppCircularProgressIndicator(
                                             modifier = Modifier.size(20.dp),
                                             strokeWidth = 2.dp
                                     )
@@ -1062,7 +1063,7 @@ fun SettingsTab(
                             },
                             leadingContent = {
                                 if (updateCheckState is UpdateCheckState.Checking) {
-                                    CircularProgressIndicator(
+                                    AppCircularProgressIndicator(
                                             modifier = Modifier.size(24.dp),
                                             strokeWidth = 2.dp
                                     )
@@ -1259,7 +1260,7 @@ fun SettingsTab(
                                 modifier = Modifier.fillMaxWidth()
                         ) {
                             if (isApiTesting) {
-                                CircularProgressIndicator(
+                                AppCircularProgressIndicator(
                                         modifier = Modifier.size(16.dp),
                                         strokeWidth = 2.dp
                                 )
