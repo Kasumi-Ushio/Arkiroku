@@ -974,6 +974,9 @@ fun MainScreen(
         HorizontalPager(
             state = mainPagerState,
             userScrollEnabled = false,
+            // Four lightweight, state-hoisted destinations are cheaper to keep
+            // warm than to compose and dispose during a multi-tab transition.
+            beyondViewportPageCount = HomeTab.entries.size - 1,
             modifier = Modifier.fillMaxSize()
         ) { page ->
         when (HomeTab.entries[page]) {
