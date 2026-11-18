@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package org.kasumi321.ushio.phitracker.ui.home
 
 import androidx.compose.foundation.basicMarquee
@@ -19,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -33,10 +36,12 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RangeSlider
@@ -51,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -168,22 +174,25 @@ fun SongsTab(
             state = listState,
             modifier = modifier.fillMaxSize(),
             contentPadding = listContentPadding,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
         ) {
             if (state.songDataUpdateAvailable && !state.isSongDataRefreshing) {
                 item(key = "song_data_update_banner", contentType = "song_data_banner") {
-                    SongDataUpdateBanner(onRefreshSongData)
+                    Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                        SongDataUpdateBanner(onRefreshSongData)
+                    }
                 }
             }
-            items(
+            itemsIndexed(
                 songs,
-                key = { it.id },
-                contentType = { "song_item" }
-            ) { song ->
+                key = { _, song -> song.id },
+                contentType = { _, _ -> "song_item" }
+            ) { index, song ->
                 SongItem(
                     song = song,
                     illustrationUrl = getIllustrationUrl(song.id),
-                    onSongClick = { songId -> onSongClick(songId, null) }
+                    onSongClick = { songId -> onSongClick(songId, null) },
+                    shape = ListItemDefaults.segmentedShapes(index = index, count = songs.size).shape
                 )
             }
         }
@@ -477,6 +486,7 @@ fun SongItem(
     song: SongInfo,
     illustrationUrl: String?,
     onSongClick: (String) -> Unit,
+    shape: Shape = CardDefaults.shape,
     modifier: Modifier = Modifier
 ) {
     val platformContext = LocalPlatformContext.current
@@ -494,6 +504,7 @@ fun SongItem(
     Card(
         modifier = modifier.fillMaxWidth()
             .clickable { onSongClick(song.id) },
+        shape = shape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )

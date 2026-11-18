@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +72,7 @@ fun ScoreCard(
     record: BestRecord,
     illustrationUrl: String?,
     onSongClick: (String, Difficulty?) -> Unit,
+    shape: Shape = CardDefaults.shape,
     modifier: Modifier = Modifier
 ) {
     ScoreCardContent(
@@ -84,6 +86,7 @@ fun ScoreCard(
         thumbnailScale = 1f,
         marqueeSongTitle = true,
         onClick = onSongClick,
+        shape = shape,
         modifier = modifier
     )
 }
@@ -100,6 +103,7 @@ fun ScoreCardContent(
     thumbnailScale: Float,
     onClick: ((String, Difficulty?) -> Unit)?,
     modifier: Modifier = Modifier,
+    shape: Shape = CardDefaults.shape,
     allowHardwareImages: Boolean = true,
     imageSlotId: String? = null,
     onIllustrationSettled: ((slotId: String, error: Throwable?) -> Unit)? = null,
@@ -153,6 +157,7 @@ fun ScoreCardContent(
         modifier = modifier
             .fillMaxWidth()
             .then(clickModifier),
+        shape = shape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
