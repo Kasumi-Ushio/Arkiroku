@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.gradle.api.tasks.testing.Test
 
 plugins {
@@ -84,6 +85,21 @@ kotlin {
         }
     }
 
+    // Standalone Kotlin/Native simulator binaries otherwise have no Keychain
+    // entitlement and fail with errSecNotAvailable. Embed the same simulator
+    // entitlement section Xcode uses; this affects only the test executable.
+    // https://youtrack.jetbrains.com/issue/KT-61470
+    iosSimulatorArm64 {
+        testRuns.configureEach {
+            executionSource.binary.linkerOpts(
+                "-sectcreate",
+                "__TEXT",
+                "__entitlements",
+                file("src/iosTest/resources/entitlements.plist").absolutePath
+            )
+        }
+    }
+
     sourceSets {
         androidMain {
             kotlin.srcDir(generateAndroidBuildTime)
@@ -153,6 +169,22 @@ kotlin {
             implementation(libs.ktor.client.mock)
         }
     }
+}
+
+if (System.getProperty("os.name").lowercase().contains("mac")) {
+    val launchIosSimulator = tasks.register<Exec>("launchIosSimulator") {
+        commandLine("open", "-a", "Simulator")
+    }
+    tasks.named("iosSimulatorArm64Test") {
+        dependsOn(launchIosSimulator)
+    }
+}
+
+tasks.withType<KotlinNativeSimulatorTest>().named("iosSimulatorArm64Test") {
+    // Run through simctl in the booted simulator so the embedded entitlements
+    // are honored by Security.framework.
+    standalone.set(false)
+    device.set("booted")
 }
 
 room {
