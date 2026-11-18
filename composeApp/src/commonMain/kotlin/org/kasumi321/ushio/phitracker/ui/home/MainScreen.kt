@@ -1,5 +1,7 @@
 package org.kasumi321.ushio.phitracker.ui.home
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -142,6 +144,7 @@ import org.kasumi321.ushio.phitracker.ui.glass.HomeHeaderSpec
 import org.kasumi321.ushio.phitracker.ui.glass.HomeNavMode
 import org.kasumi321.ushio.phitracker.ui.update.UpdateCheckState
 import org.kasumi321.ushio.phitracker.ui.update.UpdateResultDialog
+import org.kasumi321.ushio.phitracker.ui.utils.animateContinuouslyToPage
 import org.kasumi321.ushio.phitracker.ui.utils.asString
 import org.kasumi321.ushio.phitracker.ui.utils.isAtLeastMedium
 import org.kasumi321.ushio.phitracker.ui.utils.rememberReducedMotionEnabled
@@ -549,6 +552,22 @@ fun MainScreen(
     val selectedTab = tabState.selected
     val tip = remember(selectedTab) { viewModel.getRandomTip() }
     val reducedMotionEnabled = rememberReducedMotionEnabled()
+    val mainPagerState = rememberPagerState(initialPage = selectedTab.ordinal) { HomeTab.entries.size }
+    val mainPagerPosition = remember { Animatable(selectedTab.ordinal.toFloat()) }
+    val motionScheme = MaterialTheme.motionScheme
+    LaunchedEffect(mainPagerState, selectedTab, reducedMotionEnabled) {
+        val target = selectedTab.ordinal
+        if (reducedMotionEnabled) {
+            mainPagerState.scrollToPage(target)
+            mainPagerPosition.snapTo(target.toFloat())
+        } else {
+            mainPagerState.animateContinuouslyToPage(
+                targetPage = target,
+                animationSpec = motionScheme.defaultSpatialSpec(),
+                position = mainPagerPosition
+            )
+        }
+    }
     val stackedProgress = animateFloatAsState(
         targetValue = when {
             !isInExpandedPane || collectiblesChapterState.folderKey == null -> 0f
@@ -846,7 +865,12 @@ fun MainScreen(
         navMode = navMode,
         topBar = { hazeState, glassStyle ->
             GlassTopBar(hazeState = hazeState, style = glassStyle) {
-                when (selectedTab) {
+                Crossfade(
+                    targetState = selectedTab,
+                    animationSpec = if (reducedMotionEnabled) snap() else motionScheme.defaultEffectsSpec(),
+                    label = "homeHeader"
+                ) { headerTab ->
+                when (headerTab) {
                     HomeTab.B30 -> B30Header(
                         state = state.b30,
                         tip = tip,
@@ -917,6 +941,7 @@ fun MainScreen(
                         spec = HomeHeaderSpec(title = stringResource(Res.string.home_tab_tools), tip = tip, compact = !toolsAtTop)
                     )
                 }
+                }
             }
         },
         navigationBar = { hazeState, glassStyle ->
@@ -946,7 +971,12 @@ fun MainScreen(
             }
         }
     ) { contentPadding ->
-        when (selectedTab) {
+        HorizontalPager(
+            state = mainPagerState,
+            userScrollEnabled = false,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+        when (HomeTab.entries[page]) {
             HomeTab.Profile -> {
                 val pullRefreshState = rememberPullToRefreshState()
                 PullToRefreshBox(
@@ -1208,6 +1238,7 @@ fun MainScreen(
                 contentPadding = contentPadding,
                 scrollState = toolsScrollState
             )
+        }
         }
     }
 
