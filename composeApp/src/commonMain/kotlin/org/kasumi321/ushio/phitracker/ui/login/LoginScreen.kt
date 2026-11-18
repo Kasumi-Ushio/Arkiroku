@@ -29,7 +29,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppCircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -347,7 +347,7 @@ internal fun QrLoginContent(
 
             QrStatus.Loading -> {
                 Spacer(modifier = Modifier.height(48.dp))
-                CircularProgressIndicator()
+                AppLoadingIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(Res.string.login_generating_qr),
@@ -419,7 +419,7 @@ internal fun QrLoginContent(
 
             QrStatus.Exchanging -> {
                 Spacer(modifier = Modifier.height(48.dp))
-                CircularProgressIndicator()
+                AppLoadingIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(Res.string.login_syncing_game_data),
@@ -515,10 +515,11 @@ internal fun TokenLoginContent(
             enabled = state.token.isNotBlank() && !state.isLoading && !state.isLoggedIn
         ) {
             AnimatedVisibility(visible = state.isLoading) {
-                CircularProgressIndicator(
+                AppCircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    trackColor = Color.Transparent
                 )
             }
             AnimatedVisibility(visible = !state.isLoading) {

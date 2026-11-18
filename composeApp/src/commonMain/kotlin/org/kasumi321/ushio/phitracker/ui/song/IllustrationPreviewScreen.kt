@@ -17,7 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.CircularProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppCircularProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -170,7 +171,7 @@ fun IllustrationPreviewScreen(
         // High-res artwork can take a moment on first load; surface the wait
         // instead of staring at a black screen.
         if (painterState is AsyncImagePainter.State.Loading) {
-            CircularProgressIndicator(color = Color.White)
+            AppLoadingIndicator(color = Color.White)
         }
 
         PreviewButtonCapsule(
@@ -207,9 +208,10 @@ fun IllustrationPreviewScreen(
                 enabled = !isDownloading
             ) {
                 if (isDownloading) {
-                    CircularProgressIndicator(
+                    AppCircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = Color.White
+                        color = Color.White,
+                        trackColor = Color.Transparent
                     )
                 } else {
                     Icon(

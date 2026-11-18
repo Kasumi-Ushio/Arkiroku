@@ -100,6 +100,7 @@ fun B30Header(
                                 state.displayRks.formatFour()
                             ),
                             style = MaterialTheme.typography.titleMediumEmphasized,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(start = 12.dp)
                         )
@@ -148,7 +149,8 @@ fun B30Header(
                         )
                         Text(
                             text = state.displayRks.formatFour(),
-                            style = MaterialTheme.typography.headlineMediumEmphasized
+                            style = MaterialTheme.typography.headlineMediumEmphasized,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 

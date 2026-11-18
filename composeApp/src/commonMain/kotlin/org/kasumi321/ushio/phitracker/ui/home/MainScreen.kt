@@ -27,6 +27,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -45,7 +47,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.CircularProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppCircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -526,6 +528,33 @@ private fun MainNavigationRail(
     }
 }
 
+@Composable
+private fun MainTabPager(
+    state: PagerState,
+    vertical: Boolean,
+    modifier: Modifier = Modifier,
+    pageContent: @Composable (Int) -> Unit
+) {
+    // Match the navigation axis while sharing one state and continuous-scroll
+    // driver. Keeping all four destinations warm remains important in both
+    // orientations to avoid composing intermediate pages during a transition.
+    if (vertical) {
+        VerticalPager(
+            state = state,
+            userScrollEnabled = false,
+            beyondViewportPageCount = HomeTab.entries.size - 1,
+            modifier = modifier
+        ) { page -> pageContent(page) }
+    } else {
+        HorizontalPager(
+            state = state,
+            userScrollEnabled = false,
+            beyondViewportPageCount = HomeTab.entries.size - 1,
+            modifier = modifier
+        ) { page -> pageContent(page) }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun MainScreen(
@@ -552,6 +581,8 @@ fun MainScreen(
     val selectedTab = tabState.selected
     val tip = remember(selectedTab) { viewModel.getRandomTip() }
     val reducedMotionEnabled = rememberReducedMotionEnabled()
+    val windowSizeClass = rememberWindowSizeClass()
+    val navMode = if (windowSizeClass.isAtLeastMedium()) HomeNavMode.Rail else HomeNavMode.BottomBar
     val mainPagerState = rememberPagerState(initialPage = selectedTab.ordinal) { HomeTab.entries.size }
     val mainPagerPosition = remember { Animatable(selectedTab.ordinal.toFloat()) }
     val motionScheme = MaterialTheme.motionScheme
@@ -577,8 +608,6 @@ fun MainScreen(
         animationSpec = if (reducedMotionEnabled) snap() else tween(320),
         label = "collectibleStackProgress"
     )
-    val windowSizeClass = rememberWindowSizeClass()
-    val navMode = if (windowSizeClass.isAtLeastMedium()) HomeNavMode.Rail else HomeNavMode.BottomBar
 
     val navItems = listOf(
         BottomNavItem(HomeTab.Profile, stringResource(Res.string.home_tab_profile), Icons.Filled.Home, Icons.Outlined.Home),
@@ -922,7 +951,7 @@ fun MainScreen(
                             compact = !profileAtTop,
                             actions = {
                                 if (state.sync.isSyncing) {
-                                    CircularProgressIndicator(
+                                    AppCircularProgressIndicator(
                                         modifier = Modifier.size(24.dp),
                                         strokeWidth = 2.dp
                                     )
@@ -971,12 +1000,9 @@ fun MainScreen(
             }
         }
     ) { contentPadding ->
-        HorizontalPager(
+        MainTabPager(
             state = mainPagerState,
-            userScrollEnabled = false,
-            // Four lightweight, state-hoisted destinations are cheaper to keep
-            // warm than to compose and dispose during a multi-tab transition.
-            beyondViewportPageCount = HomeTab.entries.size - 1,
+            vertical = navMode == HomeNavMode.Rail,
             modifier = Modifier.fillMaxSize()
         ) { page ->
         when (HomeTab.entries[page]) {

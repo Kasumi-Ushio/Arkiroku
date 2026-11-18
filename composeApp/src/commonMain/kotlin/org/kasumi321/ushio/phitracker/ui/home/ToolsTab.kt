@@ -34,7 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppCircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -354,7 +354,7 @@ private fun LegacySyncHistoryContent(
         modifier = Modifier.fillMaxWidth()
     ) {
         if (isImporting) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            AppCircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
         } else {
             Text(stringResource(Res.string.tools_legacy_history_import))
         }
@@ -365,7 +365,7 @@ private fun LegacySyncHistoryContent(
         modifier = Modifier.fillMaxWidth()
     ) {
         if (isDiscarding) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            AppCircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
         } else {
             Text(stringResource(Res.string.tools_legacy_history_discard))
         }
@@ -684,7 +684,7 @@ private fun ApiRankByUserContent(state: ApiToolResult, onFetch: () -> Unit) {
             modifier = Modifier.fillMaxWidth()
     ) {
         if (state.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            AppCircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             Spacer(modifier = Modifier.width(8.dp))
         }
         Text(stringResource(Res.string.tools_query_my_rank_button))
@@ -710,7 +710,7 @@ private fun ApiRankByPositionContent(state: ApiToolResult, onFetch: (Int) -> Uni
         )
         Button(onClick = { onFetch(rankInput.toIntOrNull() ?: -1) }, enabled = !state.isLoading) {
             if (state.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                AppCircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             } else {
                 Text(stringResource(Res.string.tools_query_button))
             }
@@ -740,7 +740,7 @@ private fun ApiRksRankContent(state: ApiToolResult, defaultRks: Float, onFetch: 
         )
         Button(onClick = { onFetch(rksInput.toFloatOrNull() ?: -1f) }, enabled = !state.isLoading) {
             if (state.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                AppCircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             } else {
                 Text(stringResource(Res.string.tools_query_button))
             }
@@ -824,7 +824,7 @@ private fun SessionTokenContent(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (isResetting) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    AppCircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
                     Icon(Icons.Default.Key, contentDescription = null)
                 }

@@ -14,7 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1113,7 +1113,7 @@ internal fun NavGraphBuilder.secondaryDestinations(
         val songInfo = state.songInfo
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                AppLoadingIndicator()
             }
             songInfo != null -> SongDetailScreen(
                 songInfo = songInfo,
@@ -1170,7 +1170,7 @@ internal fun NavGraphBuilder.secondaryDestinations(
         }
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                AppLoadingIndicator()
             }
             state.item != null -> CollectibleDetailScreen(
                 state = state,

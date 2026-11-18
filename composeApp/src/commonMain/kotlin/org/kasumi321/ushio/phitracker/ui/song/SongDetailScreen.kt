@@ -40,7 +40,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import org.kasumi321.ushio.phitracker.ui.components.AppCircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -421,6 +421,7 @@ private fun SongInfoHeader(
                     text = songInfo.name,
                     style = MaterialTheme.typography.titleLargeEmphasized.copy(
                         color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
                         // Fixed titleLarge line height would let an auto-shrunk
                         // title drift off-center; Unspecified follows the font.
                         lineHeight = TextUnit.Unspecified
@@ -858,7 +859,7 @@ private fun DifficultyContent(
                             color = MaterialTheme.colorScheme.primary
                         )
                         if (songApiDetail.isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            AppCircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else if (songApiDetail.error != null) {
                             Text(
                                 text = songApiDetail.error!!.asString(),
@@ -1125,7 +1126,7 @@ private fun ChartTagSection(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 if (state.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    AppCircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 }
             }
 
@@ -1358,7 +1359,7 @@ private fun ChartTagVoteSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (state.voteSubmitting) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    AppCircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(
