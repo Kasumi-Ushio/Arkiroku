@@ -151,6 +151,7 @@ import phitracker.composeapp.generated.resources.settings_later
 import phitracker.composeapp.generated.resources.settings_logout
 import phitracker.composeapp.generated.resources.settings_logout_confirm
 import phitracker.composeapp.generated.resources.settings_logout_dialog_text
+import phitracker.composeapp.generated.resources.settings_logout_preserve_data
 import phitracker.composeapp.generated.resources.settings_reset_pending_update
 import phitracker.composeapp.generated.resources.settings_reset_pending_update_dialog_text
 import phitracker.composeapp.generated.resources.settings_catalog_management
@@ -1151,8 +1152,17 @@ fun SettingsTab(
                     ) { Text(stringResource(Res.string.settings_logout_confirm)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showLogoutDialog = false }) {
-                        Text(stringResource(Res.string.settings_cancel))
+                    Row {
+                        TextButton(onClick = { showLogoutDialog = false }) {
+                            Text(stringResource(Res.string.settings_cancel))
+                        }
+                        TextButton(
+                                onClick = {
+                                    showLogoutDialog = false
+                                    onResetLocalSession()
+                                },
+                                enabled = !isResettingLocalSession
+                        ) { Text(stringResource(Res.string.settings_logout_preserve_data)) }
                     }
                 }
         )

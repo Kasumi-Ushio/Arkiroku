@@ -91,8 +91,9 @@
     <string name="settings_language_title">語言</string>
     <string name="settings_later">稍後</string>
     <string name="settings_logout">登出</string>
-    <string name="settings_logout_confirm">登出</string>
-    <string name="settings_logout_dialog_text">確定要登出目前帳號嗎？所有同步進度將會重置。</string>
+    <string name="settings_logout_confirm">清除資料並登出</string>
+    <string name="settings_logout_dialog_text">是否要登出目前 sessionToken 的登入狀態？如果您希望保留目前 sessionToken 下的資料，請選擇「保留資料並登出」，否則，請選擇「清除資料並登出」。</string>
+    <string name="settings_logout_preserve_data">保留資料並登出</string>
     <string name="settings_logout_failed">登出失敗，請重試</string>
     <string name="settings_api_token_save_failed">無法安全儲存 API Token，已重新讀取目前儲存值，請核對後重試</string>
     <string name="settings_logout_credential_pending">帳號資料已清除，但已儲存的 sessionToken 未能完全清除，將於下次啟動時重新嘗試清理</string>

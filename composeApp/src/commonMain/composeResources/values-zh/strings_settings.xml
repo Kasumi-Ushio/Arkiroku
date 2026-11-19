@@ -91,8 +91,9 @@
     <string name="settings_language_title">语言</string>
     <string name="settings_later">稍后</string>
     <string name="settings_logout">退出登录</string>
-    <string name="settings_logout_confirm">退出</string>
-    <string name="settings_logout_dialog_text">确定要退出当前账号吗？所有同步进度将会重置。</string>
+    <string name="settings_logout_confirm">清除数据并退出</string>
+    <string name="settings_logout_dialog_text">是否要退出当前 sessionToken 登录？如果您希望保留当前 sessionToken 下的数据，请选择「保留数据并退出」，否则，请选择「清除数据并退出」。</string>
+    <string name="settings_logout_preserve_data">保留数据并退出</string>
     <string name="settings_logout_failed">退出登录失败，请重试</string>
     <string name="settings_api_token_save_failed">无法安全保存 API Token，已重新读取当前存储值，请核对后重试</string>
     <string name="settings_logout_credential_pending">账号数据已清除，但已存储的 sessionToken 未能完全清除，将于下次启动时重新尝试清理</string>

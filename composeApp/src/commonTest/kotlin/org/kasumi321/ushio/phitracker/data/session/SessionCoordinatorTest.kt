@@ -783,6 +783,37 @@ class SessionCoordinatorTest {
     }
 
     @Test
+    fun localSessionResetThenSameObjectIdLoginRefreshesInheritedData() = runTest {
+        val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage()
+        val repo = fake(
+            savedToken = "old-token" to Server.CN,
+            pointer = "P1",
+            boundPlayerId = "P1",
+            ownersWithRecords = setOf("P1"),
+            validate = { Result.success(profile("P1")) },
+            sync = { Result.success(syncResult()) }
+        )
+        val session = coordinator(repo, storage)
+
+        session.resetLocalSession().getOrThrow()
+
+        assertNull(repo.pointer)
+        assertEquals(0, repo.clearCalls, "the preserve-data re-login entry must not clear account rows")
+        assertTrue(repo.hasLocalRecords("P1"))
+
+        val login = session.login("rotated-token", Server.CN)
+
+        assertTrue(login.isSuccess)
+        assertEquals(
+            listOf(SyncOp("rotated-token", SyncMode.Refresh, expectedOwner = null)),
+            repo.syncOps
+        )
+        assertEquals("P1", repo.savedBinding)
+        assertEquals(0, repo.clearCalls)
+        assertTrue(repo.hasLocalRecords("P1"))
+    }
+
+    @Test
     fun resetPendingSupersedesOldLogoutAndPreservesAllAccountDataForRelogin() = runTest {
         val storage = org.kasumi321.ushio.phitracker.data.platform.FakeSecureKeyValueStorage().apply {
             map["logout_pending"] = "true"

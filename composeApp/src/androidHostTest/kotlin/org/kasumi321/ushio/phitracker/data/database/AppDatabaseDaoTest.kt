@@ -278,6 +278,35 @@ class AppDatabaseDaoTest {
     }
 
     @Test
+    fun syncWriterRefreshAfterPreservingReloginContinuesExistingHistory(): Unit = runTest {
+        database.recordDao().insertAll(
+            listOf(RecordEntity("new-player", "new-song.0", "IN", 900_000, 90f, false, 100L))
+        )
+        val previousSnapshotId = database.syncSnapshotDao().insertAndGetId(
+            snapshot("new-player", 100L, "Previous")
+        )
+        database.songSyncHistoryDao().insertAll(
+            listOf(history("new-player", previousSnapshotId, "new-song.0", "IN", 900_000, 90f, false, 100L))
+        )
+        database.currentAccountDao().setCurrent(CurrentAccountEntity("new-player"))
+
+        // resetLocalSession hides only the pointer. It leaves all four account
+        // tables intact so the next login with the same objectId can inherit.
+        database.currentAccountDao().clear()
+        val result = writer().commit(commitData(), SyncMode.Refresh, expectedCurrentOwner = null)
+
+        assertEquals(1, result.changedEntryCount)
+        assertEquals(true, result.snapshotCreated)
+        assertEquals(2, database.syncSnapshotDao().getAllOnce("new-player").size)
+        assertEquals(
+            listOf("new-song.0"),
+            database.songSyncHistoryDao().getBySnapshotId("new-player", previousSnapshotId).map { it.songId }
+        )
+        assertEquals(2, database.songSyncHistoryDao().getRecent("new-player", 100).size)
+        assertEquals("new-player", database.currentAccountDao().get()?.playerId)
+    }
+
+    @Test
     fun syncWriterRefreshDiffsOnlyAgainstTheSameOwnersRecords(): Unit = runTest {
         // A returning account (e.g. after a sessionToken reset, pointer on
         // another account) refreshes: the diff must run against its OWN old

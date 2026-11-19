@@ -91,8 +91,9 @@
     <string name="settings_language_title">Language</string>
     <string name="settings_later">Later</string>
     <string name="settings_logout">Log out</string>
-    <string name="settings_logout_confirm">Log out</string>
-    <string name="settings_logout_dialog_text">Log out of the current account? All sync progress will be reset.</string>
+    <string name="settings_logout_confirm">Log out &amp; clear data</string>
+    <string name="settings_logout_dialog_text">Would you like to log out of the current sessionToken session? To keep the data associated with the current sessionToken, choose &quot;Keep data &amp; log out&quot;. Otherwise, choose &quot;Log out &amp; clear data&quot;.</string>
+    <string name="settings_logout_preserve_data">Keep data &amp; log out</string>
     <string name="settings_logout_failed">Log out failed. Please try again.</string>
     <string name="settings_api_token_save_failed">API token could not be saved securely. The current stored value has been reloaded; please verify it and try again.</string>
     <string name="settings_logout_credential_pending">Account data was cleared, but the stored sessionToken could not be fully removed. Cleanup will retry on the next launch.</string>
