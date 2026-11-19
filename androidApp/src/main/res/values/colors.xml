@@ -6,4 +6,5 @@
       device never flashes white during the launch and between-Activity handoffs.
     -->
     <color name="window_background">#FFFFFBFE</color>
+    <color name="ic_launcher_background">#FFF7F9FF</color>
 </resources>
